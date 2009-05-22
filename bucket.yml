@@ -1,0 +1,16 @@
+---
+autojoin:
+  '#bucket': 1
+  '#xkcd': 1
+  '#bots': 1
+db_dsn: DBI:mysql:database=dbname;host=db.example.com
+db_password: SekritAwesome
+db_username: DBUsername
+password: NickservPassword
+logfile: /path/to/log/file
+logchannel: #logChannel
+bucketlog: /path/to/external/log
+timeout: 60
+ignore:
+  billygoat: 1
+  flyingferret: 1
