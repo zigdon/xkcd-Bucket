@@ -1,6 +1,21 @@
 #!/usr/bin/perl -w
+#  Copyright (C) 2008  Dan Boger - zigdon+bot@gmail.com
 #
-# $Id: bucket.pl 645 2009-05-21 22:30:53Z dan $
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software Foundation,
+#  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+#
+# $Id: bucket.pl 646 2009-05-22 17:08:45Z dan $
 
 use strict;
 use POE;
@@ -16,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 645 2009-05-21 22:30:53Z dan $';
+my $VERSION = '$Id: bucket.pl 646 2009-05-22 17:08:45Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
