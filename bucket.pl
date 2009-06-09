@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 646 2009-05-22 17:08:45Z dan $
+# $Id: bucket.pl 649 2009-06-09 20:57:55Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 646 2009-05-22 17:08:45Z dan $';
+my $VERSION = '$Id: bucket.pl 649 2009-06-09 20:57:55Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -696,7 +696,9 @@ sub db_success {
             if ( $line{tidbit} =~ /\$someone/i ) {
                 my @nicks = $irc->nicks();
                 while ( $line{tidbit} =~ /\$someone/i ) {
-                    $line{tidbit} =~ s/\$someone/$nicks[rand(@nicks)]/i;
+                    my $rnick = $nicks[rand(@nicks)];
+                    next if lc $rnick eq lc $nick and @nicks > 1;
+                    $line{tidbit} =~ s/\$someone/$rnick/i;
                 }
             }
             if ( $line{verb} eq '<reply>' ) {
