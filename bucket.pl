@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 649 2009-06-09 20:57:55Z dan $
+# $Id: bucket.pl 651 2009-06-18 19:02:58Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 649 2009-06-09 20:57:55Z dan $';
+my $VERSION = '$Id: bucket.pl 651 2009-06-18 19:02:58Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -692,6 +692,12 @@ sub db_success {
 
             $stats{last_fact}{ $bag{chl} } = $line{id};
             $stats{lookup}++;
+
+            # if we're just idle chatting, replace any $who reference with $someone
+            if ($bag{idle}) {
+                $line{tidbit} =~ s/\$who/\$someone/gi;
+            }
+
             $line{tidbit} =~ s/\$who/$bag{who}/gi;
             if ( $line{tidbit} =~ /\$someone/i ) {
                 my @nicks = $irc->nicks();
@@ -1384,6 +1390,7 @@ sub check_idle {
             addressed => 0,
             editable  => 0,
             op        => 0,
+            idle      => 1,
             type      => 'irc_public',
         },
         EVENT => 'db_success'
