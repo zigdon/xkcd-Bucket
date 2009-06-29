@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 654 2009-06-29 23:16:32Z dan $
+# $Id: bucket.pl 655 2009-06-29 23:26:05Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 654 2009-06-29 23:16:32Z dan $';
+my $VERSION = '$Id: bucket.pl 655 2009-06-29 23:26:05Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -600,6 +600,8 @@ sub irc_on_public {
         my ( $key, $val ) = ( $1, $2 );
         if ( $key eq 'band_name' and $val =~ /^(\d+)%?$/ ) {
             $config->{band_name} = $1;
+        } elsif ( $key eq 'your_mom_is' and $val =~ /^(\d+)%?$/ ) {
+            $config->{your_mom_is} = $1;
         } elsif ( $key eq 'bananas_chance' and $val =~ /^([\d.]+)%?$/ ) {
             $config->{bananas_chance} = $1;
         } elsif ( $key eq 'random_wait' and $val =~ /^(\d+)$/ ) {
@@ -614,7 +616,7 @@ sub irc_on_public {
         return;
     } elsif ( $operator and $addressed and $msg =~ /^get (\w+)/ ) {
         my ($key) = ($1);
-        return unless ( $key =~ /^(?:band_name|bananas_chance|random_wait)$/ );
+        return unless ( $key =~ /^(?:band_name|your_mom_is|bananas_chance|random_wait)$/ );
 
         $irc->yield( privmsg => $chl => "$key is $config->{$key}." );
     } else {
@@ -794,6 +796,16 @@ sub db_success {
                 }
             }
             $fact = &trim($fact);
+
+            if (not $operator and
+                $verb eq 'is' and
+                rand(100) < $config->{your_mom_is} )
+            {
+                $irc->yield( privmsg => $bag{chl} =>
+                             "Your mom is $tidbit, $bag{who}!" );
+                return;
+            }
+        
 
             Log "Learning '$fact' '$verb' '$tidbit'";
             $_[KERNEL]->post(
