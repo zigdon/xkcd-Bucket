@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 655 2009-06-29 23:26:05Z dan $
+# $Id: bucket.pl 656 2009-06-29 23:27:40Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 655 2009-06-29 23:26:05Z dan $';
+my $VERSION = '$Id: bucket.pl 656 2009-06-29 23:27:40Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -797,7 +797,7 @@ sub db_success {
             }
             $fact = &trim($fact);
 
-            if (not $operator and
+            if (not $bag{op} and
                 $verb eq 'is' and
                 rand(100) < $config->{your_mom_is} )
             {
