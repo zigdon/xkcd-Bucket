@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 651 2009-06-18 19:02:58Z dan $
+# $Id: bucket.pl 654 2009-06-29 23:16:32Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 651 2009-06-18 19:02:58Z dan $';
+my $VERSION = '$Id: bucket.pl 654 2009-06-29 23:16:32Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -368,24 +368,28 @@ sub irc_on_public {
         );
         $irc->yield(
             privmsg => $chl => "Okay, $who, updated the protection bit." );
-    } elsif ( $addressed and $operator and $msg =~ /^undo last(?: (#\S+))?/ ) {
+    } elsif ( $addressed and $msg =~ /^undo last(?: (#\S+))?/ ) {
         Log "$who called undo:";
         my $uchannel = $1 || $chl;
         my $undo = $undo{$uchannel};
+        unless ($operator or $undo->[1] eq $who) {
+            $irc->yield( privmsg => $chl => "Sorry, $who, you can't undo that." );
+            return;
+        }
         Log Dumper $undo;
         if ( $undo->[0] eq 'delete' ) {
             $_[KERNEL]->post(
                 db           => "DO",
                 SQL          => 'delete from bucket_facts where id=? limit 1',
-                PLACEHOLDERS => [ $undo->[1] ],
+                PLACEHOLDERS => [ $undo->[2] ],
                 EVENT        => "db_success",
             );
-            Report $_[KERNEL], "$who called undo: deleted $undo->[2].";
-            $irc->yield( privmsg => $chl => "Okay, $who, deleted $undo->[2]." );
+            Report $_[KERNEL], "$who called undo: deleted $undo->[3].";
+            $irc->yield( privmsg => $chl => "Okay, $who, deleted $undo->[3]." );
             delete $undo{$uchannel};
         } elsif ( $undo->[0] eq 'insert' ) {
-            if ( $undo->[1] and ref $undo->[1] eq 'ARRAY' ) {
-                foreach my $entry ( @{ $undo->[1] } ) {
+            if ( $undo->[2] and ref $undo->[2] eq 'ARRAY' ) {
+                foreach my $entry ( @{ $undo->[2] } ) {
                     my %old = %$entry;
                     $old{RE}        = 0 unless $old{RE};
                     $old{protected} = 0 unless $old{protected};
@@ -401,11 +405,11 @@ sub irc_on_public {
                         EVENT => "db_success",
                     );
                 }
-                Report $_[KERNEL], "$who called undo: undeleted $undo->[2].";
+                Report $_[KERNEL], "$who called undo: undeleted $undo->[3].";
                 $irc->yield(
-                    privmsg => $chl => "Okay, $who, undeleted $undo->[2]." );
-            } elsif ( $undo->[1] and ref $undo->[1] eq 'HASH' ) {
-                my %old = %{ $undo->[1] };
+                    privmsg => $chl => "Okay, $who, undeleted $undo->[3]." );
+            } elsif ( $undo->[2] and ref $undo->[2] eq 'HASH' ) {
+                my %old = %{ $undo->[2] };
                 $old{RE}        = 0 unless $old{RE};
                 $old{protected} = 0 unless $old{protected};
                 $_[KERNEL]->post(
@@ -430,8 +434,8 @@ sub irc_on_public {
             }
 
         } elsif ( $undo->[0] eq 'edit' ) {
-            if ( $undo->[1] and ref $undo->[1] eq 'ARRAY' ) {
-                foreach my $entry ( @{ $undo->[1] } ) {
+            if ( $undo->[2] and ref $undo->[2] eq 'ARRAY' ) {
+                foreach my $entry ( @{ $undo->[2] } ) {
                     if ( $entry->[0] eq 'update' ) {
                         $_[KERNEL]->post(
                             db  => "DO",
@@ -459,9 +463,9 @@ sub irc_on_public {
                         );
                     }
                 }
-                Report $_[KERNEL], "$who called undo: undone $undo->[2].";
+                Report $_[KERNEL], "$who called undo: undone $undo->[3].";
                 $irc->yield(
-                    privmsg => $chl => "Okay, $who, undone $undo->[2]." );
+                    privmsg => $chl => "Okay, $who, undone $undo->[3]." );
             } else {
                 $irc->yield( privmsg => $chl =>
                         "Sorry, $who, that's an invalid undo structure."
@@ -932,7 +936,7 @@ sub db_success {
         $iflag = ( $bag{flag} =~ s/i//g ? "i" : "" );
         my $count = 0;
         $undo{ $bag{chl} } =
-          [ 'edit', [], "$bag{fact} =~ s/$bag{old}/$bag{new}/" ];
+          [ 'edit', $bag{who}, [], "$bag{fact} =~ s/$bag{old}/$bag{new}/" ];
 
         foreach my $line (@lines) {
             $bag{old} =~ s{\\/}{/}g;
@@ -965,7 +969,7 @@ sub db_success {
                     PLACEHOLDERS => [ $verb, $tidbit, $line->{id} ],
                     EVENT        => "db_success",
                 );
-                push @{ $undo{ $bag{chl} }[1] },
+                push @{ $undo{ $bag{chl} }[2] },
                   [ 'update', $line->{id}, $line->{verb}, $line->{tidbit} ];
             } elsif ( $bag{op} ) {
                 $stats{deleted}++;
@@ -979,7 +983,7 @@ sub db_success {
                     PLACEHOLDERS => [ $line->{id} ],
                     EVENT        => "db_success",
                 );
-                push @{ $undo{ $bag{chl} }[1] }, [ 'insert', {%$line} ];
+                push @{ $undo{ $bag{chl} }[2] }, [ 'insert', {%$line} ];
             } else {
                 &error( $bag{chl}, $bag{who} );
                 Log "$bag{who}: $bag{fact} =~ s/// failed";
@@ -1013,7 +1017,7 @@ sub db_success {
             return;
         }
 
-        $undo{ $bag{chl} } = [ 'insert', \%line ];
+        $undo{ $bag{chl} } = [ 'insert', $bag{who}, \%line ];
         Report $_[KERNEL], "$bag{who} called forget to delete "
           . "'$line{fact}', '$line{verb}', '$line{tidbit}'";
         Log "forgetting $bag{fact}";
@@ -1035,7 +1039,7 @@ sub db_success {
             return;
         }
 
-        $undo{ $bag{chl} } = [ 'insert', \@lines, $bag{fact} ];
+        $undo{ $bag{chl} } = [ 'insert', $bag{who}, \@lines, $bag{fact} ];
         Report $_[KERNEL], "$bag{who} deleted '$bag{fact}' in $bag{chl}";
         Log "deleting $bag{fact}";
         $_[KERNEL]->post(
@@ -1124,7 +1128,7 @@ sub db_success {
     } elsif ( $bag{cmd} eq 'learn3' ) {
         if ( $res->{INSERTID} ) {
             $undo{ $bag{chl} } = [
-                'delete', $res->{INSERTID},
+                'delete', $bag{who}, $res->{INSERTID},
                 "that '$bag{fact}' is '$bag{tidbit}'"
             ];
 
