@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 656 2009-06-29 23:27:40Z dan $
+# $Id: bucket.pl 657 2009-06-30 17:06:04Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 656 2009-06-29 23:27:40Z dan $';
+my $VERSION = '$Id: bucket.pl 657 2009-06-30 17:06:04Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -802,7 +802,7 @@ sub db_success {
                 rand(100) < $config->{your_mom_is} )
             {
                 $irc->yield( privmsg => $bag{chl} =>
-                             "Your mom is $tidbit, $bag{who}!" );
+                             "$bag{who}: Your mom is $tidbit!" );
                 return;
             }
         
