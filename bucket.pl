@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 661 2009-07-06 22:30:05Z dan $
+# $Id: bucket.pl 662 2009-07-06 23:05:39Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 661 2009-07-06 22:30:05Z dan $';
+my $VERSION = '$Id: bucket.pl 662 2009-07-06 23:05:39Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -1208,7 +1208,8 @@ sub db_success {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
 
         if ( $line{id} ) {
-            $irc->yield( privmsg => $bag{chl} => "$bag{who}: That was '$line{fact}' (#$bag{id})." );
+            $irc->yield( privmsg => $bag{chl} =>
+                         "$bag{who}: That was '$line{fact}' (#$bag{id}): $line{verb} $line{tidbit}" );
         } else {
             $irc->yield( privmsg => $bag{chl} => "$bag{who}: No idea!" );
         }
