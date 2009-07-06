@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 657 2009-06-30 17:06:04Z dan $
+# $Id: bucket.pl 660 2009-07-06 22:25:31Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 657 2009-06-30 17:06:04Z dan $';
+my $VERSION = '$Id: bucket.pl 660 2009-07-06 22:25:31Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -536,6 +536,27 @@ sub irc_on_public {
             EVENT => 'db_success'
         );
 
+    } elsif ( $operator and $addressed and $msg =~ /^what was that\??$/ ) {
+        my $id = $1 || $stats{last_fact}{$chl};
+        unless ($id) {
+            $irc->yield( privmsg => $chl => "Sorry, $who, I have no idea." );
+            return;
+        }
+
+        $_[KERNEL]->post(
+            db  => 'SINGLE',
+            SQL => 'select * from bucket_facts 
+                            where id = ? ',
+            PLACEHOLDERS => [$id],
+            BAGGAGE      => {
+                cmd => "report",
+                chl => $chl,
+                who => $who,
+                msg => $msg,
+                id  => $id,
+            },
+            EVENT => 'db_success'
+        );
     } elsif ( $addressed and $msg =~ /suggest a band name/i ) {
         $_[KERNEL]->post(
             db  => 'SINGLE',
@@ -1183,6 +1204,14 @@ sub db_success {
             $fcache{ lc $bag{key} } = [@lines];
         }
         Log "Cached " . scalar(@lines) . " factoids for $bag{key}";
+    } elsif ( $bag{cmd} eq 'report' ) {
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+
+        if ( $line{id} ) {
+            $irc->yield( privmsg => $bag{chl} => "$bag{who}: That was '$line{fact}'." );
+        } else {
+            $irc->yield( privmsg => $bag{chl} => "$bag{who}: No idea!" );
+        }
     } elsif ( $bag{cmd} eq 'literal' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
 
