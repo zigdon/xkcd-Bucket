@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 662 2009-07-06 23:05:39Z dan $
+# $Id: bucket.pl 664 2009-07-09 17:55:52Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 662 2009-07-06 23:05:39Z dan $';
+my $VERSION = '$Id: bucket.pl 664 2009-07-09 17:55:52Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -699,6 +699,7 @@ sub db_success {
                     return;
                 }
                 $bag{aliases}{ $line{tidbit} } = 1;
+                $bag{alias_id} = $line{id} unless $bag{alias_id};
 
                 Log "Following alias '$line{fact}' -> '$line{tidbit}'";
                 $_[KERNEL]->post(
@@ -717,7 +718,7 @@ sub db_success {
             $bag{msg}  = $line{fact} unless defined $bag{msg};
             $bag{orig} = $line{fact} unless defined $bag{orig};
 
-            $stats{last_fact}{ $bag{chl} } = $line{id};
+            $stats{last_fact}{ $bag{chl} } = $bag{alias_id} || $line{id};
             $stats{lookup}++;
 
             # if we're just idle chatting, replace any $who reference with $someone
