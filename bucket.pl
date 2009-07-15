@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 666 2009-07-14 18:55:03Z dan $
+# $Id: bucket.pl 670 2009-07-15 21:50:03Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 666 2009-07-14 18:55:03Z dan $';
+my $VERSION = '$Id: bucket.pl 670 2009-07-15 21:50:03Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -783,19 +783,26 @@ sub db_success {
                 return;
             }
 
+            if ( $fact eq $bag{who} ) {
+                Log "Not allowing $bag{who} to edit his own factoid";
+                $irc->yield( privmsg => $bag{chl} =>
+                      "Please don't edit your own factoid, $bag{who}." );
+                return;
+            }
+
+            if ($tidbit =~ m#=~\s*s/#i) {
+                Log "Not learning what looks like a botched s/// query";
+                $irc->yield( privmsg => $bag{chl} =>
+                      "$bag{who}: Fix your s/// command." );
+                return;
+            }
+
             if ( $fact eq 'you' and $verb eq 'are' ) {
                 $fact = "Bucket";
                 $verb = "is";
             } elsif ( $fact eq 'I' and $verb eq 'am' ) {
                 $fact = $bag{who};
                 $verb = "is";
-            }
-
-            if ( $fact eq $bag{who} ) {
-                Log "Not allowing $bag{who} to edit his own factoid";
-                $irc->yield( privmsg => $bag{chl} =>
-                      "Please don't edit your own factoid, $bag{who}." );
-                return;
             }
 
             $stats{learn}++;
