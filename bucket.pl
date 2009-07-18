@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 672 2009-07-16 22:06:24Z dan $
+# $Id: bucket.pl 674 2009-07-18 02:26:19Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 672 2009-07-16 22:06:24Z dan $';
+my $VERSION = '$Id: bucket.pl 674 2009-07-18 02:26:19Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -168,7 +168,9 @@ sub irc_on_public {
         $chl = $who;
     }
 
-    if ( rand(100) < $config->{bananas_chance} ) {
+    if ( $config->{bananas_chance}
+        and rand(100) < $config->{bananas_chance} )
+    {
         $irc->yield( privmsg => $chl => "Bananas!" );
     }
 
@@ -372,8 +374,9 @@ sub irc_on_public {
         Log "$who called undo:";
         my $uchannel = $1 || $chl;
         my $undo = $undo{$uchannel};
-        unless ($operator or $undo->[1] eq $who) {
-            $irc->yield( privmsg => $chl => "Sorry, $who, you can't undo that." );
+        unless ( $operator or $undo->[1] eq $who ) {
+            $irc->yield(
+                privmsg => $chl => "Sorry, $who, you can't undo that." );
             return;
         }
         Log Dumper $undo;
@@ -637,7 +640,9 @@ sub irc_on_public {
         return;
     } elsif ( $operator and $addressed and $msg =~ /^get (\w+)/ ) {
         my ($key) = ($1);
-        return unless ( $key =~ /^(?:band_name|your_mom_is|bananas_chance|random_wait)$/ );
+        return
+          unless (
+            $key =~ /^(?:band_name|your_mom_is|bananas_chance|random_wait)$/ );
 
         $irc->yield( privmsg => $chl => "$key is $config->{$key}." );
     } else {
@@ -721,8 +726,8 @@ sub db_success {
             $stats{last_fact}{ $bag{chl} } = $bag{alias_id} || $line{id};
             $stats{lookup}++;
 
-            # if we're just idle chatting, replace any $who reference with $someone
-            if ($bag{idle}) {
+         # if we're just idle chatting, replace any $who reference with $someone
+            if ( $bag{idle} ) {
                 $line{tidbit} =~ s/\$who/\$someone/gi;
             }
 
@@ -730,7 +735,7 @@ sub db_success {
             if ( $line{tidbit} =~ /\$someone/i ) {
                 my @nicks = $irc->nicks();
                 while ( $line{tidbit} =~ /\$someone/i ) {
-                    my $rnick = $nicks[rand(@nicks)];
+                    my $rnick = $nicks[ rand(@nicks) ];
                     next if lc $rnick eq lc $nick and @nicks > 1;
                     $line{tidbit} =~ s/\$someone/$rnick/i;
                 }
@@ -790,7 +795,7 @@ sub db_success {
                 return;
             }
 
-            if ($tidbit =~ m#=~\s*s/#i) {
+            if ( $tidbit =~ m#=~\s*s/#i ) {
                 Log "Not learning what looks like a botched s/// query";
                 $irc->yield( privmsg => $bag{chl} =>
                       "$bag{who}: Fix your s/// command." );
@@ -826,16 +831,16 @@ sub db_success {
             }
             $fact = &trim($fact);
 
-            if (not $bag{op} and
-                $verb eq 'is' and
-                rand(100) < $config->{your_mom_is} )
+            if (    $config->{your_mom_is}
+                and not $bag{op}
+                and $verb eq 'is'
+                and rand(100) < $config->{your_mom_is} )
             {
                 $tidbit =~ s/\W+$//;
-                $irc->yield( privmsg => $bag{chl} =>
-                             "$bag{who}: Your mom is $tidbit!" );
+                $irc->yield(
+                    privmsg => $bag{chl} => "$bag{who}: Your mom is $tidbit!" );
                 return;
             }
-        
 
             Log "Learning '$fact' '$verb' '$tidbit'";
             $_[KERNEL]->post(
@@ -885,7 +890,8 @@ sub db_success {
             $stats{sex}++;
             $irc->yield( privmsg => $bag{chl} => $bag{orig} );
         } else {    # lookup band name!
-            if ( $bag{type} eq 'irc_public'
+            if (    $config->{band_name}
+                and $bag{type} eq 'irc_public'
                 and rand(100) < $config->{band_name} )
             {
                 my $name = $bag{orig};
@@ -1170,8 +1176,8 @@ sub db_success {
     } elsif ( $bag{cmd} eq 'learn3' ) {
         if ( $res->{INSERTID} ) {
             $undo{ $bag{chl} } = [
-                'delete', $bag{who}, $res->{INSERTID},
-                "that '$bag{fact}' is '$bag{tidbit}'"
+                'delete',         $bag{who},
+                $res->{INSERTID}, "that '$bag{fact}' is '$bag{tidbit}'"
             ];
 
             $stats{last_fact}{ $bag{chl} } = $res->{INSERTID};
@@ -1218,7 +1224,8 @@ sub db_success {
 
         if ( $line{id} ) {
             $irc->yield( privmsg => $bag{chl} =>
-                         "$bag{who}: That was '$line{fact}' (#$bag{id}): $line{verb} $line{tidbit}" );
+"$bag{who}: That was '$line{fact}' (#$bag{id}): $line{verb} $line{tidbit}"
+            );
         } else {
             $irc->yield( privmsg => $bag{chl} => "$bag{who}: No idea!" );
         }
