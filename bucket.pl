@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 683 2009-08-04 18:00:31Z dan $
+# $Id: bucket.pl 684 2009-08-04 18:01:22Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 683 2009-08-04 18:00:31Z dan $';
+my $VERSION = '$Id: bucket.pl 684 2009-08-04 18:01:22Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -160,7 +160,7 @@ sub irc_on_public {
         if ($addressed and $config->{increase_mute} and $talking{$chl} > 0) {
            $talking{$chl} += $config->{increase_mute}; 
            Report $_[KERNEL],
-             "Shutting up longer in $chl - $target seconds remaining";
+             "Shutting up longer in $chl - $talking{$chl} seconds remaining";
         }
         return;
     }
