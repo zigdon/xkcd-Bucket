@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 684 2009-08-04 18:01:22Z dan $
+# $Id: bucket.pl 685 2009-08-04 19:15:15Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 684 2009-08-04 18:01:22Z dan $';
+my $VERSION = '$Id: bucket.pl 685 2009-08-04 19:15:15Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -157,10 +157,12 @@ sub irc_on_public {
     $talking{$chl} = -1 unless exists $talking{$chl};
     $talking{$chl} = -1 if ( $talking{$chl} > 0 and $talking{$chl} < time );
     unless ( $talking{$chl} == -1 or ( $operator and $addressed ) ) {
-        if ($addressed and $config->{increase_mute} and $talking{$chl} > 0) {
-           $talking{$chl} += $config->{increase_mute}; 
-           Report $_[KERNEL],
-             "Shutting up longer in $chl - $talking{$chl} seconds remaining";
+        if ( $addressed and $config->{increase_mute} and $talking{$chl} > 0 ) {
+            $talking{$chl} += $config->{increase_mute};
+            Report $_[KERNEL],
+                "Shutting up longer in $chl - "
+              . ( $talking{$chl} - time )
+              . " seconds remaining";
         }
         return;
     }
@@ -648,8 +650,9 @@ sub irc_on_public {
     } elsif ( $operator and $addressed and $msg =~ /^get (\w+)/ ) {
         my ($key) = ($1);
         return
-          unless (
-            $key =~ /^(?:band_name|increase_mute|your_mom_is|bananas_chance|random_wait)$/ );
+          unless ( $key =~
+/^(?:band_name|increase_mute|your_mom_is|bananas_chance|random_wait)$/
+          );
 
         $irc->yield( privmsg => $chl => "$key is $config->{$key}." );
     } else {
