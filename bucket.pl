@@ -15,7 +15,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-# $Id: bucket.pl 679 2009-07-28 17:03:18Z dan $
+# $Id: bucket.pl 683 2009-08-04 18:00:31Z dan $
 
 use strict;
 use POE;
@@ -31,7 +31,7 @@ $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
 
-my $VERSION = '$Id: bucket.pl 679 2009-07-28 17:03:18Z dan $';
+my $VERSION = '$Id: bucket.pl 683 2009-08-04 18:00:31Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -157,6 +157,11 @@ sub irc_on_public {
     $talking{$chl} = -1 unless exists $talking{$chl};
     $talking{$chl} = -1 if ( $talking{$chl} > 0 and $talking{$chl} < time );
     unless ( $talking{$chl} == -1 or ( $operator and $addressed ) ) {
+        if ($addressed and $config->{increase_mute} and $talking{$chl} > 0) {
+           $talking{$chl} += $config->{increase_mute}; 
+           Report $_[KERNEL],
+             "Shutting up longer in $chl - $target seconds remaining";
+        }
         return;
     }
 
@@ -630,6 +635,8 @@ sub irc_on_public {
             $config->{bananas_chance} = $1;
         } elsif ( $key eq 'random_wait' and $val =~ /^(\d+)$/ ) {
             $config->{random_wait} = $1;
+        } elsif ( $key eq 'increase_mute' and $val =~ /^(\d+)%?$/ ) {
+            $config->{increase_mute} = $1;
         } else {
             return;
         }
@@ -642,7 +649,7 @@ sub irc_on_public {
         my ($key) = ($1);
         return
           unless (
-            $key =~ /^(?:band_name|your_mom_is|bananas_chance|random_wait)$/ );
+            $key =~ /^(?:band_name|increase_mute|your_mom_is|bananas_chance|random_wait)$/ );
 
         $irc->yield( privmsg => $chl => "$key is $config->{$key}." );
     } else {
@@ -879,6 +886,9 @@ sub db_success {
                   "No, but if you hum a few bars I can fake it" );
         } elsif ( $bag{orig} =~ s/(\w+)-ass (\w+)/$1 ass-$2/ ) {
             $stats{ass}++;
+            $irc->yield( privmsg => $bag{chl} => $bag{orig} );
+        } elsif ( $bag{orig} =~ s/\bthe fucking\b/fucking the/ ) {
+            $stats{fucking}++;
             $irc->yield( privmsg => $bag{chl} => $bag{orig} );
         } elsif (
             $bag{orig} !~ /extra|except/
