@@ -769,7 +769,7 @@ sub db_success {
         } elsif ( $bag{msg} =~ s/^what is |^what's |^the //i ) {
             $_[KERNEL]->post(
                 db  => 'SINGLE',
-                SQL => 'select fact, verb, tidbit from bucket_facts 
+                SQL => 'select id, fact, verb, tidbit from bucket_facts 
                                 where fact = ? order by rand('
                   . int( rand(1e6) ) 
                   . ') limit 1',
