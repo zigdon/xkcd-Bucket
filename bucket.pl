@@ -546,7 +546,7 @@ sub irc_on_public {
             EVENT => 'db_success'
         );
 
-    } elsif ( $operator and $addressed and $msg =~ /^what was that\??$/ ) {
+    } elsif ( $addressed and $msg =~ /^what was that\??$/ ) {
         my $id = $1 || $stats{last_fact}{$chl};
         unless ($id) {
             $irc->yield( privmsg => $chl => "Sorry, $who, I have no idea." );
