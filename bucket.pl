@@ -631,6 +631,8 @@ sub irc_on_public {
         my ( $key, $val ) = ( $1, $2 );
         if ( $key eq 'band_name' and $val =~ /^(\d+)%?$/ ) {
             $config->{band_name} = $1;
+        } elsif ( $key eq 'ex_to_sex' and $val =~ /^(\d+)%?$/ ) {
+            $config->{ex_to_sex} = $1;
         } elsif ( $key eq 'your_mom_is' and $val =~ /^(\d+)%?$/ ) {
             $config->{your_mom_is} = $1;
         } elsif ( $key eq 'bananas_chance' and $val =~ /^([\d.]+)%?$/ ) {
@@ -651,7 +653,7 @@ sub irc_on_public {
         my ($key) = ($1);
         return
           unless ( $key =~
-/^(?:band_name|increase_mute|your_mom_is|bananas_chance|random_wait)$/
+/^(?:band_name|increase_mute|ex_to_sex|your_mom_is|bananas_chance|random_wait)$/
           );
 
         $irc->yield( privmsg => $chl => "$key is $config->{$key}." );
@@ -895,7 +897,7 @@ sub db_success {
             $irc->yield( privmsg => $bag{chl} => $bag{orig} );
         } elsif (
             $bag{orig} !~ /extra|except/
-            and rand(1) < 0.05
+            and rand(100) < $config->{ex_to_sex}
             and (  $bag{orig} =~ s/\ban ex/a sex/
                 or $bag{orig} =~ s/\bex/sex/ )
           )
