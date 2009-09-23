@@ -308,10 +308,14 @@ sub irc_on_public {
         my ( $num, $unit, $word ) = ( $1, lc $2, lc $3 );
         if ($operator) {
             my $target = 0;
+            unless ($num or $word) {
+              $num = 4*60*60;  # by default, shut up for 4 hours
+            }
             if ($num) {
                 $target += $num if not $unit or $unit eq 's';
                 $target += $num * 60 if $unit eq 'm';
                 $target += $num * 60 * 60 if $unit eq 'h';
+                $target += $num * 60 * 60 * 24 if $unit eq 'd';
                 Report $_[KERNEL],
                   "Shutting up in $chl at ${who}'s request for $target seconds";
                 $irc->yield(
@@ -327,12 +331,6 @@ sub irc_on_public {
                 $irc->yield(
                     privmsg => $chl => "Okay $who.  I'll be back later" );
                 $talking{$chl} = time + $target;
-            } else {
-                Report $_[KERNEL],
-                  "Shutting up in $chl at ${who}'s request until called back";
-                $talking{$chl} = 0;
-                $irc->yield( privmsg => $chl =>
-                      "$who: shutting up (until told to 'come back')" );
             }
         } else {
             $irc->yield( privmsg => $chl => "Okay, $who - be back in a bit!" );
