@@ -798,7 +798,7 @@ sub db_success {
                 return;
             }
 
-            if ( $fact eq $bag{who} ) {
+            if ( lc $fact eq lc $bag{who} ) {
                 Log "Not allowing $bag{who} to edit his own factoid";
                 $irc->yield( privmsg => $bag{chl} =>
                       "Please don't edit your own factoid, $bag{who}." );
