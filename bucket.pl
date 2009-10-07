@@ -356,6 +356,7 @@ sub irc_on_public {
             join ", ", sort keys %{ $config->{ignore} }
         );
     } elsif ( $addressed and $operator and $msg =~ /^(un)?ignore (\S+)/i ) {
+        Report $_[KERNEL], "$who is $1ignoring $2";
         if ($1) {
             delete $config->{ignore}{ lc $2 };
         } else {
@@ -364,6 +365,7 @@ sub irc_on_public {
         &save;
         $irc->yield( privmsg => $chl => "Okay, $who.  Ignore list updated." );
     } elsif ( $addressed and $operator and $msg =~ /^(un)?exclude (\S+)/i ) {
+        Report $_[KERNEL], "$who is $1excluding $2";
         if ($1) {
             delete $config->{exclude}{ lc $2 };
         } else {
