@@ -363,6 +363,14 @@ sub irc_on_public {
         }
         &save;
         $irc->yield( privmsg => $chl => "Okay, $who.  Ignore list updated." );
+    } elsif ( $addressed and $operator and $msg =~ /^(un)?exclude (\S+)/i ) {
+        if ($1) {
+            delete $config->{exclude}{ lc $2 };
+        } else {
+            $config->{exclude}{ lc $2 } = 1;
+        }
+        &save;
+        $irc->yield( privmsg => $chl => "Okay, $who.  Exclude list updated." );
     } elsif ( $addressed and $operator and $msg =~ /^(un)?protect (.+)/i ) {
         my ( $protect, $fact ) = ( ( $1 ? 0 : 1 ), $2 );
         Report $_[KERNEL], "$who is $1protecting $fact";
@@ -743,10 +751,8 @@ sub db_success {
 
             $line{tidbit} =~ s/\$who/$bag{who}/gi;
             if ( $line{tidbit} =~ /\$someone/i ) {
-                my @nicks = $irc->nicks();
                 while ( $line{tidbit} =~ /\$someone/i ) {
-                    my $rnick = $nicks[ rand(@nicks) ];
-                    next if lc $rnick eq lc $nick and @nicks > 1;
+                    my $rnick = &someone();
                     $line{tidbit} =~ s/\$someone/$rnick/i;
                 }
             }
@@ -1378,9 +1384,9 @@ sub cached_reply {
     my $tidbit = $line->{tidbit};
     $tidbit =~ s/\$who/$who/gi;
     if ( $tidbit =~ /\$someone/i ) {
-        my @nicks = $irc->nicks();
         while ( $tidbit =~ /\$someone/i ) {
-            $tidbit =~ s/\$someone/$nicks[rand(@nicks)]/i;
+            my $rnick = &someone();
+            $tidbit =~ s/\$someone/$rnick/i;
         }
     }
 
@@ -1481,4 +1487,10 @@ sub trim {
     $msg =~ s/\\(.)/$1/g;
 
     return $msg;
+}
+
+sub someone {
+    my @nicks = grep {lc $_ ne $nick and not exists $config->{exclude}{lc $_}} $irc->nicks();
+    return 'someone' unless @nicks;
+    return $nicks[ rand(@nicks) ];
 }
