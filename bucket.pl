@@ -29,7 +29,7 @@ use Data::Dumper;
 use Fcntl qw/:seek/;
 $Data::Dumper::Indent = 1;
 
-use constant { DEBUG => 0 };
+use constant { DEBUG => 1 };
 
 my $VERSION = '$Id: bucket.pl 685 2009-08-04 19:15:15Z dan $';
 
@@ -144,7 +144,7 @@ sub irc_on_public {
     }
 
     # keep track of who's active in each channel
-    $stats{$chl}{users}{$who} = time;
+    $stats{users}{$chl}{$who} = time;
 
     my $operator = 0;
     if (   $irc->is_channel_operator( $channel, $who )
@@ -1628,17 +1628,16 @@ sub someone {
     my $channel = shift;
     my @nicks =
       grep { lc $_ ne $nick and not exists $config->{exclude}{ lc $_ } }
-      keys %{$stats{$channel}{users}};
+      keys %{$stats{users}{$channel}};
     return 'someone' unless @nicks;
     return $nicks[ rand(@nicks) ];
 }
 
 sub clear_cache {
-    foreach my $channel ( keys %stats ) {
-        next unless exists $stats{$channel}{users};
-        foreach my $user ( keys %{ $stats{$channel}{users} } ) {
-            delete $stats{$channel}{users}{$user}
-              if $stats{$channel}{users}{$user} <
+    foreach my $channel ( keys %{$stats{users}} ) {
+        foreach my $user ( keys %{ $stats{users}{$channel} } ) {
+            delete $stats{users}{$channel}{$user}
+              if $stats{users}{$channel}{$user} <
                   time - $config->{user_activity_timeout};
         }
     }
