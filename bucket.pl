@@ -946,7 +946,7 @@ sub db_success {
                                | have \s (an? \s .+)
                               )/x)) {
             my $item = ( $1 || $2 || $3 );
-            $item =~ s/^(?:his|her) /$bag{who}\'s /;
+            $item =~ s/\b(?:his|her)\b/$bag{who}\'s/;
             $item =~ s/\W+$//;
 
             if ( $item =~ / to /i) {
