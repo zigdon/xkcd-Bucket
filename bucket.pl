@@ -972,6 +972,7 @@ sub db_success {
                         &cached_reply( $bag{chl}, $bag{who}, $item, "takes item" );
                     }
                     Log "Taking a $item from $bag{who}: ". join ", ", @inventory;
+                    Report $_[KERNEL], "Taking a $item from $bag{who}";
                 }
             }
         } else {    # lookup band name!
@@ -1591,6 +1592,7 @@ sub get_item {
 
     my $item = rand @inventory;
     if ($give) {
+        Report $_[KERNEL], "Dropping $inventory[$item]";
         return splice(@inventory, $item, 1, ());
     } else {
         return $inventory[$item];
