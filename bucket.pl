@@ -57,6 +57,17 @@ my %undo;
 my %last_activity;
 my @inventory;
 
+my %config_keys = (
+    bananas_chance        => "p",
+    band_name             => "p",
+    ex_to_sex             => "p",
+    increase_mute         => "i",
+    inventory_size        => "i",
+    random_wait           => "i",
+    user_activity_timeout => "i",
+    your_mom_is           => "p",
+);
+
 $stats{startup_time} = time;
 
 if ( $config->{logfile} ) {
@@ -132,6 +143,9 @@ sub irc_on_public {
         return;
     }
 
+    # keep track of who's active in each channel
+    $stats{$chl}{users}{$who} = time;
+
     my $operator = 0;
     if (   $irc->is_channel_operator( $channel, $who )
         or $irc->is_channel_owner( $channel, $who )
@@ -170,6 +184,7 @@ sub irc_on_public {
 
     if ( time - $stats{last_updated} > 600 ) {
         &get_stats( $_[KERNEL] );
+        &clear_cache();
     }
 
     if ( $type eq 'irc_msg' ) {
@@ -309,13 +324,13 @@ sub irc_on_public {
         my ( $num, $unit, $word ) = ( $1, lc $2, lc $3 );
         if ($operator) {
             my $target = 0;
-            unless ($num or $word) {
-              $num = 4*60*60;  # by default, shut up for 4 hours
+            unless ( $num or $word ) {
+                $num = 4 * 60 * 60;    # by default, shut up for 4 hours
             }
             if ($num) {
                 $target += $num if not $unit or $unit eq 's';
-                $target += $num * 60 if $unit eq 'm';
-                $target += $num * 60 * 60 if $unit eq 'h';
+                $target += $num * 60           if $unit eq 'm';
+                $target += $num * 60 * 60      if $unit eq 'h';
                 $target += $num * 60 * 60 * 24 if $unit eq 'd';
                 Report $_[KERNEL],
                   "Shutting up in $chl at ${who}'s request for $target seconds";
@@ -636,25 +651,31 @@ sub irc_on_public {
         Log "Restarting at ${who}'s request";
         $irc->yield( privmsg => $chl => "Okay, $who, I'll be right back." );
         $irc->yield( quit => "OHSHI--" );
-    } elsif ( $operator and $addressed and $msg =~ /^set (\w+) (.*)/ ) {
+    } elsif ( $operator and $addressed and $msg =~ /^set(?: (\w+) (.*))?/ ) {
         my ( $key, $val ) = ( $1, $2 );
-        if ( $key eq 'band_name' and $val =~ /^(\d+)%?$/ ) {
-            $config->{band_name} = $1;
-        } elsif ( $key eq 'ex_to_sex' and $val =~ /^(\d+)%?$/ ) {
-            $config->{ex_to_sex} = $1;
-        } elsif ( $key eq 'your_mom_is' and $val =~ /^(\d+)%?$/ ) {
-            $config->{your_mom_is} = $1;
-        } elsif ( $key eq 'bananas_chance' and $val =~ /^([\d.]+)%?$/ ) {
-            $config->{bananas_chance} = $1;
-        } elsif ( $key eq 'random_wait' and $val =~ /^(\d+)$/ ) {
-            $config->{random_wait} = $1;
-        } elsif ( $key eq 'inventory_size' and $val =~ /^(\d+)$/ ) {
-            $config->{inventory_size} = $1;
-        } elsif ( $key eq 'increase_mute' and $val =~ /^(\d+)%?$/ ) {
-            $config->{increase_mute} = $1;
-        } else {
+
+        unless ($key) {
+            $irc->yield(
+                privmsg => $chl => "$who: Valid keys are: " . join ", ",
+                sort keys %config_keys
+            );
             return;
         }
+
+        foreach my $ckey ( keys %config_keys ) {
+            next unless $key eq $ckey;
+            if ( $config_keys{$ckey} eq 'p' and $val =~ /^(\d+)%?$/ ) {
+                $config->{$key} = $1;
+            } elsif ( $config_keys{$ckey} eq 'i' and $val =~ /^(\d+)$/ ) {
+                $config->{$key} = $1;
+            } else {
+                $irc->yield( privmsg => $chl =>
+                      "Sorry, $who, that's an invalid value for $key." );
+                return;
+            }
+            last;
+        }
+
         $irc->yield( privmsg => $chl => "Okay, $who." );
         Report $_[KERNEL], "$who set '$key' to '$val'";
 
@@ -662,17 +683,13 @@ sub irc_on_public {
         return;
     } elsif ( $operator and $addressed and $msg =~ /^get (\w+)/ ) {
         my ($key) = ($1);
-        return
-          unless ( $key =~ /^(?:
-                                 bananas_chance
-                               | band_name
-                               | ex_to_sex
-                               | increase_mute
-                               | inventory_size
-                               | random_wait
-                               | your_mom_is
-                             )$/x
-          );
+        unless ( exists $config_keys{$key} ) {
+            $irc->yield(
+                privmsg => $chl => "$who: Valid keys are: " . join ", ",
+                sort keys %config_keys
+            );
+            return;
+        }
 
         $irc->yield( privmsg => $chl => "$key is $config->{$key}." );
     } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?$/i ) {
@@ -766,7 +783,7 @@ sub db_success {
             $line{tidbit} =~ s/\$who/$bag{who}/gi;
             if ( $line{tidbit} =~ /\$someone/i ) {
                 while ( $line{tidbit} =~ /\$someone/i ) {
-                    my $rnick = &someone();
+                    my $rnick = &someone($bag{chl});
                     $line{tidbit} =~ s/\$someone/$rnick/i;
                 }
             }
@@ -931,47 +948,52 @@ sub db_success {
         {
             $stats{sex}++;
             $irc->yield( privmsg => $bag{chl} => $bag{orig} );
-        } elsif ( $bag{orig} !~ /\?\s*$/ 
-                      and
-                  $bag{orig} =~ /^(?:
+        } elsif (
+            $bag{orig} !~ /\?\s*$/
+            and $bag{orig} =~ /^(?:
                                puts \s (.+) \s in \s $nick\b .* 
                              | gives \s $nick \s (.+)
                              | gives \s (.+) \s to $nick\b .*
-                            )/ix 
-                      or
-                  ( $bag{addressed} 
-                      and 
-                    $bag{orig} =~ /^(?:
+                            )/ix
+            or (
+                    $bag{addressed}
+                and $bag{orig} =~ /^(?:
                                  take \s this \s (.+)
                                | have \s (an? \s .+)
-                              )/x)) {
+                              )/x
+            )
+          )
+        {
             my $item = ( $1 || $2 || $3 );
             $item =~ s/\b(?:his|her)\b/$bag{who}\'s/;
             $item =~ s/\W+$//;
 
-            if ( $item =~ / to /i) {
+            if ( $item =~ / to /i ) {
                 Log "Not sure how to deal with item=$item";
             } else {
                 my $dup = 0;
                 foreach my $inv_item (@inventory) {
-                    if (lc $inv_item eq lc $item) {
+                    if ( lc $inv_item eq lc $item ) {
                         $dup = 1;
                         last;
                     }
                 }
                 if ($dup) {
-                    &cached_reply( $bag{chl}, $bag{who}, $item, "duplicate item" );
+                    &cached_reply( $bag{chl}, $bag{who}, $item,
+                        "duplicate item" );
                 } else {
-                    if (@inventory >= $config->{inventory_size}) {
+                    if ( @inventory >= $config->{inventory_size} ) {
                         my $drop = &get_item(1);
-                        $irc->yield( ctcp => $bag{chl} => 
-                                     "ACTION drops $drop and takes $item" );
+                        $irc->yield( ctcp => $bag{chl} =>
+                              "ACTION drops $drop and takes $item" );
                         push @inventory, $item;
                     } else {
                         push @inventory, $item;
-                        &cached_reply( $bag{chl}, $bag{who}, $item, "takes item" );
+                        &cached_reply( $bag{chl}, $bag{who}, $item,
+                            "takes item" );
                     }
-                    Log "Taking a $item from $bag{who}: ". join ", ", @inventory;
+                    Log "Taking a $item from $bag{who}: " . join ", ",
+                      @inventory;
                     Report $_[KERNEL], "Taking a $item from $bag{who}";
                 }
             }
@@ -1452,7 +1474,7 @@ sub inventory {
     return join " and ", @inventory if @inventory == 2;
 
     my $last = $inventory[-1];
-    return join(", ", @inventory[0 .. $#inventory-1]) . ", and $last";
+    return join( ", ", @inventory[ 0 .. $#inventory - 1 ] ) . ", and $last";
 }
 
 sub cached_reply {
@@ -1464,7 +1486,7 @@ sub cached_reply {
     $tidbit =~ s/\$who/$who/gi;
     if ( $tidbit =~ /\$someone/i ) {
         while ( $tidbit =~ /\$someone/i ) {
-            my $rnick = &someone();
+            my $rnick = &someone($chl);
             $tidbit =~ s/\$someone/$rnick/i;
         }
     }
@@ -1475,7 +1497,10 @@ sub cached_reply {
         }
 
         $extra = "";
-    } elsif ( $type eq 'takes item' or $type eq 'duplicate item' or $type eq 'list items') {
+    } elsif ( $type eq 'takes item'
+        or $type eq 'duplicate item'
+        or $type eq 'list items' )
+    {
         if ( $tidbit =~ /\$item/i ) {
             $tidbit =~ s/\$item/$extra/ig;
         }
@@ -1486,7 +1511,7 @@ sub cached_reply {
 
         $extra = "";
     } elsif ( $tidbit =~ /\$(give)?item/i ) {
-        while ($tidbit =~ /\$(give)?item/i ) {
+        while ( $tidbit =~ /\$(give)?item/i ) {
             my $give = $1;
             if (@inventory) {
                 $tidbit =~ s/\$$1item/&get_item($give)/ei;
@@ -1593,14 +1618,28 @@ sub get_item {
     my $item = rand @inventory;
     if ($give) {
         Report $_[KERNEL], "Dropping $inventory[$item]";
-        return splice(@inventory, $item, 1, ());
+        return splice( @inventory, $item, 1, () );
     } else {
         return $inventory[$item];
     }
 }
 
 sub someone {
-    my @nicks = grep {lc $_ ne $nick and not exists $config->{exclude}{lc $_}} $irc->nicks();
+    my $channel = shift;
+    my @nicks =
+      grep { lc $_ ne $nick and not exists $config->{exclude}{ lc $_ } }
+      keys %{$stats{$channel}{users}};
     return 'someone' unless @nicks;
     return $nicks[ rand(@nicks) ];
+}
+
+sub clear_cache {
+    foreach my $channel ( keys %stats ) {
+        next unless exists $stats{$channel}{users};
+        foreach my $user ( keys %{ $stats{$channel}{users} } ) {
+            delete $stats{$channel}{users}{$user}
+              if $stats{$channel}{users}{$user} <
+                  time - $config->{user_activity_timeout};
+        }
+    }
 }
