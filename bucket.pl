@@ -675,7 +675,7 @@ sub irc_on_public {
           );
 
         $irc->yield( privmsg => $chl => "$key is $config->{$key}." );
-    } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?/i ) {
+    } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?$/i ) {
         &cached_reply( $chl, $who, "", "list items" );
     } else {
         my $orig = $msg;
@@ -947,6 +947,7 @@ sub db_success {
                               )/x)) {
             my $item = ( $1 || $2 || $3 );
             $item =~ s/^(?:his|her) /$bag{who}\'s /;
+            $item =~ s/\W+$//;
 
             if ( $item =~ / to /i) {
                 Log "Not sure how to deal with item=$item";
