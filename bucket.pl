@@ -774,9 +774,9 @@ sub db_success {
                 if (@inventory) {
                     my $give = $1;
                     my $item = &get_item($give);
-                    $line{tidbit} =~ s/\$$1item/$item/ig;
+                    $line{tidbit} =~ s/\$$1item/$item/i;
                 } else {
-                    $line{tidbit} =~ s/\$$1item/bananas/ig;
+                    $line{tidbit} =~ s/\$$1item/bananas/i;
                 }
             }
             if ( $line{verb} eq '<reply>' ) {
@@ -1488,9 +1488,9 @@ sub cached_reply {
         while ($tidbit =~ /\$(give)?item/i ) {
             my $give = $1;
             if (@inventory) {
-                $tidbit =~ s/\$$1item/&get_item($give)/eig;
+                $tidbit =~ s/\$$1item/&get_item($give)/ei;
             } else {
-                $tidbit =~ s/\$$1item/bananas/ig;
+                $tidbit =~ s/\$$1item/bananas/i;
             }
         }
     }
