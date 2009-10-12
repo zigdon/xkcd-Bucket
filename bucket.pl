@@ -1485,11 +1485,13 @@ sub cached_reply {
 
         $extra = "";
     } elsif ( $tidbit =~ /\$(give)?item/i ) {
-        my $give = $1;
-        if (@inventory) {
-            $tidbit =~ s/\$$1item/&get_item($give)/eig;
-        } else {
-            $tidbit =~ s/\$$1item/bananas/ig;
+        while ($tidbit =~ /\$(give)?item/i ) {
+            my $give = $1;
+            if (@inventory) {
+                $tidbit =~ s/\$$1item/&get_item($give)/eig;
+            } else {
+                $tidbit =~ s/\$$1item/bananas/ig;
+            }
         }
     }
 
