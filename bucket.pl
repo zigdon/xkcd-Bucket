@@ -29,7 +29,7 @@ use Data::Dumper;
 use Fcntl qw/:seek/;
 $Data::Dumper::Indent = 1;
 
-use constant { DEBUG => 1 };
+use constant { DEBUG => 0 };
 
 my $VERSION = '$Id: bucket.pl 685 2009-08-04 19:15:15Z dan $';
 
