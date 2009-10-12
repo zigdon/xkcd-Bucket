@@ -55,6 +55,7 @@ my %fcache;
 my %stats;
 my %undo;
 my %last_activity;
+my @inventory;
 
 $stats{startup_time} = time;
 
@@ -647,6 +648,8 @@ sub irc_on_public {
             $config->{bananas_chance} = $1;
         } elsif ( $key eq 'random_wait' and $val =~ /^(\d+)$/ ) {
             $config->{random_wait} = $1;
+        } elsif ( $key eq 'inventory_size' and $val =~ /^(\d+)$/ ) {
+            $config->{inventory_size} = $1;
         } elsif ( $key eq 'increase_mute' and $val =~ /^(\d+)%?$/ ) {
             $config->{increase_mute} = $1;
         } else {
@@ -660,11 +663,20 @@ sub irc_on_public {
     } elsif ( $operator and $addressed and $msg =~ /^get (\w+)/ ) {
         my ($key) = ($1);
         return
-          unless ( $key =~
-/^(?:band_name|increase_mute|ex_to_sex|your_mom_is|bananas_chance|random_wait)$/
+          unless ( $key =~ /^(?:
+                                 bananas_chance
+                               | band_name
+                               | ex_to_sex
+                               | increase_mute
+                               | inventory_size
+                               | random_wait
+                               | your_mom_is
+                             )$/x
           );
 
         $irc->yield( privmsg => $chl => "$key is $config->{$key}." );
+    } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?/i ) {
+        &cached_reply( $chl, $who, "", "list items" );
     } else {
         my $orig = $msg;
         $msg = &trim($msg);
@@ -756,6 +768,15 @@ sub db_success {
                 while ( $line{tidbit} =~ /\$someone/i ) {
                     my $rnick = &someone();
                     $line{tidbit} =~ s/\$someone/$rnick/i;
+                }
+            }
+            while ( $line{tidbit} =~ /\$(give)?item/i ) {
+                if (@inventory) {
+                    my $give = $1;
+                    my $item = &get_item($give);
+                    $line{tidbit} =~ s/\$$1item/$item/ig;
+                } else {
+                    $line{tidbit} =~ s/\$$1item/bananas/ig;
                 }
             }
             if ( $line{verb} eq '<reply>' ) {
@@ -910,6 +931,48 @@ sub db_success {
         {
             $stats{sex}++;
             $irc->yield( privmsg => $bag{chl} => $bag{orig} );
+        } elsif ( $bag{orig} !~ /\?\s*$/ 
+                      and
+                  $bag{orig} =~ /^(?:
+                               puts \s (.+) \s in \s $nick\b .* 
+                             | gives \s $nick \s (.+)
+                             | gives \s (.+) \s to $nick\b .*
+                            )/ix 
+                      or
+                  ( $bag{addressed} 
+                      and 
+                    $bag{orig} =~ /^(?:
+                                 take \s this \s (.+)
+                               | have \s (an? \s .+)
+                              )/x)) {
+            my $item = ( $1 || $2 || $3 );
+            $item =~ s/^(?:his|her) /$bag{who}\'s /;
+
+            if ( $item =~ / to /i) {
+                Log "Not sure how to deal with item=$item";
+            } else {
+                my $dup = 0;
+                foreach my $inv_item (@inventory) {
+                    if (lc $inv_item eq lc $item) {
+                        $dup = 1;
+                        last;
+                    }
+                }
+                if ($dup) {
+                    &cached_reply( $bag{chl}, $bag{who}, $item, "duplicate item" );
+                } else {
+                    if (@inventory >= $config->{inventory_size}) {
+                        my $drop = &get_item(1);
+                        $irc->yield( ctcp => $bag{chl} => 
+                                     "ACTION drops $drop and takes $item" );
+                        push @inventory, $item;
+                    } else {
+                        push @inventory, $item;
+                        &cached_reply( $bag{chl}, $bag{who}, $item, "takes item" );
+                    }
+                    Log "Taking a $item from $bag{who}: ". join ", ", @inventory;
+                }
+            }
         } else {    # lookup band name!
             if (    $config->{band_name}
                 and $bag{type} eq 'irc_public'
@@ -1315,6 +1378,9 @@ sub irc_start {
     $irc->plugin_add( Connector => $_[HEAP]->{connector} );
 
     &cache( $_[KERNEL], "Don't know" );
+    &cache( $_[KERNEL], "takes item" );
+    &cache( $_[KERNEL], "list items" );
+    &cache( $_[KERNEL], "duplicate item" );
     &cache( $_[KERNEL], "band name reply" );
 
     $irc->yield(
@@ -1378,6 +1444,15 @@ sub error {
     &cached_reply( $chl, $who, $prefix, "don't know" );
 }
 
+sub inventory {
+    return "nothing" unless @inventory;
+    return $inventory[0] if @inventory == 1;
+    return join " and ", @inventory if @inventory == 2;
+
+    my $last = $inventory[-1];
+    return join(", ", @inventory[0 .. $#inventory-1]) . ", and $last";
+}
+
 sub cached_reply {
     my ( $chl, $who, $extra, $type ) = @_;
     my $line = $fcache{$type}[ rand( @{ $fcache{$type} } ) ];
@@ -1398,6 +1473,23 @@ sub cached_reply {
         }
 
         $extra = "";
+    } elsif ( $type eq 'takes item' or $type eq 'duplicate item' or $type eq 'list items') {
+        if ( $tidbit =~ /\$item/i ) {
+            $tidbit =~ s/\$item/$extra/ig;
+        }
+
+        if ( $tidbit =~ /\$inventory/i ) {
+            $tidbit =~ s/\$inventory/&inventory/eg;
+        }
+
+        $extra = "";
+    } elsif ( $tidbit =~ /\$(give)?item/i ) {
+        my $give = $1;
+        if (@inventory) {
+            $tidbit =~ s/\$$1item/&get_item($give)/eig;
+        } else {
+            $tidbit =~ s/\$$1item/bananas/ig;
+        }
     }
 
     if ( $line->{verb} eq '<action>' ) {
@@ -1489,6 +1581,17 @@ sub trim {
     $msg =~ s/\\(.)/$1/g;
 
     return $msg;
+}
+
+sub get_item {
+    my $give = shift;
+
+    my $item = rand @inventory;
+    if ($give) {
+        return splice(@inventory, $item, 1, ());
+    } else {
+        return $inventory[$item];
+    }
 }
 
 sub someone {
