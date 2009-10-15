@@ -989,7 +989,7 @@ sub db_success {
         {
             my $item = ( $1 || $2 || $3 );
             $item =~ s/\b(?:his|her)\b/$bag{who}\'s/;
-            $item =~ s/\W+$//;
+            $item =~ s/[ .?!]+$//;
 
             my ($rc, @dropped) = &put_item($item, 0);
             if ($rc == 1) {
