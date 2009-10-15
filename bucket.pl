@@ -191,7 +191,6 @@ sub irc_on_public {
     if ( time - $stats{last_updated} > 600 ) {
         &get_stats( $_[KERNEL] );
         &clear_cache();
-        &random_item_cache(1);
     }
 
     if ( $type eq 'irc_msg' ) {
@@ -1707,11 +1706,10 @@ sub clear_cache {
 }
 
 sub random_item_cache {
-    my $force = shift;
     my $limit = $config->{random_item_cache_size} || 20;
     $limit =~ s/\D//g;
 
-    if (not $force and @random_items >= $limit) {
+    if (@random_items >= $limit) {
         return;
     }
 
