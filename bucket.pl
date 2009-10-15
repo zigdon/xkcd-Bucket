@@ -1542,8 +1542,8 @@ sub cached_reply {
         if ( $tidbit =~ /\$item/i ) {
             $tidbit =~ s/\$item/$newitem/ig;
         }
-        if ( $tidbit =~ /\$olditem/i ) {
-            $tidbit =~ s/\$olditem/$olditems/ig;
+        if ( $tidbit =~ /\$giveitem/i ) {
+            $tidbit =~ s/\$giveitem/$olditems/ig;
         }
     } elsif ( $type eq 'takes item'
         or $type eq 'duplicate item'
