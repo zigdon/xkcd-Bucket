@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS `bucket_items` (
   `what` varchar(255) NOT NULL,
   `user` varchar(64) NOT NULL,
   PRIMARY KEY  (`id`),
+  UNIQUE KEY `what` (`what`),
   KEY `from` (`user`),
   KEY `where` (`channel`)
 ) ENGINE=MyISAM  DEFAULT CHARSET=latin1 ;
