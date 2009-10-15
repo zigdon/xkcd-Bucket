@@ -63,6 +63,7 @@ my %config_keys = (
     band_name              => "p",
     ex_to_sex              => "p",
     increase_mute          => "i",
+    inventory_preload      => "i",
     inventory_size         => "i",
     item_drop_rate         => "i",
     random_item_cache_size => "i",
@@ -806,9 +807,7 @@ sub db_success {
             }
 
             while ( $line{tidbit} =~ /\$newitem/i ) {
-                my $newitem = shift @random_items || 
-                              { what => 'bananas', user => 'Randall' };
-                $newitem = $newitem->{what};
+                my $newitem = shift @random_items || 'bananas';
                 my ($rc, @dropped) = &put_item($newitem, 1);
                 if ($rc == 2) {
                     &cached_reply( $bag{chl}, $bag{who}, \@dropped,
@@ -1415,8 +1414,20 @@ sub db_success {
     } elsif ( $bag{cmd} eq 'stats2' ) {
         $stats{rows} = $res->{RESULT}{c};
     } elsif ( $bag{cmd} eq 'itemcache' ) {
-        @random_items = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
-        Log "Updated random item cache: ", join ", ", map {$_->{what}} @random_items;
+        @random_items = ref $res->{RESULT} ? map {$_->{what}} @{ $res->{RESULT} } : [];
+        Log "Updated random item cache: ", join ", ", @random_items;
+
+        if ($stats{preloaded_items}) {
+            if (@random_items > $stats{preloaded_items}) {
+                @inventory = splice(@random_items, 0, $stats{preloaded_items}, ());
+            } else {
+                @inventory = @random_items;
+                @random_items = ();
+            }
+            delete $stats{preloaded_items};
+
+            &random_item_cache($_[KERNEL]);
+        }
     } else {
         Log "DB returned.",
           "Query: $res->{QUERY}, Result: $res->{RESULT}, Bags: $res->{BAGGAGE}";
@@ -1445,6 +1456,7 @@ sub irc_start {
     &cache( $_[KERNEL], "duplicate item" );
     &cache( $_[KERNEL], "band name reply" );
     &random_item_cache($_[KERNEL]);
+    $stats{preloaded_items} = $config->{inventory_preload} || 0;
 
     $irc->yield(
         connect => {
@@ -1571,9 +1583,7 @@ sub cached_reply {
         }
     } elsif ( $tidbit =~ /\$newitem/i ) {
         while ( $tidbit =~ /\$newitem/i ) {
-            my $newitem = shift @random_items || 
-                          { what => 'bananas', user => 'Randall' };
-            $newitem = $newitem->{what};
+            my $newitem = shift @random_items || 'bananas';
             my ($rc, @dropped) = &put_item($newitem, 1);
             if ($rc == 2) {
                 &cached_reply( $chl, $who, \@dropped, "drops item" );
