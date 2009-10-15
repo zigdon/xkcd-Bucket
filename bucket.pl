@@ -191,6 +191,7 @@ sub irc_on_public {
     if ( time - $stats{last_updated} > 600 ) {
         &get_stats( $_[KERNEL] );
         &clear_cache();
+        &random_item_cache( $_[KERNEL], 1 );
     }
 
     if ( $type eq 'irc_msg' ) {
@@ -1017,7 +1018,7 @@ sub db_success {
                 PLACEHOLDERS => [ $item, $bag{who}, $bag{chl} ],
                 EVENT => 'db_success'
             );
-            &random_item_cache;
+            &random_item_cache($_[KERNEL]);
         } else {    # lookup band name!
             if (    $config->{band_name}
                 and $bag{type} eq 'irc_public'
@@ -1442,7 +1443,7 @@ sub irc_start {
     &cache( $_[KERNEL], "list items" );
     &cache( $_[KERNEL], "duplicate item" );
     &cache( $_[KERNEL], "band name reply" );
-    &random_item_cache;
+    &random_item_cache($_[KERNEL]);
 
     $irc->yield(
         connect => {
@@ -1706,14 +1707,16 @@ sub clear_cache {
 }
 
 sub random_item_cache {
+    my $kernel = shift;
+    my $force = shift;
     my $limit = $config->{random_item_cache_size} || 20;
     $limit =~ s/\D//g;
 
-    if (@random_items >= $limit) {
+    if (not $force and @random_items >= $limit) {
         return;
     }
 
-    $_[KERNEL]->post(
+    $kernel->post(
         db      => 'MULTIPLE',
         BAGGAGE => { cmd => "itemcache" },
         SQL     => "select what, user from bucket_items order by rand() limit $limit",
