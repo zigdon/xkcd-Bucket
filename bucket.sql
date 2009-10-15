@@ -55,7 +55,6 @@ CREATE TABLE IF NOT EXISTS `bucket_facts` (
 
 CREATE TABLE IF NOT EXISTS `bucket_items` (
   `id` int(10) unsigned NOT NULL auto_increment,
-  `when` timestamp NOT NULL default '0000-00-00 00:00:00' on update CURRENT_TIMESTAMP,
   `channel` varchar(64) NOT NULL,
   `what` varchar(255) NOT NULL,
   `user` varchar(64) NOT NULL,
