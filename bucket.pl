@@ -1171,6 +1171,11 @@ sub db_success {
             }
             $irc->yield(
                 privmsg => $bag{chl} => "Okay, $bag{who}, factoid updated." );
+
+            if ( exists $fcache{ lc $bag{fact} } ) {
+                Log "Updating cache for '$bag{fact}'";
+                &cache( $_[KERNEL], $bag{fact} );
+            }
             return;
         }
 
@@ -1181,6 +1186,11 @@ sub db_success {
                 $count .= " matches";
             }
             $irc->yield( privmsg => $bag{chl} => "Okay, $bag{who}; $count." );
+
+            if ( exists $fcache{ lc $bag{fact} } ) {
+                Log "Updating cache for '$bag{fact}'";
+                &cache( $_[KERNEL], $bag{fact} );
+            }
             return;
         }
 
