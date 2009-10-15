@@ -374,7 +374,7 @@ sub irc_on_public {
         }
         $irc->yield( $cmd => $dst );
         $irc->yield( privmsg => $chl => "$who: ${cmd}ing $dst" );
-        Report $_[KERNEL], "${cmd}ing $dst at $who's request";
+        Report $_[KERNEL], "${cmd}ing $dst at ${who}'s request";
     } elsif ( $addressed and $operator and lc $msg eq 'list ignored' ) {
         $irc->yield(
             privmsg => $chl => "Currently ignored: ",
