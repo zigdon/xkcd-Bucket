@@ -640,12 +640,23 @@ sub irc_on_public {
                 privmsg => $chl => "$who: Hold on, I'm still counting" );
             return;
         }
-        my $days = int( ( time - $stats{startup_time} ) / 24 / 60 / 60 );
+        my $awake = (time - $stats{startup_time}) / 60; # minutes
+        my $units = "minute";
+        if ($awake > 60) {
+           $awake /= 60; # hours
+           $units = "hour";
+        } 
+        if ($awake > 24) {
+           $awake /= 24; # days
+           $units = "day";
+        } 
+        $awake = int ($awake);
+
         $irc->yield(
             privmsg => $chl => sprintf(
                 join( " ",
                     "I've been awake since %s",
-                    "(about %d day%s).",
+                    "(about %d %s%s).",
                     "In that time, I learned %d new thing%s,",
                     "updated %d thing%s,",
                     "and forgot %d thing%s.",
@@ -655,7 +666,7 @@ sub irc_on_public {
                     "in my inventory." ),
                 scalar localtime( $stats{startup_time} ),
 #<<<
-                $days,            &s($days),
+                $awake, $units,   &s($awake),
                 $stats{learn},    &s( $stats{learn} ),
                 $stats{edited},   &s( $stats{edited} ),
                 $stats{deleted},  &s( $stats{deleted} ),
