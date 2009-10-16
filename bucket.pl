@@ -635,7 +635,7 @@ sub irc_on_public {
             EVENT => 'db_success'
         );
     } elsif ( $addressed and $msg eq 'stats' ) {
-        my $days = int ((time - $stats{startup_time}/) 24/60/60);
+        my $days = int ((time - $stats{startup_time})/ 24/60/60);
         $irc->yield(
             privmsg => $chl => sprintf(
                 join( " ",
