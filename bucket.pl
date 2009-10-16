@@ -1009,7 +1009,6 @@ sub db_success {
 
             Log "Taking $item from $bag{who}: " . join ", ",
               @inventory;
-            Report $_[KERNEL], "Taking $item from $bag{who}";
             $_[KERNEL]->post(
                 db   => 'DO',
                 SQL  => 'insert into bucket_items 
@@ -1691,7 +1690,7 @@ sub get_item {
 
     my $item = rand @inventory;
     if ($give) {
-        Report $_[KERNEL], "Dropping $inventory[$item]";
+        Log "Dropping $inventory[$item]";
         return splice( @inventory, $item, 1, () );
     } else {
         return $inventory[$item];
