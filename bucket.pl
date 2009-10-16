@@ -110,8 +110,8 @@ sub Log {
 }
 
 sub Report {
-    my $kernel = shift;
-    my $delay = shift if $_[0] =~ /^\d+$/;
+    my $kernel     = shift;
+    my $delay      = shift if $_[0] =~ /^\d+$/;
     my $logchannel = DEBUG ? $channel : $config->{logchannel};
     unshift @_, "REPORT:" if DEBUG;
 
@@ -635,7 +635,11 @@ sub irc_on_public {
             EVENT => 'db_success'
         );
     } elsif ( $addressed and $msg eq 'stats' ) {
-        my $days = int ((time - $stats{startup_time})/ 24/60/60);
+        unless ( $stats{stats_cached} ) {
+            $irc->yield(
+                privmsg => $chl => "$who: Hold on, I'm still counting" );
+        }
+        my $days = int( ( time - $stats{startup_time} ) / 24 / 60 / 60 );
         $irc->yield(
             privmsg => $chl => sprintf(
                 join( " ",
@@ -647,16 +651,17 @@ sub irc_on_public {
                     "That brings me to a total of %d",
                     "thing%s I know about %d subject%s.",
                     "I have carried a total of %d item%s",
-                    "in my inventory."
-                    ),
+                    "in my inventory." ),
                 scalar localtime( $stats{startup_time} ),
-                $days,            &s($days), 
-                $stats{learn},    &s($stats{learn}),
-                $stats{edited},   &s($stats{edited}),
-                $stats{deleted},  &s($stats{deleted}),
-                $stats{rows},     &s($stats{rows}),
-                $stats{triggers}, &s($stats{triggers}),
-                $stats{items},    &s($stats{items}),
+#<<<
+                $days,            &s($days),
+                $stats{learn},    &s( $stats{learn} ),
+                $stats{edited},   &s( $stats{edited} ),
+                $stats{deleted},  &s( $stats{deleted} ),
+                $stats{rows},     &s( $stats{rows} ),
+                $stats{triggers}, &s( $stats{triggers} ),
+                $stats{items},    &s( $stats{items} ),
+#>>>
             )
         );
     } elsif ( $operator and $addressed and $msg eq 'restart' ) {
@@ -796,7 +801,7 @@ sub db_success {
             $line{tidbit} =~ s/\$who/$bag{who}/gi;
             if ( $line{tidbit} =~ /\$someone/i ) {
                 while ( $line{tidbit} =~ /\$someone/i ) {
-                    my $rnick = &someone($bag{chl});
+                    my $rnick = &someone( $bag{chl} );
                     $line{tidbit} =~ s/\$someone/$rnick/i;
                 }
             }
@@ -812,8 +817,8 @@ sub db_success {
 
             while ( $line{tidbit} =~ /\$newitem/i ) {
                 my $newitem = shift @random_items || 'bananas';
-                my ($rc, @dropped) = &put_item($newitem, 1);
-                if ($rc == 2) {
+                my ( $rc, @dropped ) = &put_item( $newitem, 1 );
+                if ( $rc == 2 ) {
                     &cached_reply( $bag{chl}, $bag{who}, \@dropped,
                         "drops item" );
                     return;
@@ -995,33 +1000,30 @@ sub db_success {
             $item =~ s/\b(?:his|her)\b/$bag{who}\'s/;
             $item =~ s/[ .?!]+$//;
 
-            my ($rc, @dropped) = &put_item($item, 0);
-            if ($rc == 1) {
-                &cached_reply( $bag{chl}, $bag{who}, $item,
-                    "takes item" );
-            } elsif ($rc == 2) {
-                &cached_reply( $bag{chl}, $bag{who}, [$item, @dropped],
+            my ( $rc, @dropped ) = &put_item( $item, 0 );
+            if ( $rc == 1 ) {
+                &cached_reply( $bag{chl}, $bag{who}, $item, "takes item" );
+            } elsif ( $rc == 2 ) {
+                &cached_reply( $bag{chl}, $bag{who}, [ $item, @dropped ],
                     "pickup full" );
-            } elsif ($rc == -1) {
-                &cached_reply( $bag{chl}, $bag{who}, $item,
-                    "duplicate item" );
+            } elsif ( $rc == -1 ) {
+                &cached_reply( $bag{chl}, $bag{who}, $item, "duplicate item" );
                 return;
             } else {
                 Log "&put_item($item) returned weird value: $rc";
                 return;
             }
 
-            Log "Taking $item from $bag{who}: " . join ", ",
-              @inventory;
+            Log "Taking $item from $bag{who}: " . join ", ", @inventory;
             $_[KERNEL]->post(
-                db   => 'DO',
-                SQL  => 'insert into bucket_items 
+                db  => 'DO',
+                SQL => 'insert into bucket_items 
                                 (what, user, channel)
                                 values (?, ?, ?)',
                 PLACEHOLDERS => [ $item, $bag{who}, $bag{chl} ],
-                EVENT => 'db_success'
+                EVENT        => 'db_success'
             );
-            &random_item_cache($_[KERNEL]);
+            &random_item_cache( $_[KERNEL] );
         } else {    # lookup band name!
             if (    $config->{band_name}
                 and $bag{type} eq 'irc_public'
@@ -1417,21 +1419,24 @@ sub db_success {
     } elsif ( $bag{cmd} eq 'stats2' ) {
         $stats{rows} = $res->{RESULT}{c};
     } elsif ( $bag{cmd} eq 'stats3' ) {
-        $stats{items} = $res->{RESULT}{c};
+        $stats{items}        = $res->{RESULT}{c};
+        $stats{stats_cached} = time;
     } elsif ( $bag{cmd} eq 'itemcache' ) {
-        @random_items = ref $res->{RESULT} ? map {$_->{what}} @{ $res->{RESULT} } : [];
+        @random_items =
+          ref $res->{RESULT} ? map { $_->{what} } @{ $res->{RESULT} } : [];
         Log "Updated random item cache: ", join ", ", @random_items;
 
-        if ($stats{preloaded_items}) {
-            if (@random_items > $stats{preloaded_items}) {
-                @inventory = splice(@random_items, 0, $stats{preloaded_items}, ());
+        if ( $stats{preloaded_items} ) {
+            if ( @random_items > $stats{preloaded_items} ) {
+                @inventory =
+                  splice( @random_items, 0, $stats{preloaded_items}, () );
             } else {
-                @inventory = @random_items;
+                @inventory    = @random_items;
                 @random_items = ();
             }
             delete $stats{preloaded_items};
 
-            &random_item_cache($_[KERNEL]);
+            &random_item_cache( $_[KERNEL] );
         }
     } else {
         Log "DB returned.",
@@ -1460,7 +1465,7 @@ sub irc_start {
     &cache( $_[KERNEL], "list items" );
     &cache( $_[KERNEL], "duplicate item" );
     &cache( $_[KERNEL], "band name reply" );
-    &random_item_cache($_[KERNEL]);
+    &random_item_cache( $_[KERNEL] );
     $stats{preloaded_items} = $config->{inventory_preload} || 0;
 
     $irc->yield(
@@ -1550,8 +1555,9 @@ sub cached_reply {
         }
 
         $extra = "";
-    } elsif ( $type eq 'pickup full' 
-              or $type eq 'drops item') {
+    } elsif ( $type eq 'pickup full'
+        or $type eq 'drops item' )
+    {
         $extra = [$extra] unless ref $extra eq 'ARRAY';
         my $newitem;
         my @olditems = @$extra;
@@ -1566,7 +1572,7 @@ sub cached_reply {
         }
     } elsif ( $type eq 'takes item'
         or $type eq 'duplicate item'
-        or $type eq 'list items')
+        or $type eq 'list items' )
     {
         if ( $tidbit =~ /\$item/i ) {
             $tidbit =~ s/\$item/$extra/ig;
@@ -1589,8 +1595,8 @@ sub cached_reply {
     } elsif ( $tidbit =~ /\$newitem/i ) {
         while ( $tidbit =~ /\$newitem/i ) {
             my $newitem = shift @random_items || 'bananas';
-            my ($rc, @dropped) = &put_item($newitem, 1);
-            if ($rc == 2) {
+            my ( $rc, @dropped ) = &put_item( $newitem, 1 );
+            if ( $rc == 2 ) {
                 &cached_reply( $chl, $who, \@dropped, "drops item" );
                 return;
             }
@@ -1713,13 +1719,13 @@ sub someone {
     my $channel = shift;
     my @nicks =
       grep { lc $_ ne $nick and not exists $config->{exclude}{ lc $_ } }
-      keys %{$stats{users}{$channel}};
+      keys %{ $stats{users}{$channel} };
     return 'someone' unless @nicks;
     return $nicks[ rand(@nicks) ];
 }
 
 sub clear_cache {
-    foreach my $channel ( keys %{$stats{users}} ) {
+    foreach my $channel ( keys %{ $stats{users} } ) {
         foreach my $user ( keys %{ $stats{users}{$channel} } ) {
             delete $stats{users}{$channel}{$user}
               if $stats{users}{$channel}{$user} <
@@ -1730,19 +1736,20 @@ sub clear_cache {
 
 sub random_item_cache {
     my $kernel = shift;
-    my $force = shift;
-    my $limit = $config->{random_item_cache_size} || 20;
+    my $force  = shift;
+    my $limit  = $config->{random_item_cache_size} || 20;
     $limit =~ s/\D//g;
 
-    if (not $force and @random_items >= $limit) {
+    if ( not $force and @random_items >= $limit ) {
         return;
     }
 
     $kernel->post(
         db      => 'MULTIPLE',
         BAGGAGE => { cmd => "itemcache" },
-        SQL     => "select what, user from bucket_items order by rand() limit $limit",
-        EVENT   => 'db_success'
+        SQL =>
+          "select what, user from bucket_items order by rand() limit $limit",
+        EVENT => 'db_success'
     );
 }
 
@@ -1757,7 +1764,7 @@ sub random_item_cache {
 # 1  - item accepted
 # 2  - items dropped.  for handed items, the item has also been accepted.
 sub put_item {
-    my $item = shift;
+    my $item    = shift;
     my $crafted = shift;
 
     my $dup = 0;
@@ -1771,20 +1778,23 @@ sub put_item {
     if ($dup) {
         return -1;
     } else {
-        if ( ($crafted and @inventory >= 2 * $config->{inventory_size} ) or
-             (not $crafted and @inventory >= $config->{inventory_size} )) {
+        if (   ( $crafted and @inventory >= 2 * $config->{inventory_size} )
+            or ( not $crafted and @inventory >= $config->{inventory_size} ) )
+        {
 
             my $dropping_rate = $config->{item_drop_rate} || 3;
             my @drop;
-            while (@inventory >= $config->{inventory_size} and $dropping_rate-- > 0) {
-               push @drop, &get_item(1);
+            while ( @inventory >= $config->{inventory_size}
+                and $dropping_rate-- > 0 )
+            {
+                push @drop, &get_item(1);
             }
 
             unless ($crafted) {
                 push @inventory, $item;
             }
 
-            return (2, @drop);
+            return ( 2, @drop );
         } else {
             push @inventory, $item;
             return 1;
