@@ -638,6 +638,7 @@ sub irc_on_public {
         unless ( $stats{stats_cached} ) {
             $irc->yield(
                 privmsg => $chl => "$who: Hold on, I'm still counting" );
+            return;
         }
         my $days = int( ( time - $stats{startup_time} ) / 24 / 60 / 60 );
         $irc->yield(
