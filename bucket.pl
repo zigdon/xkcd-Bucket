@@ -635,24 +635,28 @@ sub irc_on_public {
             EVENT => 'db_success'
         );
     } elsif ( $addressed and $msg eq 'stats' ) {
+        my $days = int (time - $stats{startup_time}/ 24/60/60);
         $irc->yield(
             privmsg => $chl => sprintf(
                 join( " ",
-                    "I've been awake since %s.",
+                    "I've been awake since %s",
+                    "(about %d day%s).",
                     "In that time, I learned %d new thing%s,",
                     "updated %d thing%s,",
                     "and forgot %d thing%s.",
                     "That brings me to a total of %s",
-                    "things I know about %s subjects." ),
+                    "thing%s I know about %s subject%s.",
+                    "I have carried a total of %d item%s",
+                    "in my inventory."
+                    ),
                 scalar localtime( $stats{startup_time} ),
-                $stats{learn},
-                ( $stats{learn} == 1 ? "" : "s" ),
-                $stats{edited},
-                ( $stats{edited} == 1 ? "" : "s" ),
-                $stats{deleted},
-                ( $stats{deleted} == 1 ? "" : "s" ),
-                $stats{rows},
-                $stats{triggers}
+                $days,            &s($days), 
+                $stats{learn},    &s($stats{learn}),
+                $stats{edited},   &s($stats{edited}),
+                $stats{deleted},  &s($stats{deleted}),
+                $stats{rows},     &s($stats{rows}),
+                $stats{triggers}, &s($stats{triggers}),
+                $stats{items},    &s($stats{items}),
             )
         );
     } elsif ( $operator and $addressed and $msg eq 'restart' ) {
@@ -1412,6 +1416,8 @@ sub db_success {
         $stats{triggers} = $res->{RESULT}{c};
     } elsif ( $bag{cmd} eq 'stats2' ) {
         $stats{rows} = $res->{RESULT}{c};
+    } elsif ( $bag{cmd} eq 'stats3' ) {
+        $stats{items} = $res->{RESULT}{c};
     } elsif ( $bag{cmd} eq 'itemcache' ) {
         @random_items = ref $res->{RESULT} ? map {$_->{what}} @{ $res->{RESULT} } : [];
         Log "Updated random item cache: ", join ", ", @random_items;
@@ -1631,6 +1637,12 @@ sub get_stats {
         SQL     => "select count(id) c from bucket_facts",
         EVENT   => 'db_success'
     );
+    $kernel->post(
+        db      => 'SINGLE',
+        BAGGAGE => { cmd => "stats3" },
+        SQL     => "select count(id) c from bucket_items",
+        EVENT   => 'db_success'
+    );
 
     $stats{last_updated} = time;
 }
@@ -1787,4 +1799,8 @@ sub make_list {
     return join " and ", @list if @list == 2;
     my $last = $list[-1];
     return join( ", ", @list[ 0 .. $#list - 1 ] ) . ", and $last";
+}
+
+sub s {
+    return $_[0] == 1 ? "" : "s";
 }
