@@ -635,7 +635,7 @@ sub irc_on_public {
             EVENT => 'db_success'
         );
     } elsif ( $addressed and $msg eq 'stats' ) {
-        my $days = int (time - $stats{startup_time}/ 24/60/60);
+        my $days = int ((time - $stats{startup_time}/) 24/60/60);
         $irc->yield(
             privmsg => $chl => sprintf(
                 join( " ",
@@ -644,8 +644,8 @@ sub irc_on_public {
                     "In that time, I learned %d new thing%s,",
                     "updated %d thing%s,",
                     "and forgot %d thing%s.",
-                    "That brings me to a total of %s",
-                    "thing%s I know about %s subject%s.",
+                    "That brings me to a total of %d",
+                    "thing%s I know about %d subject%s.",
                     "I have carried a total of %d item%s",
                     "in my inventory."
                     ),
