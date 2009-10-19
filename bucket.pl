@@ -663,7 +663,7 @@ sub irc_on_public {
                     "That brings me to a total of %d",
                     "thing%s I know about %d subject%s.",
                     "I have carried a total of %d item%s",
-                    "in my inventory." ),
+                    "in my inventory, %d of which I still have." ),
                 scalar localtime( $stats{startup_time} ),
 #<<<
                 $awake, $units,   &s($awake),
@@ -673,6 +673,7 @@ sub irc_on_public {
                 $stats{rows},     &s( $stats{rows} ),
                 $stats{triggers}, &s( $stats{triggers} ),
                 $stats{items},    &s( $stats{items} ),
+                scalar @inventory,
 #>>>
             )
         );
