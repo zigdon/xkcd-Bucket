@@ -29,7 +29,7 @@ use Data::Dumper;
 use Fcntl qw/:seek/;
 $Data::Dumper::Indent = 1;
 
-use constant { DEBUG => 0 };
+use constant { DEBUG => 1 };
 
 my $VERSION = '$Id: bucket.pl 685 2009-08-04 19:15:15Z dan $';
 
@@ -88,6 +88,7 @@ POE::Session->create(
     inline_states => {
         _start           => \&irc_start,
         irc_001          => \&irc_on_connect,
+        irc_kick         => \&irc_on_kick,
         irc_public       => \&irc_on_public,
         irc_ctcp_action  => \&irc_on_public,
         irc_msg          => \&irc_on_public,
@@ -130,11 +131,42 @@ sub delayed_post {
     $irc->yield( privmsg => $_[ARG0], $_[ARG1] );
 }
 
+sub irc_on_kick {
+    my ($kicker) = split /!/, $_[ARG0];
+    my $chl      = $_[ARG1];
+    my $kickee   = $_[ARG2];
+    my $desc     = $_[ARG3];
+
+    Log "$kicker kicked $kickee from $chl";
+
+    $_[KERNEL]->post(
+        db  => 'SINGLE',
+        SQL => 'select id, fact, verb, tidbit from bucket_facts 
+                        where fact = ? or fact = ? 
+                        order by rand('
+          . int( rand(1e6) ) 
+          . ') limit 1',
+        PLACEHOLDERS => [ "$kicker kicked $kickee", "$kicker kicked someone" ],
+        BAGGAGE      => {
+            cmd       => "fact",
+            chl       => $chl,
+            msg       => "$kicker kicked $kickee",
+            orig      => "$kicker kicked $kickee",
+            who       => $kicker,
+            addressed => 0,
+            editable  => 0,
+            op        => 1,
+            type      => 'irc_kick',
+        },
+        EVENT => 'db_success'
+    );
+}
+
 sub irc_on_public {
     my ($who) = split /!/, $_[ARG0];
     my $type  = $_[STATE];
     my $chl   = $_[ARG1];
-    $chl = $chl->[0];
+    $chl = $chl->[0] if ref $chl eq 'ARRAY';
     my $msg = $_[ARG2];
 
     if ( not $stats{tail_time} or time - $stats{tail_time} > 60 ) {
