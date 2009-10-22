@@ -299,6 +299,7 @@ sub irc_on_public {
         my ( $fact, $search ) = ( $1, $2 );
         $search =~ s{([\\/%?"'])}{\\$1}g;
         $fact = &trim($fact);
+        $msg =~ s/ =~ \/$search\///;
         Log "Looking up a particular factoid - '$search' in '$fact'";
         $_[KERNEL]->post(
             db  => 'SINGLE',
@@ -1726,7 +1727,7 @@ sub check_idle {
             chl       => $chl,
             msg       => undef,
             orig      => undef,
-            who       => 'Bucket',
+            who       => $nick,
             addressed => 0,
             editable  => 0,
             op        => 0,
