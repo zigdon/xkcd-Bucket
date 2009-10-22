@@ -1881,7 +1881,7 @@ sub round_time {
     }
     $dt = int($dt);
 
-    $units .= &s($units);
+    $units .= &s($dt);
 
     return ( $dt, $units );
 }
