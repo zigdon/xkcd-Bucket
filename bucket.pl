@@ -29,7 +29,7 @@ use Data::Dumper;
 use Fcntl qw/:seek/;
 $Data::Dumper::Indent = 1;
 
-use constant { DEBUG => 0 };
+use constant { DEBUG => 1 };
 
 my $VERSION = '$Id: bucket.pl 685 2009-08-04 19:15:15Z dan $';
 
@@ -139,26 +139,11 @@ sub irc_on_kick {
 
     Log "$kicker kicked $kickee from $chl";
 
-    $_[KERNEL]->post(
-        db  => 'SINGLE',
-        SQL => 'select id, fact, verb, tidbit from bucket_facts 
-                        where fact = ? or fact = ? 
-                        order by rand('
-          . int( rand(1e6) ) 
-          . ') limit 1',
-        PLACEHOLDERS => [ "$kicker kicked $kickee", "$kicker kicked someone" ],
-        BAGGAGE      => {
-            cmd       => "fact",
-            chl       => $chl,
-            msg       => "$kicker kicked $kickee",
-            orig      => "$kicker kicked $kickee",
-            who       => $kicker,
-            addressed => 0,
-            editable  => 0,
-            op        => 1,
-            type      => 'irc_kick',
-        },
-        EVENT => 'db_success'
+    &lookup(msgs  => [ "$kicker kicked $kickee", "$kicker kicked someone" ],
+            chl   => $chl,
+            who   => $kicker,
+            op    => 1,
+            type  => 'irc_kick',
     );
 }
 
@@ -301,23 +286,14 @@ sub irc_on_public {
         $fact = &trim($fact);
         $msg =~ s/ =~ \/$search\///;
         Log "Looking up a particular factoid - '$search' in '$fact'";
-        $_[KERNEL]->post(
-            db  => 'SINGLE',
-            SQL => qq{select id, fact, verb, tidbit from bucket_facts 
-                            where fact = ? and tidbit like "%$search%"
-                            order by rand(} . int( rand(1e6) ) . ') limit 1',
-            PLACEHOLDERS => [$fact],
-            BAGGAGE      => {
-                cmd       => "fact",
+        &lookup(
                 chl       => $chl,
                 msg       => $msg,
-                orig      => $msg,
                 who       => $who,
                 addressed => $addressed,
                 editable  => $editable,
                 op        => $operator,
-            },
-            EVENT => 'db_success'
+                search    => $search,
         );
     } elsif ( $msg =~ /^literal(?:\[(\d+)\])?\s+(.*)/i ) {
         my ( $page, $fact ) = ( $1 || 1, $2 );
@@ -642,22 +618,9 @@ sub irc_on_public {
             EVENT => 'db_success'
         );
     } elsif ( $addressed and $msg eq 'something random' ) {
-        $_[KERNEL]->post(
-            db  => 'SINGLE',
-            SQL => 'select id, fact, verb, tidbit from bucket_facts 
-                            order by rand(' . int( rand(1e6) ) . ') limit 1 ',
-            BAGGAGE => {
-                cmd       => "fact",
-                chl       => $chl,
-                msg       => undef,
-                orig      => undef,
-                who       => $who,
-                addressed => 0,
-                editable  => 0,
-                op        => 0,
-                type      => 'irc_public',
-            },
-            EVENT => 'db_success'
+        &lookup(
+            chl       => $chl,
+            who       => $who,
         );
     } elsif ( $addressed and $msg eq 'stats' ) {
         unless ( $stats{stats_cached} ) {
@@ -756,15 +719,7 @@ sub irc_on_public {
             }
 
             #Log "Looking up $msg";
-            $_[KERNEL]->post(
-                db  => 'SINGLE',
-                SQL => 'select id, fact, verb, tidbit from bucket_facts 
-                                where fact = ? order by rand('
-                  . int( rand(1e6) ) 
-                  . ') limit 1',
-                PLACEHOLDERS => [$msg],
-                BAGGAGE      => {
-                    cmd       => "fact",
+	    &lookup( 
                     chl       => $chl,
                     msg       => $msg,
                     orig      => $orig,
@@ -773,9 +728,7 @@ sub irc_on_public {
                     editable  => $editable,
                     op        => $operator,
                     type      => $type,
-                },
-                EVENT => 'db_success'
-            );
+		);
         }
     }
 }
@@ -809,16 +762,7 @@ sub db_success {
                 $bag{alias_id} = $line{id} unless $bag{alias_id};
 
                 Log "Following alias '$line{fact}' -> '$line{tidbit}'";
-                $_[KERNEL]->post(
-                    db  => 'SINGLE',
-                    SQL => 'select fact, verb, tidbit from bucket_facts 
-                                    where fact = ? order by rand('
-                      . int( rand(1e6) ) 
-                      . ') limit 1',
-                    PLACEHOLDERS => [ $line{tidbit} ],
-                    BAGGAGE      => { %bag, msg => $line{tidbit} },
-                    EVENT        => 'db_success'
-                );
+                &lookup(%bag, msg => $line{tidbit});
                 return;
             }
 
@@ -879,16 +823,7 @@ sub db_success {
             }
             return;
         } elsif ( $bag{msg} =~ s/^what is |^what's |^the //i ) {
-            $_[KERNEL]->post(
-                db  => 'SINGLE',
-                SQL => 'select id, fact, verb, tidbit from bucket_facts 
-                                where fact = ? order by rand('
-                  . int( rand(1e6) ) 
-                  . ') limit 1',
-                PLACEHOLDERS => [ $bag{msg} ],
-                BAGGAGE      => {%bag},
-                EVENT        => 'db_success'
-            );
+            &lookup(%bag);
             return;
         }
 
@@ -1703,23 +1638,10 @@ sub check_idle {
     my $chl = DEBUG ? $channel : $mainchannel;
     return if time - $last_activity{$chl} < 60 * $config->{random_wait};
 
-    $_[KERNEL]->post(
-        db  => 'SINGLE',
-        SQL => 'select id, fact, verb, tidbit from bucket_facts 
-                        order by rand(' . int( rand(100) ) . ') limit 1 ',
-        BAGGAGE => {
-            cmd       => "fact",
-            chl       => $chl,
-            msg       => undef,
-            orig      => undef,
-            who       => $nick,
-            addressed => 0,
-            editable  => 0,
-            op        => 0,
-            idle      => 1,
-            type      => 'irc_public',
-        },
-        EVENT => 'db_success'
+    &lookup(
+        chl       => $chl,
+        who       => $nick,
+        idle      => 1,
     );
 
     $last_activity{$chl} = time;
@@ -1881,4 +1803,52 @@ sub do {
     my ($chl, $action) = @_;
 
     $irc->yield( ctcp => $chl => "ACTION $action" );
+}
+
+sub lookup {
+    my %params = @_;
+    my $sql;
+    my $type;
+
+    if (exists $params{msg}) {
+        $sql = "fact = ?";
+        $type = "single";
+    } elsif (exists $params{msgs}) {
+	$sql = "fact in (". 
+	       join(", ", map {"?"} @{$params{msgs}}) .
+	        ")";
+        $params{msg} = $params{msgs}[0];
+        $type = "multiple";
+    } else { 
+      $sql = "1";
+      $type = "none";
+    }
+
+    if (exists $params{search}) {
+        $sql .= " and tidbit like \"%$params{search}%\"";
+    }
+
+    POE::Kernel->post(
+	db  => 'SINGLE',
+	SQL => "select id, fact, verb, tidbit from bucket_facts 
+			where $sql order by rand("
+	  . int( rand(1e6) ) 
+	  . ') limit 1',
+	PLACEHOLDERS => $type eq 'multiple' ?  $params{msgs} :
+                        $type eq 'single'   ? [$params{msg}] :
+                                              [],
+	BAGGAGE      => {
+	    cmd       => "fact",
+	    chl       => $params{chl},
+	    msg       => $params{msg},
+	    orig      => $params{orig}      || $params{msg},
+	    who       => $params{who},
+	    addressed => $params{addressed} || 0,
+	    editable  => $params{editable}  || 0,
+	    op        => $params{operator}  || 0,
+            idle      => $params{idle}      || 0,
+	    type      => $params{type}      || "irc_public",
+	},
+	EVENT => 'db_success'
+    );
 }
