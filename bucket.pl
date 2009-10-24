@@ -664,6 +664,17 @@ sub irc_on_public {
               &round_time( $talking{$chl} - time );
         }
         &say( $chl => $reply );
+    } elsif ( $operator and $addressed and $msg =~ /^stat (\w+)\??/) {
+	my $key = $1;
+        Log("stats: $key");
+	if ($key eq 'keys') {
+	    &say($chl => "$who: valid keys are: ". 
+		  &make_list(sort keys %stats) . ".");
+	} elsif (exists $stats{$key}) {
+	    &say($chl => "$who: $key: $stats{$key}.");
+	} else {
+	    &say($chl => "Sorry, $who, I don't have statistics for '$key'.");
+	}
     } elsif ( $operator and $addressed and $msg eq 'restart' ) {
         Report $_[KERNEL], "Restarting at ${who}'s request";
         Log "Restarting at ${who}'s request";
@@ -672,26 +683,21 @@ sub irc_on_public {
     } elsif ( $operator and $addressed and $msg =~ /^set(?: (\w+) (.*))?/ ) {
         my ( $key, $val ) = ( $1, $2 );
 
-        unless ($key) {
-            $irc->yield(
-                privmsg => $chl => "$who: Valid keys are: " . join ", ",
+        unless ($key and exists $config_keys{$key}) {
+            &say( $chl => "$who: Valid keys are: " . join ", ",
                 sort keys %config_keys
             );
             return;
         }
 
-        foreach my $ckey ( keys %config_keys ) {
-            next unless $key eq $ckey;
-            if ( $config_keys{$ckey} eq 'p' and $val =~ /^(\d+)%?$/ ) {
-                $config->{$key} = $1;
-            } elsif ( $config_keys{$ckey} eq 'i' and $val =~ /^(\d+)$/ ) {
-                $config->{$key} = $1;
-            } else {
-                &say( $chl => "Sorry, $who, that's an invalid value for $key." );
-                return;
-            }
-            last;
-        }
+	if ( $config_keys{$key} eq 'p' and $val =~ /^(\d+)%?$/ ) {
+	    $config->{$key} = $1;
+	} elsif ( $config_keys{$key} eq 'i' and $val =~ /^(\d+)$/ ) {
+	    $config->{$key} = $1;
+	} else {
+	    &say( $chl => "Sorry, $who, that's an invalid value for $key." );
+	    return;
+	}
 
         &say( $chl => "Okay, $who." );
         Report $_[KERNEL], "$who set '$key' to '$val'";
@@ -1794,13 +1800,15 @@ sub round_time {
 }
 
 sub say {
-    my ($chl, $text) = @_;
+    my $chl = shift;
+    my $text = "@_";
 
     $irc->yield( privmsg => $chl => $text );
 }
 
 sub do {
-    my ($chl, $action) = @_;
+    my $chl = shift;
+    my $action = "@_";
 
     $irc->yield( ctcp => $chl => "ACTION $action" );
 }
