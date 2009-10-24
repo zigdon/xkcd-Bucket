@@ -671,7 +671,13 @@ sub irc_on_public {
 	    &say($chl => "$who: valid keys are: ". 
 		  &make_list(sort keys %stats) . ".");
 	} elsif (exists $stats{$key}) {
-	    &say($chl => "$who: $key: $stats{$key}.");
+            if (ref $stats{$key}) {
+                my $dump = Dumper($stats{$key});
+                $dump =~ s/[\s\n]+/ /g;
+                &say($chl => "$who: $key: $dump.");
+            } else {
+                &say($chl => "$who: $key: $stats{$key}.");
+            }
 	} else {
 	    &say($chl => "Sorry, $who, I don't have statistics for '$key'.");
 	}
