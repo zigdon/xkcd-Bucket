@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-#  Copyright (C) 2008  Dan Boger - zigdon+bot@gmail.com
+#  Copyright (C) 2009  Dan Boger - zigdon+bot@gmail.com
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -122,13 +122,13 @@ sub Report {
             $kernel->delay_add(
                 delayed_post => 2 * $delay => $logchannel => "@_" );
         } else {
-            $irc->yield( privmsg => $logchannel => "@_" );
+	    &say($logchannel, "@_");
         }
     }
 }
 
 sub delayed_post {
-    $irc->yield( privmsg => $_[ARG0], $_[ARG1] );
+    &say( $_[ARG0], $_[ARG1] );
 }
 
 sub irc_on_kick {
@@ -234,7 +234,7 @@ sub irc_on_public {
     if ( $config->{bananas_chance}
         and rand(100) < $config->{bananas_chance} )
     {
-        $irc->yield( privmsg => $chl => "Bananas!" );
+        &say( $chl => "Bananas!" );
     }
 
     my $editable = 0;
@@ -375,8 +375,7 @@ sub irc_on_public {
                 $target += $num * 60 * 60 * 24 if $unit eq 'd';
                 Report $_[KERNEL],
                   "Shutting up in $chl at ${who}'s request for $target seconds";
-                $irc->yield(
-                    privmsg => $chl => "Okay $who.  I'll be back later" );
+                &say( $chl => "Okay $who.  I'll be back later" );
                 $talking{$chl} = time + $target;
             } elsif ($word) {
                 $target += 60 if $word eq 'min' or $word eq 'minute';
@@ -385,32 +384,30 @@ sub irc_on_public {
                 $target += 30 * 60 + int( rand( 30 * 60 ) ) if $word eq 'while';
                 Report $_[KERNEL],
                   "Shutting up in $chl at ${who}'s request for $target seconds";
-                $irc->yield(
-                    privmsg => $chl => "Okay $who.  I'll be back later" );
+                &say( $chl => "Okay $who.  I'll be back later" );
                 $talking{$chl} = time + $target;
             }
         } else {
-            $irc->yield( privmsg => $chl => "Okay, $who - be back in a bit!" );
+            &say( $chl => "Okay, $who - be back in a bit!" );
             $talking{$chl} = time + $config->{timeout};
         }
     } elsif ( $addressed
         and $operator
         and $msg =~ /^unshut up\W*$|^come back\W*$/i )
     {
-        $irc->yield( privmsg => $chl => "\\o/" );
+        &say( $chl => "\\o/" );
         $talking{$chl} = -1;
     } elsif ( $addressed and $operator and $msg =~ /^(join|part) (#\w+)/i ) {
         my ( $cmd, $dst ) = ( $1, $2 );
         unless ($dst) {
-            $irc->yield( privmsg => $chl => "$who: $cmd what channel?" );
+            &say( $chl => "$who: $cmd what channel?" );
             return;
         }
         $irc->yield( $cmd => $dst );
-        $irc->yield( privmsg => $chl => "$who: ${cmd}ing $dst" );
+        &say( $chl => "$who: ${cmd}ing $dst" );
         Report $_[KERNEL], "${cmd}ing $dst at ${who}'s request";
     } elsif ( $addressed and $operator and lc $msg eq 'list ignored' ) {
-        $irc->yield(
-            privmsg => $chl => "Currently ignored: ",
+        &say( $chl => "Currently ignored: ",
             join ", ", sort keys %{ $config->{ignore} }
         );
     } elsif ( $addressed and $operator and $msg =~ /^(un)?ignore (\S+)/i ) {
@@ -421,7 +418,7 @@ sub irc_on_public {
             $config->{ignore}{ lc $2 } = 1;
         }
         &save;
-        $irc->yield( privmsg => $chl => "Okay, $who.  Ignore list updated." );
+        &say( $chl => "Okay, $who.  Ignore list updated." );
     } elsif ( $addressed and $operator and $msg =~ /^(un)?exclude (\S+)/i ) {
         Report $_[KERNEL], "$who is $1excluding $2";
         if ($1) {
@@ -430,7 +427,7 @@ sub irc_on_public {
             $config->{exclude}{ lc $2 } = 1;
         }
         &save;
-        $irc->yield( privmsg => $chl => "Okay, $who.  Exclude list updated." );
+        &say( $chl => "Okay, $who.  Exclude list updated." );
     } elsif ( $addressed and $operator and $msg =~ /^(un)?protect (.+)/i ) {
         my ( $protect, $fact ) = ( ( $1 ? 0 : 1 ), $2 );
         Report $_[KERNEL], "$who is $1protecting $fact";
@@ -441,15 +438,13 @@ sub irc_on_public {
             PLACEHOLDERS => [ $protect, $fact ],
             EVENT        => "db_success",
         );
-        $irc->yield(
-            privmsg => $chl => "Okay, $who, updated the protection bit." );
+        &say( $chl => "Okay, $who, updated the protection bit." );
     } elsif ( $addressed and $msg =~ /^undo last(?: (#\S+))?/ ) {
         Log "$who called undo:";
         my $uchannel = $1 || $chl;
         my $undo = $undo{$uchannel};
         unless ( $operator or $undo->[1] eq $who ) {
-            $irc->yield(
-                privmsg => $chl => "Sorry, $who, you can't undo that." );
+            &say( $chl => "Sorry, $who, you can't undo that." );
             return;
         }
         Log Dumper $undo;
@@ -461,7 +456,7 @@ sub irc_on_public {
                 EVENT        => "db_success",
             );
             Report $_[KERNEL], "$who called undo: deleted $undo->[3].";
-            $irc->yield( privmsg => $chl => "Okay, $who, deleted $undo->[3]." );
+            &say( $chl => "Okay, $who, deleted $undo->[3]." );
             delete $undo{$uchannel};
         } elsif ( $undo->[0] eq 'insert' ) {
             if ( $undo->[2] and ref $undo->[2] eq 'ARRAY' ) {
@@ -482,8 +477,7 @@ sub irc_on_public {
                     );
                 }
                 Report $_[KERNEL], "$who called undo: undeleted $undo->[3].";
-                $irc->yield(
-                    privmsg => $chl => "Okay, $who, undeleted $undo->[3]." );
+                &say( $chl => "Okay, $who, undeleted $undo->[3]." );
             } elsif ( $undo->[2] and ref $undo->[2] eq 'HASH' ) {
                 my %old = %{ $undo->[2] };
                 $old{RE}        = 0 unless $old{RE};
@@ -500,11 +494,11 @@ sub irc_on_public {
                 );
                 Report $_[KERNEL], "$who called undo:",
                   "unforgot $old{fact} $old{verb} $old{tidbit}.";
-                $irc->yield( privmsg => $chl =>
+                &say( $chl =>
                       "Okay, $who, unforgot $old{fact} $old{verb} $old{tidbit}."
                 );
             } else {
-                $irc->yield( privmsg => $chl =>
+                &say( $chl =>
                         "Sorry, $who, that's an invalid undo structure."
                       . "  Tell Zigdon, please." );
             }
@@ -540,17 +534,15 @@ sub irc_on_public {
                     }
                 }
                 Report $_[KERNEL], "$who called undo: undone $undo->[3].";
-                $irc->yield(
-                    privmsg => $chl => "Okay, $who, undone $undo->[3]." );
+                &say( $chl => "Okay, $who, undone $undo->[3]." );
             } else {
-                $irc->yield( privmsg => $chl =>
+                &say( $chl =>
                         "Sorry, $who, that's an invalid undo structure."
                       . "  Tell Zigdon, please." );
             }
             delete $undo{$uchannel};
         } else {
-            $irc->yield(
-                privmsg => $chl => "Sorry, $who, can't undo $undo->[0] yet" );
+            &say( $chl => "Sorry, $who, can't undo $undo->[0] yet" );
         }
     } elsif ( $addressed and $operator and $msg =~ /^alias (.*) => (.*)/ ) {
         my ( $src, $dst ) = ( $1, $2 );
@@ -593,7 +585,7 @@ sub irc_on_public {
     {
         my $id = $1 || $stats{last_fact}{$chl};
         unless ($id) {
-            $irc->yield( privmsg => $chl => "Sorry, $who, forget what?" );
+            &say( $chl => "Sorry, $who, forget what?" );
             return;
         }
 
@@ -615,7 +607,7 @@ sub irc_on_public {
     } elsif ( $addressed and $msg =~ /^what was that\??$/ ) {
         my $id = $1 || $stats{last_fact}{$chl};
         unless ($id) {
-            $irc->yield( privmsg => $chl => "Sorry, $who, I have no idea." );
+            &say( $chl => "Sorry, $who, I have no idea." );
             return;
         }
 
@@ -669,8 +661,7 @@ sub irc_on_public {
         );
     } elsif ( $addressed and $msg eq 'stats' ) {
         unless ( $stats{stats_cached} ) {
-            $irc->yield(
-                privmsg => $chl => "$who: Hold on, I'm still counting" );
+            &say( $chl => "$who: Hold on, I'm still counting" );
             return;
         }
         my ( $awake, $units ) = &round_time( time - $stats{startup_time} );
@@ -709,11 +700,11 @@ sub irc_on_public {
               . "but I'll be back in about %s %s. ",
               &round_time( $talking{$chl} - time );
         }
-        $irc->yield( privmsg => $chl => $reply );
+        &say( $chl => $reply );
     } elsif ( $operator and $addressed and $msg eq 'restart' ) {
         Report $_[KERNEL], "Restarting at ${who}'s request";
         Log "Restarting at ${who}'s request";
-        $irc->yield( privmsg => $chl => "Okay, $who, I'll be right back." );
+        &say( $chl => "Okay, $who, I'll be right back." );
         $irc->yield( quit => "OHSHI--" );
     } elsif ( $operator and $addressed and $msg =~ /^set(?: (\w+) (.*))?/ ) {
         my ( $key, $val ) = ( $1, $2 );
@@ -733,14 +724,13 @@ sub irc_on_public {
             } elsif ( $config_keys{$ckey} eq 'i' and $val =~ /^(\d+)$/ ) {
                 $config->{$key} = $1;
             } else {
-                $irc->yield( privmsg => $chl =>
-                      "Sorry, $who, that's an invalid value for $key." );
+                &say( $chl => "Sorry, $who, that's an invalid value for $key." );
                 return;
             }
             last;
         }
 
-        $irc->yield( privmsg => $chl => "Okay, $who." );
+        &say( $chl => "Okay, $who." );
         Report $_[KERNEL], "$who set '$key' to '$val'";
 
         &save;
@@ -748,14 +738,13 @@ sub irc_on_public {
     } elsif ( $operator and $addressed and $msg =~ /^get (\w+)/ ) {
         my ($key) = ($1);
         unless ( exists $config_keys{$key} ) {
-            $irc->yield(
-                privmsg => $chl => "$who: Valid keys are: " . join ", ",
+            &say( $chl => "$who: Valid keys are: " . join ", ",
                 sort keys %config_keys
             );
             return;
         }
 
-        $irc->yield( privmsg => $chl => "$key is $config->{$key}." );
+        &say( $chl => "$key is $config->{$key}." );
     } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?$/i ) {
         &cached_reply( $chl, $who, "", "list items" );
     } else {
@@ -875,18 +864,17 @@ sub db_success {
             }
 
             if ( $line{verb} eq '<reply>' ) {
-                $irc->yield( privmsg => $bag{chl} => $line{tidbit} );
+                &say( $bag{chl} => $line{tidbit} );
             } elsif ( $line{verb} eq '\'s' ) {
-                $irc->yield(
-                    privmsg => $bag{chl} => "$bag{msg}'s $line{tidbit}" );
+                &say( $bag{chl} => "$bag{msg}'s $line{tidbit}" );
             } elsif ( $line{verb} eq '<action>' ) {
-                $irc->yield( ctcp => $bag{chl} => "ACTION $line{tidbit}" );
+                &do( $bag{chl} => $line{tidbit} );
             } else {
                 if ( lc $bag{msg} eq 'bucket' and lc $line{verb} eq 'is' ) {
                     $bag{msg}   = 'I';
                     $line{verb} = 'am';
                 }
-                $irc->yield( privmsg => $bag{chl} =>
+                &say( $bag{chl} =>
                       "$bag{msg} $line{verb} $line{tidbit}" );
             }
             return;
@@ -924,14 +912,14 @@ sub db_success {
 
             if ( lc $fact eq lc $bag{who} ) {
                 Log "Not allowing $bag{who} to edit his own factoid";
-                $irc->yield( privmsg => $bag{chl} =>
+                &say( $bag{chl} =>
                       "Please don't edit your own factoid, $bag{who}." );
                 return;
             }
 
             if ( $tidbit =~ m#=~\s*s/#i ) {
                 Log "Not learning what looks like a botched s/// query";
-                $irc->yield( privmsg => $bag{chl} =>
+                &say( $bag{chl} =>
                       "$bag{who}: Fix your s/// command." );
                 return;
             }
@@ -971,8 +959,7 @@ sub db_success {
                 and rand(100) < $config->{your_mom_is} )
             {
                 $tidbit =~ s/\W+$//;
-                $irc->yield(
-                    privmsg => $bag{chl} => "$bag{who}: Your mom is $tidbit!" );
+                &say( $bag{chl} => "$bag{who}: Your mom is $tidbit!" );
                 return;
             }
 
@@ -1004,19 +991,19 @@ sub db_success {
             $stats{say}++;
             $msg =~ s/\W+$//;
             $msg .= "!";
-            $irc->yield( privmsg => $bag{chl} => ucfirst $msg );
+            &say( $bag{chl} => ucfirst $msg );
         } elsif ( $bag{orig} =~ /^(?:Do you|Does anyone) know (\w+)/i
             and $1 !~ /who|of|if|why|where|what|when|whose|how/i )
         {
             $stats{hum}++;
-            $irc->yield( privmsg => $bag{chl} =>
+            &say( $bag{chl} =>
                   "No, but if you hum a few bars I can fake it" );
         } elsif ( $bag{orig} =~ s/(\w+)-ass (\w+)/$1 ass-$2/ ) {
             $stats{ass}++;
-            $irc->yield( privmsg => $bag{chl} => $bag{orig} );
+            &say( $bag{chl} => $bag{orig} );
         } elsif ( $bag{orig} =~ s/\bthe fucking\b/fucking the/ ) {
             $stats{fucking}++;
-            $irc->yield( privmsg => $bag{chl} => $bag{orig} );
+            &say( $bag{chl} => $bag{orig} );
         } elsif (
             $bag{orig} !~ /extra|except/
             and rand(100) < $config->{ex_to_sex}
@@ -1025,7 +1012,7 @@ sub db_success {
           )
         {
             $stats{sex}++;
-            $irc->yield( privmsg => $bag{chl} => $bag{orig} );
+            &say( $bag{chl} => $bag{orig} );
         } elsif (
             $bag{orig} !~ /\?\s*$/
             and $bag{orig} =~ /^(?:
@@ -1144,7 +1131,7 @@ sub db_success {
     } elsif ( $bag{cmd} eq 'band_name_suggest' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
 
-        $irc->yield( privmsg => $bag{chl} => "How about '$line{band}'?" );
+        &say( $bag{chl} => "How about '$line{band}'?" );
     } elsif ( $bag{cmd} eq 'edit' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
 
@@ -1155,7 +1142,7 @@ sub db_success {
 
         if ( $lines[0]->{protected} and not $bag{op} ) {
             Log "$bag{who}: that factoid is protected";
-            $irc->yield( privmsg => $bag{chl} =>
+            &say( $bag{chl} =>
                   "Sorry, $bag{who}, that factoid is protected" );
             return;
         }
@@ -1221,8 +1208,7 @@ sub db_success {
             if ($gflag) {
                 next;
             }
-            $irc->yield(
-                privmsg => $bag{chl} => "Okay, $bag{who}, factoid updated." );
+            &say( $bag{chl} => "Okay, $bag{who}, factoid updated." );
 
             if ( exists $fcache{ lc $bag{fact} } ) {
                 Log "Updating cache for '$bag{fact}'";
@@ -1237,7 +1223,7 @@ sub db_success {
             } else {
                 $count .= " matches";
             }
-            $irc->yield( privmsg => $bag{chl} => "Okay, $bag{who}; $count." );
+            &say( $bag{chl} => "Okay, $bag{who}; $count." );
 
             if ( exists $fcache{ lc $bag{fact} } ) {
                 Log "Updating cache for '$bag{fact}'";
@@ -1266,8 +1252,7 @@ sub db_success {
             PLACEHOLDERS => [ $line{id} ],
             EVENT        => "db_success",
         );
-        $irc->yield(
-            privmsg => $bag{chl} => "Okay, $bag{who}, forgot that",
+        &say( $bag{chl} => "Okay, $bag{who}, forgot that",
             "$line{fact} $line{verb} $line{tidbit}"
         );
     } elsif ( $bag{cmd} eq 'delete' ) {
@@ -1289,7 +1274,7 @@ sub db_success {
         );
         my $s = "";
         $s = "s" unless @lines == 1;
-        $irc->yield( privmsg => $bag{chl} => "Okay, $bag{who}, "
+        &say( $bag{chl} => "Okay, $bag{who}, "
               . scalar @lines
               . " factoid$s deleted." );
     } elsif ( $bag{cmd} eq 'unalias' ) {
@@ -1314,7 +1299,7 @@ sub db_success {
     } elsif ( $bag{cmd} eq 'learn1' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
         if ( $line{id} ) {
-            $irc->yield( privmsg => $bag{chl} =>
+            &say( $bag{chl} =>
                   "$bag{who}: I already had it that way" );
             return;
         }
@@ -1332,7 +1317,7 @@ sub db_success {
             if ( $bag{op} ) {
                 unless ( $bag{forced} ) {
                     Log "$bag{who}: that factoid is protected (op, not forced)";
-                    $irc->yield( privmsg => $bag{chl} =>
+                    &say( $bag{chl} =>
                             "Sorry, $bag{who}, that factoid is protected.  "
                           . "Use <$bag{verb}> to override." );
                     return;
@@ -1341,7 +1326,7 @@ sub db_success {
                 Log "$bag{who}: overriding protection.";
             } else {
                 Log "$bag{who}: that factoid is protected";
-                $irc->yield( privmsg => $bag{chl} =>
+                &say( $bag{chl} =>
                       "Sorry, $bag{who}, that factoid is protected" );
                 return;
             }
@@ -1374,10 +1359,10 @@ sub db_success {
             $stats{last_fact}{ $bag{chl} } = $res->{INSERTID};
         }
         if ( $bag{also} ) {
-            $irc->yield( privmsg => $bag{chl} =>
+            &say( $bag{chl} =>
                   "Okay, $bag{who} (added as only factoid)." );
         } else {
-            $irc->yield( privmsg => $bag{chl} => "Okay, $bag{who}." );
+            &say( $bag{chl} => "Okay, $bag{who}." );
         }
         if ( exists $fcache{ lc $bag{fact} } ) {
             Log "Updating cache for '$bag{fact}'";
@@ -1386,7 +1371,7 @@ sub db_success {
     } elsif ( $bag{cmd} eq 'alias1' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
         if ( $line{id} and $line{verb} ne '<alias>' ) {
-            $irc->yield( privmsg => $bag{chl} => "Sorry, $bag{who}, "
+            &say( $bag{chl} => "Sorry, $bag{who}, "
                   . "there is already a factoid for '$bag{src}'." );
             return;
         }
@@ -1414,11 +1399,11 @@ sub db_success {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
 
         if ( $line{id} ) {
-            $irc->yield( privmsg => $bag{chl} =>
+            &say( $bag{chl} =>
 "$bag{who}: That was '$line{fact}' (#$bag{id}): $line{verb} $line{tidbit}"
             );
         } else {
-            $irc->yield( privmsg => $bag{chl} => "$bag{who}: No idea!" );
+            &say( $bag{chl} => "$bag{who}: No idea!" );
         }
     } elsif ( $bag{cmd} eq 'literal' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
@@ -1459,7 +1444,7 @@ sub db_success {
         if (@lines) {
             $answer .= "|" . @lines . " more";
         }
-        $irc->yield( privmsg => $bag{chl} => "$prefix $answer" );
+        &say( $bag{chl} => "$prefix $answer" );
     } elsif ( $bag{cmd} eq 'stats1' ) {
         $stats{triggers} = $res->{RESULT}{c};
     } elsif ( $bag{cmd} eq 'stats2' ) {
@@ -1555,7 +1540,7 @@ sub irc_on_notice {
 sub irc_on_connect {
     Log("Connected...");
     Log("Identifying...");
-    $irc->yield( privmsg => nickserv => "identify $pass" );
+    &say( nickserv => "identify $pass" );
     Log("Done.");
 }
 
@@ -1653,12 +1638,12 @@ sub cached_reply {
     }
 
     if ( $line->{verb} eq '<action>' ) {
-        $irc->yield( ctcp => $chl => "ACTION $tidbit" );
+        &do( $chl => $tidbit );
     } elsif ( $line->{verb} eq '<reply>' ) {
-        $irc->yield( privmsg => $chl => $tidbit );
+        &say( $chl => $tidbit );
     } else {
         $extra ||= "";
-        $irc->yield( privmsg => $chl => "$extra$tidbit" );
+        &say( $chl => "$extra$tidbit" );
     }
 }
 
@@ -1884,4 +1869,16 @@ sub round_time {
     $units .= &s($dt);
 
     return ( $dt, $units );
+}
+
+sub say {
+    my ($chl, $text) = @_;
+
+    $irc->yield( privmsg => $chl => $text );
+}
+
+sub do {
+    my ($chl, $action) = @_;
+
+    $irc->yield( ctcp => $chl => "ACTION $action" );
 }
