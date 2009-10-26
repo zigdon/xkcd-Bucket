@@ -122,7 +122,7 @@ sub Report {
             $kernel->delay_add(
                 delayed_post => 2 * $delay => $logchannel => "@_" );
         } else {
-	    &say($logchannel, "@_");
+            &say( $logchannel, "@_" );
         }
     }
 }
@@ -139,11 +139,12 @@ sub irc_on_kick {
 
     Log "$kicker kicked $kickee from $chl";
 
-    &lookup(msgs  => [ "$kicker kicked $kickee", "$kicker kicked someone" ],
-            chl   => $chl,
-            who   => $kicker,
-            op    => 1,
-            type  => 'irc_kick',
+    &lookup(
+        msgs => [ "$kicker kicked $kickee", "$kicker kicked someone" ],
+        chl  => $chl,
+        who  => $kicker,
+        op   => 1,
+        type => 'irc_kick',
     );
 }
 
@@ -287,13 +288,13 @@ sub irc_on_public {
         $msg =~ s/ =~ \/$search\///;
         Log "Looking up a particular factoid - '$search' in '$fact'";
         &lookup(
-                chl       => $chl,
-                msg       => $msg,
-                who       => $who,
-                addressed => $addressed,
-                editable  => $editable,
-                op        => $operator,
-                search    => $search,
+            chl       => $chl,
+            msg       => $msg,
+            who       => $who,
+            addressed => $addressed,
+            editable  => $editable,
+            op        => $operator,
+            search    => $search,
         );
     } elsif ( $msg =~ /^literal(?:\[(\d+)\])?\s+(.*)/i ) {
         my ( $page, $fact ) = ( $1 || 1, $2 );
@@ -383,7 +384,8 @@ sub irc_on_public {
         &say( $chl => "$who: ${cmd}ing $dst" );
         Report $_[KERNEL], "${cmd}ing $dst at ${who}'s request";
     } elsif ( $addressed and $operator and lc $msg eq 'list ignored' ) {
-        &say( $chl => "Currently ignored: ",
+        &say(
+            $chl => "Currently ignored: ",
             join ", ", sort keys %{ $config->{ignore} }
         );
     } elsif ( $addressed and $operator and $msg =~ /^(un)?ignore (\S+)/i ) {
@@ -474,8 +476,7 @@ sub irc_on_public {
                       "Okay, $who, unforgot $old{fact} $old{verb} $old{tidbit}."
                 );
             } else {
-                &say( $chl =>
-                        "Sorry, $who, that's an invalid undo structure."
+                &say( $chl => "Sorry, $who, that's an invalid undo structure."
                       . "  Tell Zigdon, please." );
             }
 
@@ -512,8 +513,7 @@ sub irc_on_public {
                 Report $_[KERNEL], "$who called undo: undone $undo->[3].";
                 &say( $chl => "Okay, $who, undone $undo->[3]." );
             } else {
-                &say( $chl =>
-                        "Sorry, $who, that's an invalid undo structure."
+                &say( $chl => "Sorry, $who, that's an invalid undo structure."
                       . "  Tell Zigdon, please." );
             }
             delete $undo{$uchannel};
@@ -619,8 +619,8 @@ sub irc_on_public {
         );
     } elsif ( $addressed and $msg eq 'something random' ) {
         &lookup(
-            chl       => $chl,
-            who       => $who,
+            chl => $chl,
+            who => $who,
         );
     } elsif ( $addressed and $msg eq 'stats' ) {
         unless ( $stats{stats_cached} ) {
@@ -664,23 +664,23 @@ sub irc_on_public {
               &round_time( $talking{$chl} - time );
         }
         &say( $chl => $reply );
-    } elsif ( $operator and $addressed and $msg =~ /^stat (\w+)\??/) {
-	my $key = $1;
-        Log("stats: $key");
-	if ($key eq 'keys') {
-	    &say($chl => "$who: valid keys are: ". 
-		  &make_list(sort keys %stats) . ".");
-	} elsif (exists $stats{$key}) {
-            if (ref $stats{$key}) {
-                my $dump = Dumper($stats{$key});
+    } elsif ( $operator and $addressed and $msg =~ /^stat (\w+)\??/ ) {
+        my $key = $1;
+        if ( $key eq 'keys' ) {
+            &say(   $chl => "$who: valid keys are: "
+                  . &make_list( sort keys %stats )
+                  . "." );
+        } elsif ( exists $stats{$key} ) {
+            if ( ref $stats{$key} ) {
+                my $dump = Dumper( $stats{$key} );
                 $dump =~ s/[\s\n]+/ /g;
-                &say($chl => "$who: $key: $dump.");
+                &say( $chl => "$who: $key: $dump." );
             } else {
-                &say($chl => "$who: $key: $stats{$key}.");
+                &say( $chl => "$who: $key: $stats{$key}." );
             }
-	} else {
-	    &say($chl => "Sorry, $who, I don't have statistics for '$key'.");
-	}
+        } else {
+            &say( $chl => "Sorry, $who, I don't have statistics for '$key'." );
+        }
     } elsif ( $operator and $addressed and $msg eq 'restart' ) {
         Report $_[KERNEL], "Restarting at ${who}'s request";
         Log "Restarting at ${who}'s request";
@@ -689,21 +689,22 @@ sub irc_on_public {
     } elsif ( $operator and $addressed and $msg =~ /^set(?: (\w+) (.*))?/ ) {
         my ( $key, $val ) = ( $1, $2 );
 
-        unless ($key and exists $config_keys{$key}) {
-            &say( $chl => "$who: Valid keys are: " . join ", ",
+        unless ( $key and exists $config_keys{$key} ) {
+            &say(
+                $chl => "$who: Valid keys are: " . join ", ",
                 sort keys %config_keys
             );
             return;
         }
 
-	if ( $config_keys{$key} eq 'p' and $val =~ /^(\d+)%?$/ ) {
-	    $config->{$key} = $1;
-	} elsif ( $config_keys{$key} eq 'i' and $val =~ /^(\d+)$/ ) {
-	    $config->{$key} = $1;
-	} else {
-	    &say( $chl => "Sorry, $who, that's an invalid value for $key." );
-	    return;
-	}
+        if ( $config_keys{$key} eq 'p' and $val =~ /^(\d+)%?$/ ) {
+            $config->{$key} = $1;
+        } elsif ( $config_keys{$key} eq 'i' and $val =~ /^(\d+)$/ ) {
+            $config->{$key} = $1;
+        } else {
+            &say( $chl => "Sorry, $who, that's an invalid value for $key." );
+            return;
+        }
 
         &say( $chl => "Okay, $who." );
         Report $_[KERNEL], "$who set '$key' to '$val'";
@@ -713,7 +714,8 @@ sub irc_on_public {
     } elsif ( $operator and $addressed and $msg =~ /^get (\w+)/ ) {
         my ($key) = ($1);
         unless ( exists $config_keys{$key} ) {
-            &say( $chl => "$who: Valid keys are: " . join ", ",
+            &say(
+                $chl => "$who: Valid keys are: " . join ", ",
                 sort keys %config_keys
             );
             return;
@@ -731,16 +733,16 @@ sub irc_on_public {
             }
 
             #Log "Looking up $msg";
-	    &lookup( 
-                    chl       => $chl,
-                    msg       => $msg,
-                    orig      => $orig,
-                    who       => $who,
-                    addressed => $addressed,
-                    editable  => $editable,
-                    op        => $operator,
-                    type      => $type,
-		);
+            &lookup(
+                chl       => $chl,
+                msg       => $msg,
+                orig      => $orig,
+                who       => $who,
+                addressed => $addressed,
+                editable  => $editable,
+                op        => $operator,
+                type      => $type,
+            );
         }
     }
 }
@@ -774,7 +776,7 @@ sub db_success {
                 $bag{alias_id} = $line{id} unless $bag{alias_id};
 
                 Log "Following alias '$line{fact}' -> '$line{tidbit}'";
-                &lookup(%bag, msg => $line{tidbit});
+                &lookup( %bag, msg => $line{tidbit} );
                 return;
             }
 
@@ -789,35 +791,7 @@ sub db_success {
                 $line{tidbit} =~ s/\$who/\$someone/gi;
             }
 
-            $line{tidbit} =~ s/\$who/$bag{who}/gi;
-            if ( $line{tidbit} =~ /\$someone/i ) {
-                while ( $line{tidbit} =~ /\$someone/i ) {
-                    my $rnick = &someone( $bag{chl} );
-                    $line{tidbit} =~ s/\$someone/$rnick/i;
-                }
-            }
-            while ( $line{tidbit} =~ /\$(give)?item/i ) {
-                if (@inventory) {
-                    my $give = $1;
-                    my $item = &get_item($give);
-                    $line{tidbit} =~ s/\$$1item/$item/i;
-                } else {
-                    $line{tidbit} =~ s/\$$1item/bananas/i;
-                }
-            }
-
-            while ( $line{tidbit} =~ /\$newitem/i ) {
-                my $newitem = shift @random_items || 'bananas';
-                my ( $rc, @dropped ) = &put_item( $newitem, 1 );
-                if ( $rc == 2 ) {
-                    &cached_reply( $bag{chl}, $bag{who}, \@dropped,
-                        "drops item" );
-                    return;
-                }
-
-                $line{tidbit} =~ s/\$newitem/$newitem/i;
-                Report $_[KERNEL], "New item created: $newitem";
-            }
+            $line{tidbit} = &expand( $bag{who}, $bag{chl}, $line{tidbit} );
 
             if ( $line{verb} eq '<reply>' ) {
                 &say( $bag{chl} => $line{tidbit} );
@@ -830,8 +804,7 @@ sub db_success {
                     $bag{msg}   = 'I';
                     $line{verb} = 'am';
                 }
-                &say( $bag{chl} =>
-                      "$bag{msg} $line{verb} $line{tidbit}" );
+                &say( $bag{chl} => "$bag{msg} $line{verb} $line{tidbit}" );
             }
             return;
         } elsif ( $bag{msg} =~ s/^what is |^what's |^the //i ) {
@@ -866,8 +839,7 @@ sub db_success {
 
             if ( $tidbit =~ m#=~\s*s/#i ) {
                 Log "Not learning what looks like a botched s/// query";
-                &say( $bag{chl} =>
-                      "$bag{who}: Fix your s/// command." );
+                &say( $bag{chl} => "$bag{who}: Fix your s/// command." );
                 return;
             }
 
@@ -943,8 +915,7 @@ sub db_success {
             and $1 !~ /who|of|if|why|where|what|when|whose|how/i )
         {
             $stats{hum}++;
-            &say( $bag{chl} =>
-                  "No, but if you hum a few bars I can fake it" );
+            &say( $bag{chl} => "No, but if you hum a few bars I can fake it" );
         } elsif ( $bag{orig} =~ s/(\w+)-ass (\w+)/$1 ass-$2/ ) {
             $stats{ass}++;
             &say( $bag{chl} => $bag{orig} );
@@ -995,13 +966,10 @@ sub db_success {
             }
 
             Log "Taking $item from $bag{who}: " . join ", ", @inventory;
-            $_[KERNEL]->post(
-                db  => 'DO',
-                SQL => 'insert into bucket_items 
-                                (what, user, channel)
-                                values (?, ?, ?)',
-                PLACEHOLDERS => [ $item, $bag{who}, $bag{chl} ],
-                EVENT        => 'db_success'
+            &sql(
+                'insert into bucket_items (what, user, channel)
+                         values (?, ?, ?)',
+                [ $item, $bag{who}, $bag{chl} ]
             );
             &random_item_cache( $_[KERNEL] );
         } else {    # lookup band name!
@@ -1060,13 +1028,10 @@ sub db_success {
     } elsif ( $bag{cmd} eq 'band_name2' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
         unless ( $line{id} ) {
-            $_[KERNEL]->post(
-                db  => 'DO',
-                SQL => 'insert band_names (band)
-                        values (?)',
-                PLACEHOLDERS => [ $bag{stripped_name} ],
-                BAGGAGE      => { %bag, cmd => "new band name" },
-                EVENT        => 'db_success'
+            &sql(
+                'insert band_names (band) values (?)',
+                [ $bag{stripped_name} ],
+                { %bag, cmd => "new band name" }
             );
 
             $bag{name} =~ s/(^| )(\w)/$1\u$2/g;
@@ -1089,8 +1054,7 @@ sub db_success {
 
         if ( $lines[0]->{protected} and not $bag{op} ) {
             Log "$bag{who}: that factoid is protected";
-            &say( $bag{chl} =>
-                  "Sorry, $bag{who}, that factoid is protected" );
+            &say( $bag{chl} => "Sorry, $bag{who}, that factoid is protected" );
             return;
         }
 
@@ -1199,7 +1163,8 @@ sub db_success {
             PLACEHOLDERS => [ $line{id} ],
             EVENT        => "db_success",
         );
-        &say( $bag{chl} => "Okay, $bag{who}, forgot that",
+        &say(
+            $bag{chl} => "Okay, $bag{who}, forgot that",
             "$line{fact} $line{verb} $line{tidbit}"
         );
     } elsif ( $bag{cmd} eq 'delete' ) {
@@ -1221,7 +1186,7 @@ sub db_success {
         );
         my $s = "";
         $s = "s" unless @lines == 1;
-        &say( $bag{chl} => "Okay, $bag{who}, "
+        &say(   $bag{chl} => "Okay, $bag{who}, "
               . scalar @lines
               . " factoid$s deleted." );
     } elsif ( $bag{cmd} eq 'unalias' ) {
@@ -1246,8 +1211,7 @@ sub db_success {
     } elsif ( $bag{cmd} eq 'learn1' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
         if ( $line{id} ) {
-            &say( $bag{chl} =>
-                  "$bag{who}: I already had it that way" );
+            &say( $bag{chl} => "$bag{who}: I already had it that way" );
             return;
         }
 
@@ -1287,14 +1251,11 @@ sub db_success {
         Report $_[KERNEL], "$bag{who} taught in $bag{chl}:"
           . " '$bag{fact}', '$bag{verb}', '$bag{tidbit}'";
         Log "$bag{who} taught '$bag{fact}', '$bag{verb}', '$bag{tidbit}'";
-        $_[KERNEL]->post(
-            db  => 'DO',
-            SQL => 'insert bucket_facts (fact, verb, tidbit, protected)
-                    values (?, ?, ?, ?)',
-            PLACEHOLDERS =>
-              [ $bag{fact}, $bag{verb}, $bag{tidbit}, $line{protected} || 0 ],
-            BAGGAGE => { %bag, cmd => "learn3" },
-            EVENT   => 'db_success'
+        &sql(
+            'insert bucket_facts (fact, verb, tidbit, protected)
+                     values (?, ?, ?, ?)',
+            [ $bag{fact}, $bag{verb}, $bag{tidbit}, $line{protected} || 0 ],
+            { %bag, cmd => "learn3" }
         );
     } elsif ( $bag{cmd} eq 'learn3' ) {
         if ( $res->{INSERTID} ) {
@@ -1306,8 +1267,7 @@ sub db_success {
             $stats{last_fact}{ $bag{chl} } = $res->{INSERTID};
         }
         if ( $bag{also} ) {
-            &say( $bag{chl} =>
-                  "Okay, $bag{who} (added as only factoid)." );
+            &say( $bag{chl} => "Okay, $bag{who} (added as only factoid)." );
         } else {
             &say( $bag{chl} => "Okay, $bag{who}." );
         }
@@ -1326,14 +1286,11 @@ sub db_success {
         Report $_[KERNEL],
           "$bag{who} aliased in $bag{chl} '$bag{src}' to '$bag{dst}'";
         Log "$bag{who} aliased '$bag{src}' to '$bag{dst}'";
-        $_[KERNEL]->post(
-            db  => 'DO',
-            SQL => 'insert bucket_facts (fact, verb, tidbit, protected)
-                    values (?, "<alias>", ?, 1)',
-            PLACEHOLDERS => [ $bag{src}, $bag{dst} ],
-            BAGGAGE =>
-              { %bag, fact => $bag{src}, tidbit => $bag{dst}, cmd => "learn3" },
-            EVENT => 'db_success'
+        &sql(
+            'insert bucket_facts (fact, verb, tidbit, protected)
+                     values (?, "<alias>", ?, 1)',
+            [ $bag{src}, $bag{dst} ],
+            { %bag, fact => $bag{src}, tidbit => $bag{dst}, cmd => "learn3" }
         );
     } elsif ( $bag{cmd} eq 'cache' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
@@ -1519,13 +1476,6 @@ sub cached_reply {
     Log "cached '$type' reply: $line->{verb} $line->{tidbit}";
 
     my $tidbit = $line->{tidbit};
-    $tidbit =~ s/\$who/$who/gi;
-    if ( $tidbit =~ /\$someone/i ) {
-        while ( $tidbit =~ /\$someone/i ) {
-            my $rnick = &someone($chl);
-            $tidbit =~ s/\$someone/$rnick/i;
-        }
-    }
 
     if ( $type eq 'band name reply' ) {
         if ( $tidbit =~ /\$band/i ) {
@@ -1561,28 +1511,9 @@ sub cached_reply {
         }
 
         $extra = "";
-    } elsif ( $tidbit =~ /\$(give)?item/i ) {
-        while ( $tidbit =~ /\$(give)?item/i ) {
-            my $give = $1;
-            if (@inventory) {
-                $tidbit =~ s/\$$1item/&get_item($give)/ei;
-            } else {
-                $tidbit =~ s/\$$1item/bananas/i;
-            }
-        }
-    } elsif ( $tidbit =~ /\$newitem/i ) {
-        while ( $tidbit =~ /\$newitem/i ) {
-            my $newitem = shift @random_items || 'bananas';
-            my ( $rc, @dropped ) = &put_item( $newitem, 1 );
-            if ( $rc == 2 ) {
-                &cached_reply( $chl, $who, \@dropped, "drops item" );
-                return;
-            }
-
-            $tidbit =~ s/\$newitem/$newitem/i;
-            Report $_[KERNEL], "New item created: $newitem";
-        }
     }
+
+    $tidbit = &expand( $who, $chl, $tidbit );
 
     if ( $line->{verb} eq '<action>' ) {
         &do( $chl => $tidbit );
@@ -1651,9 +1582,9 @@ sub check_idle {
     return if time - $last_activity{$chl} < 60 * $config->{random_wait};
 
     &lookup(
-        chl       => $chl,
-        who       => $nick,
-        idle      => 1,
+        chl  => $chl,
+        who  => $nick,
+        idle => 1,
     );
 
     $last_activity{$chl} = time;
@@ -1806,14 +1737,14 @@ sub round_time {
 }
 
 sub say {
-    my $chl = shift;
+    my $chl  = shift;
     my $text = "@_";
 
     $irc->yield( privmsg => $chl => $text );
 }
 
 sub do {
-    my $chl = shift;
+    my $chl    = shift;
     my $action = "@_";
 
     $irc->yield( ctcp => $chl => "ACTION $action" );
@@ -1824,45 +1755,92 @@ sub lookup {
     my $sql;
     my $type;
 
-    if (exists $params{msg}) {
-        $sql = "fact = ?";
+    if ( exists $params{msg} ) {
+        $sql  = "fact = ?";
         $type = "single";
-    } elsif (exists $params{msgs}) {
-	$sql = "fact in (". 
-	       join(", ", map {"?"} @{$params{msgs}}) .
-	        ")";
+    } elsif ( exists $params{msgs} ) {
+        $sql = "fact in (" . join( ", ", map { "?" } @{ $params{msgs} } ) . ")";
         $params{msg} = $params{msgs}[0];
         $type = "multiple";
-    } else { 
-      $sql = "1";
-      $type = "none";
+    } else {
+        $sql  = "1";
+        $type = "none";
     }
 
-    if (exists $params{search}) {
+    if ( exists $params{search} ) {
         $sql .= " and tidbit like \"%$params{search}%\"";
     }
 
     POE::Kernel->post(
-	db  => 'SINGLE',
-	SQL => "select id, fact, verb, tidbit from bucket_facts 
+        db  => 'SINGLE',
+        SQL => "select id, fact, verb, tidbit from bucket_facts 
 			where $sql order by rand("
-	  . int( rand(1e6) ) 
-	  . ') limit 1',
-	PLACEHOLDERS => $type eq 'multiple' ?  $params{msgs} :
-                        $type eq 'single'   ? [$params{msg}] :
-                                              [],
-	BAGGAGE      => {
-	    cmd       => "fact",
-	    chl       => $params{chl},
-	    msg       => $params{msg},
-	    orig      => $params{orig}      || $params{msg},
-	    who       => $params{who},
-	    addressed => $params{addressed} || 0,
-	    editable  => $params{editable}  || 0,
-	    op        => $params{operator}  || 0,
-            idle      => $params{idle}      || 0,
-	    type      => $params{type}      || "irc_public",
-	},
-	EVENT => 'db_success'
+          . int( rand(1e6) ) 
+          . ') limit 1',
+        PLACEHOLDERS => $type eq 'multiple' ? $params{msgs}
+        : $type eq 'single' ? [ $params{msg} ]
+        : [],
+        BAGGAGE => {
+            cmd       => "fact",
+            chl       => $params{chl},
+            msg       => $params{msg},
+            orig      => $params{orig} || $params{msg},
+            who       => $params{who},
+            addressed => $params{addressed} || 0,
+            editable  => $params{editable} || 0,
+            op        => $params{operator} || 0,
+            idle      => $params{idle} || 0,
+            type      => $params{type} || "irc_public",
+        },
+        EVENT => 'db_success'
     );
 }
+
+sub sql {
+    my ( $sql, $placeholders, $baggage ) = @_;
+
+    POE::Kernel->post(
+        db    => 'DO',
+        SQL   => $sql,
+        EVENT => 'db_success',
+        $placeholders ? ( PLACEHOLDERS => $placeholders ) : (),
+        $baggage      ? ( BAGGAGE      => $baggage )      : (),
+    );
+}
+
+sub expand {
+    my $who = shift;
+    my $chl = shift;
+    my $msg = "@_";
+
+    $msg =~ s/\$who/$who/gi;
+    if ( $msg =~ /\$someone/i ) {
+        while ( $msg =~ /\$someone/i ) {
+            my $rnick = &someone($chl);
+            $msg =~ s/\$someone/$rnick/i;
+        }
+    }
+    while ( $msg =~ /\$(give)?item/i ) {
+        if (@inventory) {
+            my $give = $1;
+            my $item = &get_item($give);
+            $msg =~ s/\$$1item/$item/i;
+        } else {
+            $msg =~ s/\$$1item/bananas/i;
+        }
+    }
+
+    while ( $msg =~ /\$newitem/i ) {
+        my $newitem = shift @random_items || 'bananas';
+        my ( $rc, @dropped ) = &put_item( $newitem, 1 );
+        if ( $rc == 2 ) {
+            &cached_reply( $chl, $who, \@dropped, "drops item" );
+            return;
+        }
+
+        $msg =~ s/\$newitem/$newitem/i;
+    }
+
+    return $msg;
+}
+
