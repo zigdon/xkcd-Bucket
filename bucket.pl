@@ -94,6 +94,7 @@ POE::Session->create(
         irc_msg          => \&irc_on_public,
         irc_notice       => \&irc_on_notice,
         irc_disconnected => \&irc_on_disconnect,
+        irc_topic        => \&irc_on_topic,
         db_success       => \&db_success,
         delayed_post     => \&delayed_post,
         check_idle       => \&check_idle,
@@ -129,6 +130,14 @@ sub Report {
 
 sub delayed_post {
     &say( $_[ARG0], $_[ARG1] );
+}
+
+sub irc_on_topic {
+    my $chl = $_[ARG1];
+    my $topic = $_[ARG2];
+
+    $stats{topics}{$chl}{old} = $stats{topics}{$chl}{current};
+    $stats{topics}{$chl}{current} = $topic;
 }
 
 sub irc_on_kick {
@@ -417,6 +426,15 @@ sub irc_on_public {
             EVENT        => "db_success",
         );
         &say( $chl => "Okay, $who, updated the protection bit." );
+    } elsif ( $operator and $addressed and $msg =~ /^restore topic(?: (#\S+))?/ ) {
+        my $tchl = $1 || $chl;
+        unless (exists $stats{topics}{$tchl}{old} ) {
+            &say( $chl => "Sorry, $who, I don't know what was the earlier topic!" );
+            return;
+        }
+        Log "$who restored topic in $tchl: $stats{topics}{$tchl}{old}"; 
+        &say( $chl => "Okay, $who." );
+        $irc->yield( topic => $tchl => $stats{topics}{$tchl}{old} );
     } elsif ( $addressed and $msg =~ /^undo last(?: (#\S+))?/ ) {
         Log "$who called undo:";
         my $uchannel = $1 || $chl;
