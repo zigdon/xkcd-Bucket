@@ -1446,6 +1446,10 @@ sub irc_on_notice {
     if (    $who eq 'NickServ'
         and $msg =~ /Password accepted|isn't registered/ )
     {
+        $irc->yield( mode => $nick => "+B" );
+        unless ($config->{hide_hostmask}) {
+            $irc->yield( mode => $nick => "-x" );
+        }
         $irc->yield( join => $channel );
         unless (DEBUG) {
             Log("Autojoining channels");
