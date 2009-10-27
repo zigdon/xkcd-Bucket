@@ -62,6 +62,7 @@ my %config_keys = (
     bananas_chance         => "p",
     band_name              => "p",
     ex_to_sex              => "p",
+    idle_source            => "s",
     increase_mute          => "i",
     inventory_preload      => "i",
     inventory_size         => "i",
@@ -719,6 +720,9 @@ sub irc_on_public {
             $config->{$key} = $1;
         } elsif ( $config_keys{$key} eq 'i' and $val =~ /^(\d+)$/ ) {
             $config->{$key} = $1;
+        } elsif ( $config_keys{$key} eq 's' ) {
+            $val =~ s/^\s+|\s+$//g;
+            $config->{$key} = $val;
         } else {
             &say( $chl => "Sorry, $who, that's an invalid value for $key." );
             return;
@@ -1603,13 +1607,31 @@ sub check_idle {
     my $chl = DEBUG ? $channel : $mainchannel;
     return if time - $last_activity{$chl} < 60 * $config->{random_wait};
 
+    $last_activity{$chl} = time;
+
+    if ($config->{idle_source} and $config->{idle_source} eq 'MLIA') {
+        Log "Looking up MLIA story";
+        require LWP::Simple;
+        require XML::Simple;
+
+        $LWP::Simple::ua->timeout(10);
+        my $rss = LWP::Simple::get("http://feeds.feedburner.com/mlia");
+        if ($rss) {
+            Log "Retrieved RSS";
+            my $xml = XML::Simple::XMLin($rss);
+            if ($xml and my $story = $xml->{channel}{item}[rand(40)]{description}) {
+                $story =~ s/<.*//s;
+                &say( $chl => $story );
+                return;
+            }
+        }
+    }
+
     &lookup(
         chl  => $chl,
         who  => $nick,
         idle => 1,
     );
-
-    $last_activity{$chl} = time;
 }
 
 sub trim {
@@ -1723,6 +1745,7 @@ sub put_item {
 sub make_list {
     my @list = @_;
 
+    return "" unless @list;
     return $list[0] if @list == 1;
     return join " and ", @list if @list == 2;
     my $last = $list[-1];
