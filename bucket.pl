@@ -325,22 +325,40 @@ sub irc_on_public {
             },
             EVENT => 'db_success'
         );
-    } elsif ( $addressed and $operator and $msg =~ /^delete (.*)/i ) {
-        my $fact = $1;
+    } elsif ( $addressed and $operator and $msg =~ /^delete (#)?(.*)/i ) {
+        my $id = $1;
+        my $fact = $2;
         $stats{deleted}++;
-        $_[KERNEL]->post(
-            db  => "MULTIPLE",
-            SQL => "select fact, tidbit, verb, RE, protected, mood, chance
-                                   from bucket_facts where fact = ?",
-            PLACEHOLDERS => [$fact],
-            EVENT        => "db_success",
-            BAGGAGE      => {
-                cmd  => "delete",
-                chl  => $chl,
-                who  => $who,
-                fact => $fact,
-            }
-        );
+
+        if ($id) {
+            $_[KERNEL]->post(
+                db  => "SINGLE",
+                SQL => "select fact, tidbit, verb, RE, protected, mood, chance
+                                       from bucket_facts where id = ?",
+                PLACEHOLDERS => [$fact],
+                EVENT        => "db_success",
+                BAGGAGE      => {
+                    cmd  => "delete_id",
+                    chl  => $chl,
+                    who  => $who,
+                    fact => $fact,
+                }
+            );
+        } else {
+            $_[KERNEL]->post(
+                db  => "MULTIPLE",
+                SQL => "select fact, tidbit, verb, RE, protected, mood, chance
+                                       from bucket_facts where fact = ?",
+                PLACEHOLDERS => [$fact],
+                EVENT        => "db_success",
+                BAGGAGE      => {
+                    cmd  => "delete",
+                    chl  => $chl,
+                    who  => $who,
+                    fact => $fact,
+                }
+            );
+        }
     } elsif (
         $addressed
         and $msg =~ /^(?:shut \s up | go \s away)
@@ -600,26 +618,30 @@ sub irc_on_public {
         );
 
     } elsif ( $addressed and $msg =~ /^what was that\??$/ ) {
-        my $id = $1 || $stats{last_fact}{$chl};
+        my $id = $stats{last_fact}{$chl};
         unless ($id) {
             &say( $chl => "Sorry, $who, I have no idea." );
             return;
         }
 
-        $_[KERNEL]->post(
-            db  => 'SINGLE',
-            SQL => 'select * from bucket_facts 
-                            where id = ? ',
-            PLACEHOLDERS => [$id],
-            BAGGAGE      => {
-                cmd => "report",
-                chl => $chl,
-                who => $who,
-                msg => $msg,
-                id  => $id,
-            },
-            EVENT => 'db_success'
-        );
+        if ($id =~ /^(\d+)$/) {
+            $_[KERNEL]->post(
+                db  => 'SINGLE',
+                SQL => 'select * from bucket_facts 
+                                where id = ? ',
+                PLACEHOLDERS => [$id],
+                BAGGAGE      => {
+                    cmd => "report",
+                    chl => $chl,
+                    who => $who,
+                    msg => $msg,
+                    id  => $id,
+                },
+                EVENT => 'db_success'
+            );
+        } else {
+            &say( $chl => "$who: that was $id" );
+        }
     } elsif ( $addressed and $msg =~ /suggest a band name/i ) {
         $_[KERNEL]->post(
             db  => 'SINGLE',
@@ -1189,6 +1211,22 @@ sub db_success {
             $bag{chl} => "Okay, $bag{who}, forgot that",
             "$line{fact} $line{verb} $line{tidbit}"
         );
+    } elsif ( $bag{cmd} eq 'delete_id' ) {
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        unless ($line{fact}) {
+            &error( $bag{chl}, $bag{who} );
+            Log "Nothing found in id $bag{fact}";
+            return;
+        }
+
+        $undo{ $bag{chl} } = [ 'insert', $bag{who}, \%line, $bag{fact} ];
+        Report $_[KERNEL], "$bag{who} deleted '$line{fact}' (#$bag{fact}) in $bag{chl}";
+        Log "deleting $bag{fact}";
+        &sql('delete from bucket_facts where id=?',
+             [ $bag{fact} ],
+        );
+        &say(   $bag{chl} => "Okay, $bag{who}, deleted " .
+                             "'$line{fact} $line{verb} $line{tidbit}'." );
     } elsif ( $bag{cmd} eq 'delete' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : ();
         unless (@lines) {
@@ -1619,9 +1657,10 @@ sub check_idle {
         if ($rss) {
             Log "Retrieved RSS";
             my $xml = XML::Simple::XMLin($rss);
-            if ($xml and my $story = $xml->{channel}{item}[rand(40)]{description}) {
-                $story =~ s/<.*//s;
-                &say( $chl => $story );
+            if ($xml and my $story = $xml->{channel}{item}[rand(40)]) {
+                $story->{description} =~ s/<.*//s;
+                &say( $chl => $story->{description} );
+                $stats{last_fact}{$chl} = $story->{"feedburner:origLink"};
                 return;
             }
         }
