@@ -678,16 +678,21 @@ sub irc_on_public {
             $reply .= "In that time, I ";
             my @fact_stats;
             push @fact_stats,
-              sprintf "learned %d new thing%s",
+              sprintf "learned %d new factoid%s",
               $stats{learn}, &s( $stats{learn} )
               if ( $stats{learn} );
             push @fact_stats,
-              sprintf "updated %d thing%s", $stats{edited}, &s( $stats{edited} )
+              sprintf "updated %d factoid%s", $stats{edited}, &s( $stats{edited} )
               if ( $stats{edited} );
             push @fact_stats,
-              sprintf "forgot %d thing%s",
+              sprintf "forgot %d factoid%s",
               $stats{deleted}, &s( $stats{deleted} )
               if ( $stats{deleted} );
+
+            # strip out the string 'factoids' from all but the first entry
+            if (@fact_stats > 1) {
+                s/ factoid?// foreach @fact_stats[1..$#fact_stats];
+            }
             $reply .= &make_list(@fact_stats) . ". ";
         }
         $reply .= sprintf "I know now a total of %d thing%s "
