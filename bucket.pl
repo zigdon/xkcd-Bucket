@@ -691,7 +691,7 @@ sub irc_on_public {
 
             # strip out the string 'factoids' from all but the first entry
             if (@fact_stats > 1) {
-                s/ factoid?// foreach @fact_stats[1..$#fact_stats];
+                s/ factoids?// foreach @fact_stats[1..$#fact_stats];
             }
             $reply .= &make_list(@fact_stats) . ". ";
         }
