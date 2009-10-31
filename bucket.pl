@@ -1669,7 +1669,7 @@ sub check_idle {
             for ( 1 .. 5 ) {
                 if ( $xml and my $story = $xml->{channel}{item}[ rand(40) ] ) {
                     $story->{description} =~ s/<.*//s;
-                    $story->{description} =~ /MLIA\W*$//;
+                    $story->{description} =~ s/MLIA\W*$//;
                     next if length $story->{description} > 400;
 
                     &say( $chl => $story->{description} );
