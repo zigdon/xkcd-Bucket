@@ -1877,7 +1877,7 @@ sub lookup {
             who       => $params{who},
             addressed => $params{addressed} || 0,
             editable  => $params{editable} || 0,
-            op        => $params{operator} || 0,
+            op        => $params{op} || 0,
             idle      => $params{idle} || 0,
             type      => $params{type} || "irc_public",
         },
