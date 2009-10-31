@@ -134,10 +134,10 @@ sub delayed_post {
 }
 
 sub irc_on_topic {
-    my $chl = $_[ARG1];
+    my $chl   = $_[ARG1];
     my $topic = $_[ARG2];
 
-    $stats{topics}{$chl}{old} = $stats{topics}{$chl}{current};
+    $stats{topics}{$chl}{old}     = $stats{topics}{$chl}{current};
     $stats{topics}{$chl}{current} = $topic;
 }
 
@@ -326,7 +326,7 @@ sub irc_on_public {
             EVENT => 'db_success'
         );
     } elsif ( $addressed and $operator and $msg =~ /^delete (#)?(.*)/i ) {
-        my $id = $1;
+        my $id   = $1;
         my $fact = $2;
         $stats{deleted}++;
 
@@ -445,13 +445,17 @@ sub irc_on_public {
             EVENT        => "db_success",
         );
         &say( $chl => "Okay, $who, updated the protection bit." );
-    } elsif ( $operator and $addressed and $msg =~ /^restore topic(?: (#\S+))?/ ) {
+    } elsif ( $operator
+        and $addressed
+        and $msg =~ /^restore topic(?: (#\S+))?/ )
+    {
         my $tchl = $1 || $chl;
-        unless (exists $stats{topics}{$tchl}{old} ) {
-            &say( $chl => "Sorry, $who, I don't know what was the earlier topic!" );
+        unless ( exists $stats{topics}{$tchl}{old} ) {
+            &say( $chl =>
+                  "Sorry, $who, I don't know what was the earlier topic!" );
             return;
         }
-        Log "$who restored topic in $tchl: $stats{topics}{$tchl}{old}"; 
+        Log "$who restored topic in $tchl: $stats{topics}{$tchl}{old}";
         &say( $chl => "Okay, $who." );
         $irc->yield( topic => $tchl => $stats{topics}{$tchl}{old} );
     } elsif ( $addressed and $msg =~ /^undo last(?: (#\S+))?/ ) {
@@ -624,7 +628,7 @@ sub irc_on_public {
             return;
         }
 
-        if ($id =~ /^(\d+)$/) {
+        if ( $id =~ /^(\d+)$/ ) {
             $_[KERNEL]->post(
                 db  => 'SINGLE',
                 SQL => 'select * from bucket_facts 
@@ -682,7 +686,8 @@ sub irc_on_public {
               $stats{learn}, &s( $stats{learn} )
               if ( $stats{learn} );
             push @fact_stats,
-              sprintf "updated %d factoid%s", $stats{edited}, &s( $stats{edited} )
+              sprintf "updated %d factoid%s", $stats{edited},
+              &s( $stats{edited} )
               if ( $stats{edited} );
             push @fact_stats,
               sprintf "forgot %d factoid%s",
@@ -690,8 +695,8 @@ sub irc_on_public {
               if ( $stats{deleted} );
 
             # strip out the string 'factoids' from all but the first entry
-            if (@fact_stats > 1) {
-                s/ factoids?// foreach @fact_stats[1..$#fact_stats];
+            if ( @fact_stats > 1 ) {
+                s/ factoids?// foreach @fact_stats[ 1 .. $#fact_stats ];
             }
             $reply .= &make_list(@fact_stats) . ". ";
         }
@@ -1218,20 +1223,19 @@ sub db_success {
         );
     } elsif ( $bag{cmd} eq 'delete_id' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
-        unless ($line{fact}) {
+        unless ( $line{fact} ) {
             &error( $bag{chl}, $bag{who} );
             Log "Nothing found in id $bag{fact}";
             return;
         }
 
         $undo{ $bag{chl} } = [ 'insert', $bag{who}, \%line, $bag{fact} ];
-        Report $_[KERNEL], "$bag{who} deleted '$line{fact}' (#$bag{fact}) in $bag{chl}";
+        Report $_[KERNEL],
+          "$bag{who} deleted '$line{fact}' (#$bag{fact}) in $bag{chl}";
         Log "deleting $bag{fact}";
-        &sql('delete from bucket_facts where id=?',
-             [ $bag{fact} ],
-        );
-        &say(   $bag{chl} => "Okay, $bag{who}, deleted " .
-                             "'$line{fact} $line{verb} $line{tidbit}'." );
+        &sql( 'delete from bucket_facts where id=?', [ $bag{fact} ], );
+        &say( $bag{chl} => "Okay, $bag{who}, deleted "
+              . "'$line{fact} $line{verb} $line{tidbit}'." );
     } elsif ( $bag{cmd} eq 'delete' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : ();
         unless (@lines) {
@@ -1494,7 +1498,7 @@ sub irc_on_notice {
         and $msg =~ /Password accepted|isn't registered/ )
     {
         $irc->yield( mode => $nick => "+B" );
-        unless ($config->{hide_hostmask}) {
+        unless ( $config->{hide_hostmask} ) {
             $irc->yield( mode => $nick => "-x" );
         }
         $irc->yield( join => $channel );
@@ -1652,7 +1656,7 @@ sub check_idle {
 
     $last_activity{$chl} = time;
 
-    if ($config->{idle_source} and $config->{idle_source} eq 'MLIA') {
+    if ( $config->{idle_source} and $config->{idle_source} eq 'MLIA' ) {
         Log "Looking up MLIA story";
         require LWP::Simple;
         require XML::Simple;
@@ -1662,11 +1666,15 @@ sub check_idle {
         if ($rss) {
             Log "Retrieved RSS";
             my $xml = XML::Simple::XMLin($rss);
-            if ($xml and my $story = $xml->{channel}{item}[rand(40)]) {
-                $story->{description} =~ s/<.*//s;
-                &say( $chl => $story->{description} );
-                $stats{last_fact}{$chl} = $story->{"feedburner:origLink"};
-                return;
+            for ( 1 .. 5 ) {
+                if ( $xml and my $story = $xml->{channel}{item}[ rand(40) ] ) {
+                    $story->{description} =~ s/<.*//s;
+                    next if length $story->{description} > 400;
+
+                    &say( $chl => $story->{description} );
+                    $stats{last_fact}{$chl} = $story->{"feedburner:origLink"};
+                    return;
+                }
             }
         }
     }
