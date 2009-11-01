@@ -77,3 +77,31 @@ CREATE TABLE IF NOT EXISTS `mainlog` (
   PRIMARY KEY  (`id`),
   KEY `stamp` (`stamp`)
 ) ENGINE=MyISAM  DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `bucket_values`
+--
+
+CREATE TABLE IF NOT EXISTS `bucket_values` (
+  `id` int(10) unsigned NOT NULL auto_increment,
+  `var_id` int(10) unsigned NOT NULL,
+  `value` varchar(32) NOT NULL,
+  PRIMARY KEY  (`id`),
+  UNIQUE KEY `var_id` (`var_id`,`value`)
+) ENGINE=MyISAM  DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `bucket_vars`
+--
+
+CREATE TABLE IF NOT EXISTS `bucket_vars` (
+  `id` int(10) unsigned NOT NULL auto_increment,
+  `name` varchar(16) NOT NULL,
+  `perms` enum('read-only','editable') NOT NULL default 'read-only',
+  PRIMARY KEY  (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=MyISAM  DEFAULT CHARSET=latin1;
