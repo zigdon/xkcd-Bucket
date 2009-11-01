@@ -24,12 +24,17 @@ use POE::Component::IRC::State;
 use POE::Component::IRC::Plugin::NickServID;
 use POE::Component::IRC::Plugin::Connector;
 use POE::Component::SimpleDBI;
+use Lingua::EN::Conjugate qw/past gerund/;
+use Lingua::EN::Inflect qw/A PL_N/;
 use YAML qw/LoadFile DumpFile/;
 use Data::Dumper;
 use Fcntl qw/:seek/;
 $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
+
+# work around a bug: https://rt.cpan.org/Ticket/Display.html?id=50991
+sub s_form { return Lingua::EN::Conjugate::s_form(@_); }
 
 my $VERSION = '$Id: bucket.pl 685 2009-08-04 19:15:15Z dan $';
 
@@ -57,6 +62,7 @@ my %undo;
 my %last_activity;
 my @inventory;
 my @random_items;
+my %replacables;
 
 my %config_keys = (
     bananas_chance         => "p",
@@ -438,12 +444,22 @@ sub irc_on_public {
         my ( $protect, $fact ) = ( ( $1 ? 0 : 1 ), $2 );
         Report $_[KERNEL], "$who is $1protecting $fact";
         Log "$1protecting $fact";
-        $_[KERNEL]->post(
-            db           => "DO",
-            SQL          => 'update bucket_facts set protected=? where fact=?',
-            PLACEHOLDERS => [ $protect, $fact ],
-            EVENT        => "db_success",
-        );
+
+        if ($fact =~ s/^\$//) { # it's a variable!
+            unless (exists $replacables{lc $fact}) {
+                &say( $chl => "Sorry, $who, \$$fact isn't a valid variable." );
+                return;
+            }
+
+            $replacables{lc $fact}{perms} = $protect ? "read-only" : "editable";
+        } else {
+            $_[KERNEL]->post(
+                db           => "DO",
+                SQL          => 'update bucket_facts set protected=? where fact=?',
+                PLACEHOLDERS => [ $protect, $fact ],
+                EVENT        => "db_success",
+            );
+        }
         &say( $chl => "Okay, $who, updated the protection bit." );
     } elsif ( $operator
         and $addressed
@@ -776,6 +792,118 @@ sub irc_on_public {
         }
 
         &say( $chl => "$key is $config->{$key}." );
+    } elsif ( $addressed and $msg eq 'list vars' ) {
+        unless ( keys %replacables ) {
+            &say( $chl => "Sorry, $who, there are no defined variables!" );
+            return;
+        }
+        &say(
+            $chl => "Known variables:",
+            &make_list( sort keys %replacables ) . "."
+        );
+    } elsif ( $addressed and $msg =~ /^list var (\w+)$/ ) {
+        my $var = $1;
+        unless ( exists $replacables{$var} ) {
+            &say( $chl => "Sorry, $who, I don't know a variable '$var'." );
+            return;
+        }
+
+        unless ( ref $replacables{$var}{vals} eq 'ARRAY'
+            and @{ $replacables{$var}{vals} } )
+        {
+            &say( $chl => "$who: \$$var has no values defined!" );
+            return;
+        }
+
+        my @vals = @{ $replacables{$var}{vals} };
+        &say( $chl => "$var:", &make_list( sort @vals ) );
+    } elsif ( $addressed and $msg =~ /^remove value (\w+) (\S+)$/ ) {
+        my ( $var, $value ) = ( lc $1, lc $2 );
+        unless ( exists $replacables{$var} ) {
+            &say( $chl => "Sorry, $who, I don't know of a variable '$var'." );
+            return;
+        }
+
+        if ( $replacables{$var}{perms} ne "editable" and not $operator ) {
+            &say( $chl =>
+                  "Sorry, $who, you don't have permissions to edit '$var'." );
+            return;
+        }
+
+        foreach my $i ( 0 .. @{ $replacables{$var}{vals} } - 1 ) {
+            next unless $replacables{$var}{vals}[$i] eq $value;
+
+            Log "found!";
+            splice( @{ $replacables{$var}{vals} }, $i, 1, () );
+            &say( $chl => "Okay, $who." );
+
+            &sql("delete from bucket_values where var_id=? and value=? limit 1",
+                 [$replacables{$var}{id}, $value]);
+            return;
+        }
+
+        &say( $chl => "$who, '$value' isn't a valid value for \$$var!" );
+    } elsif ( $addressed and $msg =~ /^add value (\w+) (\S+)$/ ) {
+        my ( $var, $value ) = ( lc $1, lc $2 );
+        unless ( exists $replacables{$var} ) {
+            &say( $chl => "Sorry, $who, I don't know of a variable '$var'." );
+            return;
+        }
+
+        if ( $replacables{$var}{perms} ne "editable" and not $operator ) {
+            &say( $chl =>
+                  "Sorry, $who, you don't have permissions to edit '$var'." );
+            return;
+        }
+
+        foreach my $v ( @{ $replacables{$var}{vals} } ) {
+            next unless $v eq $value;
+
+            &say( $chl => "$who, I had it that way!" );
+            return;
+        }
+
+        push @{ $replacables{$var}{vals} }, $value;
+        &say( $chl => "Okay, $who." );
+
+        &sql("insert into bucket_values (var_id, value) values (?, ?)",
+             [ $replacables{$var}{id}, $value ]);
+    } elsif ( $operator and $addressed and $msg =~ /^create var (\w+)$/ ) {
+        my $var = $1;
+        if ( exists $replacables{$var} ) {
+            &say( $chl =>
+                  "Sorry, $who, there already exists a variable '$var'." );
+            return;
+        }
+
+        $replacables{$var} = { vals => [], perms => "read-only" };
+        Log "$who created a new variable '$var' in $chl";
+        Report $_[KERNEL], "$who created a new variable '$var' in $chl";
+        $undo{$chl} = [ 'newvar', $who, $var, "new variable '$var'." ];
+        &say( $chl => "Okay, $who." );
+        
+        &sql( 'insert into bucket_vars (name, perms) values (?, "read-only")',
+              [$var], { cmd => "create_var", var => $var } );
+    } elsif ( $operator and $addressed and $msg =~ /^remove var (\w+)$/ ) {
+        my $var = $1;
+        unless ( exists $replacables{$var} ) {
+            &say( $chl => "Sorry, $who, there isn't a variable '$var'!" );
+            return;
+        }
+
+        Log Dumper $replacables{$var};
+        $undo{$chl} = [
+            'delvar', $who, $var, $replacables{$var},
+            "deletion of variable '$var'."
+          ] &say(
+            $chl => "Okay, $who, removed variable \$$var with",
+            scalar @{ $replacables{$var}{vals} }, "values."
+          );
+        &sql("delete from bucket_values where var_id = ?",
+             [$replacables{$var}{id}]);
+        &sql("delete from bucket_vars where id = ?",
+             [$replacables{$var}{id}]);
+        delete $replacables{$var};
     } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?$/i ) {
         &cached_reply( $chl, $who, "", "list items" );
     } else {
@@ -1063,6 +1191,31 @@ sub db_success {
                 }
             }
         }
+    } elsif ( $bag{cmd} eq 'create_var' ) {
+        if ($res->{INSERTID}) {
+            $replacables{$bag{var}}{id} = $res->{INSERTID};
+            Log "ID for $bag{var}: $res->{INSERTID}";
+        } else {
+            Log "ERR: create_var called without an INSERTID!";
+        }
+    } elsif ( $bag{cmd} eq 'load_vars' ) {
+        my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
+
+        Log "Loading replacables";
+        foreach my $line (@lines) {
+            unless (exists $replacables{$line->{name}}) {
+                $replacables{$line->{name}} = 
+                    { vals => [],
+                      perms => $line->{perms},
+                      id => $line->{id}};
+            }
+
+            push @{$replacables{$line->{name}}{vals}}, $line->{value};
+        }
+
+        Log "Loaded vars:", &make_list(
+            map { "$_ (". scalar @{$replacables{$_}{vals}} .")" }
+            sort keys %replacables);
     } elsif ( $bag{cmd} eq 'band_name' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
         unless ( $line{id} ) {
@@ -1462,6 +1615,20 @@ sub irc_start {
     $_[HEAP]->{connector} = POE::Component::IRC::Plugin::Connector->new();
     $irc->plugin_add( Connector => $_[HEAP]->{connector} );
 
+    # load the variables
+    $_[KERNEL]->post(
+        db  => 'MULTIPLE',
+        SQL => 'select vars.id id, name, perms, value 
+                from bucket_vars vars 
+                     left join bucket_values vals 
+                     on vars.id = vals.var_id  
+                order by vars.id',
+        BAGGAGE      => {
+            cmd   => "load_vars",
+        },
+        EVENT => 'db_success'
+    );
+
     &cache( $_[KERNEL], "Don't know" );
     &cache( $_[KERNEL], "takes item" );
     &cache( $_[KERNEL], "drops item" );
@@ -1501,6 +1668,7 @@ sub irc_on_notice {
         unless ( $config->{hide_hostmask} ) {
             $irc->yield( mode => $nick => "-x" );
         }
+
         $irc->yield( join => $channel );
         unless (DEBUG) {
             Log("Autojoining channels");
@@ -1939,6 +2107,100 @@ sub expand {
         $msg =~ s/\$newitem/$newitem/i;
     }
 
+    my $oldmsg = "";
+    while ( $oldmsg ne $msg and $msg =~ /\$(\w+)/ ) {
+        $oldmsg = $msg;
+        my $var = $1;
+        Log "Found variable \$$var";
+
+        # yay for special cases!
+        my $conjugate;
+        my $record;
+        if ($var eq 'verbed') {
+            $conjugate = \&past;
+            $record = $replacables{ verb };
+            Log "Special case verbed";
+        } elsif ($var eq 'verbs') {
+            $conjugate = \&s_form;
+            $record = $replacables{ verb };
+            Log "Special case verbs";
+        } elsif ($var eq 'verbing') {
+            $conjugate = \&gerund;
+            $record = $replacables{ verb };
+            Log "Special case verbing";
+        } elsif ($var eq 'nouns') {
+            $conjugate = \&PL_N;
+            $record = $replacables{ noun };
+            Log "Special case nouns";
+        } elsif ($var eq 'noun') {
+            Log "Special case noun";
+            $record = $replacables{ noun };
+
+            while ( $msg =~ /\ba \$noun\b/i ) {
+                my $replacement = &set_case($record, $var, $conjugate);
+                $replacement = A($replacement);
+                Log "Replacing 'a \$noun' with $replacement";
+                last if $replacement =~ /\$/;
+
+                $msg =~ s/\ba \$noun\b/$replacement/i;
+            }
+        } else {
+            $record = $replacables{ lc $var };
+        }
+
+        unless ($record) {
+            Log "Can't find a record for \$$var";
+            last;
+        }
+
+        Log Dumper $record;
+
+        while ( $msg =~ /\$$var\b/i ) {
+            my $replacement = &set_case($record, $var, $conjugate);
+            Log "Replacing \$$var with $replacement";
+            last if $replacement =~ /\$/;
+
+            $msg =~ s/\$$var\b/$replacement/i;
+        }
+
+        Log " => $msg";
+    }
+
+
     return $msg;
 }
 
+sub set_case {
+    my ( $record, $var, $conjugate ) = @_;
+
+    my $case;
+    if ( $var =~ /^[A-Z_]+$/ ) {
+        $case = "U";
+    } elsif ( $var =~ /^[A-Z][a-z_]+$/ ) {
+        $case = "u";
+    } else {
+        $case = "l";
+    }
+    $var = lc $var;
+
+    return "\$$var" unless $record->{vals};
+    my @values = @{ $record->{vals} };
+    return "\$$var" unless @values;
+    my $value = $values[ rand @values ];
+    $value =~ s/\$//g;
+
+    if (ref $conjugate eq 'CODE') {
+        Log "Conjugating $value ($conjugate)";
+        Log join ", ", "past=".\&past, "s_form=".\&s_form, "gerund=".\&gerund;
+        $value = $conjugate->($value);
+        Log " => $value";
+    }
+
+    if ( $case eq "l" ) {
+        return $value;
+    } elsif ( $case eq 'U' ) {
+        return uc $value;
+    } elsif ( $case eq 'u' ) {
+        return ucfirst $value;
+    }
+}
