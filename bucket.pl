@@ -79,6 +79,28 @@ my %config_keys = (
     your_mom_is            => "p",
 );
 
+#<<<
+my %gender_vars = (
+  g_subj => { male => "he" ,     female => "she",     androgynous => "they",     inanimate => "it",
+              aliases => [ qw/he she they it heshe shehe/ ]},
+  g_obj  => { male => "him",     female => "her",     androgynous => "them",     inanimate => "it",
+              aliases => [ qw/him her them himher herhim/ ]},
+  g_ref  => { male => "himself", female => "herself", androgynous => "themself", inanimate => "itself",
+              aliases => [ qw/himself herself themself itself himselfherself herselfhimself/ ]},
+  g_pos  => { male => "his",     female => "hers",    androgynous => "theirs",   inanimate => "its",
+              aliases => [ qw/hers theirs hishers hershis/ ]},
+  g_det  => { male => "his",     female => "her",     androgynous => "their",    inanimate => "its",
+              aliases => [ qw/their hisher herhis/ ]},
+);
+#>>>
+# set up gender aliases
+foreach my $type ( keys %gender_vars ) {
+    foreach my $alias ( @{ $gender_vars{$type}{aliases} } ) {
+        $gender_vars{$alias} = $gender_vars{$type};
+        &Log("Setting gender alias: $alias => $type");
+    }
+}
+
 $stats{startup_time} = time;
 
 if ( $config->{logfile} ) {
@@ -102,6 +124,8 @@ POE::Session->create(
         irc_notice       => \&irc_on_notice,
         irc_disconnected => \&irc_on_disconnect,
         irc_topic        => \&irc_on_topic,
+        irc_join         => \&irc_on_join,
+        irc_chan_sync    => \&irc_on_chan_sync,
         db_success       => \&db_success,
         delayed_post     => \&delayed_post,
         check_idle       => \&check_idle,
@@ -186,6 +210,10 @@ sub irc_on_public {
 
     # keep track of who's active in each channel
     $stats{users}{$chl}{$who} = time;
+
+    unless ( exists $stats{users}{genders}{$who} ) {
+        &load_gender($who);
+    }
 
     my $operator = 0;
     if (   $irc->is_channel_operator( $channel, $who )
@@ -445,17 +473,18 @@ sub irc_on_public {
         Report $_[KERNEL], "$who is $1protecting $fact";
         Log "$1protecting $fact";
 
-        if ($fact =~ s/^\$//) { # it's a variable!
-            unless (exists $replacables{lc $fact}) {
+        if ( $fact =~ s/^\$// ) {    # it's a variable!
+            unless ( exists $replacables{ lc $fact } ) {
                 &say( $chl => "Sorry, $who, \$$fact isn't a valid variable." );
                 return;
             }
 
-            $replacables{lc $fact}{perms} = $protect ? "read-only" : "editable";
+            $replacables{ lc $fact }{perms} =
+              $protect ? "read-only" : "editable";
         } else {
             $_[KERNEL]->post(
-                db           => "DO",
-                SQL          => 'update bucket_facts set protected=? where fact=?',
+                db  => "DO",
+                SQL => 'update bucket_facts set protected=? where fact=?',
                 PLACEHOLDERS => [ $protect, $fact ],
                 EVENT        => "db_success",
             );
@@ -837,8 +866,10 @@ sub irc_on_public {
             splice( @{ $replacables{$var}{vals} }, $i, 1, () );
             &say( $chl => "Okay, $who." );
 
-            &sql("delete from bucket_values where var_id=? and value=? limit 1",
-                 [$replacables{$var}{id}, $value]);
+            &sql(
+                "delete from bucket_values where var_id=? and value=? limit 1",
+                [ $replacables{$var}{id}, $value ]
+            );
             return;
         }
 
@@ -866,8 +897,8 @@ sub irc_on_public {
         push @{ $replacables{$var}{vals} }, $value;
         &say( $chl => "Okay, $who." );
 
-        &sql("insert into bucket_values (var_id, value) values (?, ?)",
-             [ $replacables{$var}{id}, $value ]);
+        &sql( "insert into bucket_values (var_id, value) values (?, ?)",
+            [ $replacables{$var}{id}, $value ] );
     } elsif ( $operator and $addressed and $msg =~ /^create var (\w+)$/ ) {
         my $var = $1;
         if ( exists $replacables{$var} ) {
@@ -881,9 +912,9 @@ sub irc_on_public {
         Report $_[KERNEL], "$who created a new variable '$var' in $chl";
         $undo{$chl} = [ 'newvar', $who, $var, "new variable '$var'." ];
         &say( $chl => "Okay, $who." );
-        
+
         &sql( 'insert into bucket_vars (name, perms) values (?, "read-only")',
-              [$var], { cmd => "create_var", var => $var } );
+            [$var], { cmd => "create_var", var => $var } );
     } elsif ( $operator and $addressed and $msg =~ /^remove var (\w+)$/ ) {
         my $var = $1;
         unless ( exists $replacables{$var} ) {
@@ -899,13 +930,75 @@ sub irc_on_public {
             $chl => "Okay, $who, removed variable \$$var with",
             scalar @{ $replacables{$var}{vals} }, "values."
           );
-        &sql("delete from bucket_values where var_id = ?",
-             [$replacables{$var}{id}]);
-        &sql("delete from bucket_vars where id = ?",
-             [$replacables{$var}{id}]);
+        &sql( "delete from bucket_values where var_id = ?",
+            [ $replacables{$var}{id} ] );
+        &sql( "delete from bucket_vars where id = ?",
+            [ $replacables{$var}{id} ] );
         delete $replacables{$var};
     } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?$/i ) {
         &cached_reply( $chl, $who, "", "list items" );
+    } elsif (
+        $addressed
+        and $msg =~ /^(I|[-\w]+) \s (?:am|is) \s
+                       (
+                         male          |
+                         female        |
+                         androgynous   |
+                         inanimate     |
+                         full \s name  |
+                         random gender
+                       )\.?$/x
+        or $msg =~ / ^(I|[-\w]+) \s (am|is) \s an? \s
+                       ( he | she | him | her | it )\.?$
+                     /x
+      )
+    {
+        my ( $target, $gender, $pronoun ) = ( $1, $2, $3 );
+        if ( $target ne "I" and not $operator ) {
+            &say(
+                $chl => "$who, you should let $target set their own gender." );
+            return;
+        }
+
+        $target = $who if $target eq 'I';
+
+        if ($pronoun) {
+            $gender = undef;
+            $gender = "male"   if $pronoun eq 'him' or $pronoun eq 'he';
+            $gender = "female" if $pronoun eq 'her' or $pronoun eq 'she';
+            $gender = "inanimate" if $pronoun eq 'it';
+
+            unless ($gender) {
+                &say( $chl => "Sorry, $who, I didn't understand that." );
+                return;
+            }
+        }
+
+        Log "$who set ${target}'s gender to $gender";
+        $stats{users}{genders}{$target} = $gender;
+        &sql( "replace genders (nick, gender, stamp) values (?, ?, ?)",
+            [ $target, $gender, undef ] );
+        &say( $chl => "Okay, $who" );
+    } elsif ( $addressed and $msg =~ /^what is my gender\??$/i ) {
+        if ( exists $stats{users}{genders}{$who} ) {
+            &say(
+                $chl => "$who: Grammatically, I refer to you as",
+                $stats{users}{genders}{$who} . ".  See",
+                "http://wiki.xkcd.com/Bucket#Docs for information on",
+                "setting this."
+            );
+
+        } else {
+            &load_gender($who);
+            &say( $chl => "$who: I don't know how to refer to you!" );
+        }
+    } elsif ( $addressed and $msg =~ /^what gender is ([-\w]+)\??$/ ) {
+        if ( exists $stats{users}{genders}{$1} ) {
+            &say( $chl => "$who: $1 is $stats{users}{genders}{$1}." );
+        } else {
+            &load_gender($1);
+            &say( $chl => "$who: I don't know how to refer to $1!" );
+        }
     } else {
         my $orig = $msg;
         $msg = &trim($msg);
@@ -1012,13 +1105,6 @@ sub db_success {
                 return;
             }
 
-            if ( lc $fact eq lc $bag{who} ) {
-                Log "Not allowing $bag{who} to edit his own factoid";
-                &say( $bag{chl} =>
-                      "Please don't edit your own factoid, $bag{who}." );
-                return;
-            }
-
             if ( $tidbit =~ m#=~\s*s/#i ) {
                 Log "Not learning what looks like a botched s/// query";
                 &say( $bag{chl} => "$bag{who}: Fix your s/// command." );
@@ -1061,6 +1147,13 @@ sub db_success {
             {
                 $tidbit =~ s/\W+$//;
                 &say( $bag{chl} => "$bag{who}: Your mom is $tidbit!" );
+                return;
+            }
+
+            if ( lc $fact eq lc $bag{who} ) {
+                Log "Not allowing $bag{who} to edit his own factoid";
+                &say( $bag{chl} =>
+                      "Please don't edit your own factoid, $bag{who}." );
                 return;
             }
 
@@ -1192,30 +1285,36 @@ sub db_success {
             }
         }
     } elsif ( $bag{cmd} eq 'create_var' ) {
-        if ($res->{INSERTID}) {
-            $replacables{$bag{var}}{id} = $res->{INSERTID};
+        if ( $res->{INSERTID} ) {
+            $replacables{ $bag{var} }{id} = $res->{INSERTID};
             Log "ID for $bag{var}: $res->{INSERTID}";
         } else {
             Log "ERR: create_var called without an INSERTID!";
         }
+    } elsif ( $bag{cmd} eq 'load_gender' ) {
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        $stats{users}{genders}{ $bag{nick} } = $line{gender} || "androgynous";
     } elsif ( $bag{cmd} eq 'load_vars' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
 
         Log "Loading replacables";
         foreach my $line (@lines) {
-            unless (exists $replacables{$line->{name}}) {
-                $replacables{$line->{name}} = 
-                    { vals => [],
-                      perms => $line->{perms},
-                      id => $line->{id}};
+            unless ( exists $replacables{ $line->{name} } ) {
+                $replacables{ $line->{name} } = {
+                    vals  => [],
+                    perms => $line->{perms},
+                    id    => $line->{id}
+                };
             }
 
-            push @{$replacables{$line->{name}}{vals}}, $line->{value};
+            push @{ $replacables{ $line->{name} }{vals} }, $line->{value};
         }
 
-        Log "Loaded vars:", &make_list(
-            map { "$_ (". scalar @{$replacables{$_}{vals}} .")" }
-            sort keys %replacables);
+        Log "Loaded vars:",
+          &make_list(
+            map { "$_ (" . scalar @{ $replacables{$_}{vals} } . ")" }
+              sort keys %replacables
+          );
     } elsif ( $bag{cmd} eq 'band_name' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
         unless ( $line{id} ) {
@@ -1623,10 +1722,8 @@ sub irc_start {
                      left join bucket_values vals 
                      on vars.id = vals.var_id  
                 order by vars.id',
-        BAGGAGE      => {
-            cmd   => "load_vars",
-        },
-        EVENT => 'db_success'
+        BAGGAGE => { cmd => "load_vars", },
+        EVENT   => 'db_success'
     );
 
     &cache( $_[KERNEL], "Don't know" );
@@ -1670,14 +1767,27 @@ sub irc_on_notice {
         }
 
         $irc->yield( join => $channel );
-        unless (DEBUG) {
-            Log("Autojoining channels");
-            foreach
-              my $chl ( $config->{logchannel}, keys %{ $config->{autojoin} } )
-            {
-                $irc->yield( join => $chl );
-                Log("... $chl");
-            }
+    }
+}
+
+sub irc_on_join {
+    my ($who) = split /!/, $_[ARG0];
+
+    return if exists $stats{users}{genders}{$who};
+
+    &load_gender($who);
+}
+
+sub irc_on_chan_sync {
+    my $chl = $_[ARG0];
+    Log "Sync done for $chl";
+
+    if ( not DEBUG and $chl eq $channel ) {
+        Log("Autojoining channels");
+        foreach my $chl ( $config->{logchannel}, keys %{ $config->{autojoin} } )
+        {
+            $irc->yield( join => $chl );
+            Log("... $chl");
         }
     }
 }
@@ -2016,6 +2126,19 @@ sub do {
     $irc->yield( ctcp => $chl => "ACTION $action" );
 }
 
+sub load_gender {
+    my $who = shift;
+
+    Log "Looking up ${who}'s gender...";
+    POE::Kernel->post(
+        db           => 'SINGLE',
+        SQL          => 'select gender from genders where nick = ? limit 1',
+        PLACEHOLDERS => [$who],
+        EVENT        => 'db_success',
+        BAGGAGE      => { cmd => 'load_gender', nick => $who },
+    );
+}
+
 sub lookup {
     my %params = @_;
     my $sql;
@@ -2079,13 +2202,20 @@ sub expand {
     my $chl = shift;
     my $msg = "@_";
 
-    $msg =~ s/\$who/$who/gi;
+    my $gender = $stats{users}{genders}{$who};
+    if ( $msg =~ /\$who/ ) {
+        $msg =~ s/\$who/$who/gi;
+    }
+
     if ( $msg =~ /\$someone/i ) {
         while ( $msg =~ /\$someone/i ) {
             my $rnick = &someone($chl);
             $msg =~ s/\$someone/$rnick/i;
+
+            $gender ||= $stats{users}{genders}{$rnick};
         }
     }
+
     while ( $msg =~ /\$(give)?item/i ) {
         if (@inventory) {
             my $give = $1;
@@ -2107,6 +2237,19 @@ sub expand {
         $msg =~ s/\$newitem/$newitem/i;
     }
 
+    if ($gender) {
+        Log "Gender = $gender";
+        foreach my $gvar ( keys %gender_vars ) {
+            next unless $msg =~ /\$$gvar/i;
+
+            Log "Replacing $gvar...";
+            if ( exists $gender_vars{$gvar}{$gender} ) {
+                Log " => $gender_vars{$gvar}{$gender}";
+                $msg =~ s/\$$gvar/$gender_vars{$gvar}{$gender}/gi;
+            }
+        }
+    }
+
     my $oldmsg = "";
     while ( $oldmsg ne $msg and $msg =~ /\$(\w+)/ ) {
         $oldmsg = $msg;
@@ -2116,28 +2259,28 @@ sub expand {
         # yay for special cases!
         my $conjugate;
         my $record;
-        if ($var eq 'verbed') {
+        if ( $var eq 'verbed' ) {
             $conjugate = \&past;
-            $record = $replacables{ verb };
+            $record    = $replacables{verb};
             Log "Special case verbed";
-        } elsif ($var eq 'verbs') {
+        } elsif ( $var eq 'verbs' ) {
             $conjugate = \&s_form;
-            $record = $replacables{ verb };
+            $record    = $replacables{verb};
             Log "Special case verbs";
-        } elsif ($var eq 'verbing') {
+        } elsif ( $var eq 'verbing' ) {
             $conjugate = \&gerund;
-            $record = $replacables{ verb };
+            $record    = $replacables{verb};
             Log "Special case verbing";
-        } elsif ($var eq 'nouns') {
+        } elsif ( $var eq 'nouns' ) {
             $conjugate = \&PL_N;
-            $record = $replacables{ noun };
+            $record    = $replacables{noun};
             Log "Special case nouns";
-        } elsif ($var eq 'noun') {
+        } elsif ( $var eq 'noun' ) {
             Log "Special case noun";
-            $record = $replacables{ noun };
+            $record = $replacables{noun};
 
             while ( $msg =~ /\ba \$noun\b/i ) {
-                my $replacement = &set_case($record, $var, $conjugate);
+                my $replacement = &set_case( $record, $var, $conjugate );
                 $replacement = A($replacement);
                 Log "Replacing 'a \$noun' with $replacement";
                 last if $replacement =~ /\$/;
@@ -2156,7 +2299,7 @@ sub expand {
         Log Dumper $record;
 
         while ( $msg =~ /\$$var\b/i ) {
-            my $replacement = &set_case($record, $var, $conjugate);
+            my $replacement = &set_case( $record, $var, $conjugate );
             Log "Replacing \$$var with $replacement";
             last if $replacement =~ /\$/;
 
@@ -2165,7 +2308,6 @@ sub expand {
 
         Log " => $msg";
     }
-
 
     return $msg;
 }
@@ -2189,9 +2331,10 @@ sub set_case {
     my $value = $values[ rand @values ];
     $value =~ s/\$//g;
 
-    if (ref $conjugate eq 'CODE') {
+    if ( ref $conjugate eq 'CODE' ) {
         Log "Conjugating $value ($conjugate)";
-        Log join ", ", "past=".\&past, "s_form=".\&s_form, "gerund=".\&gerund;
+        Log join ", ", "past=" . \&past, "s_form=" . \&s_form,
+          "gerund=" . \&gerund;
         $value = $conjugate->($value);
         Log " => $value";
     }
