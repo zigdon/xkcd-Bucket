@@ -82,7 +82,7 @@ my %config_keys = (
 );
 
 my %gender_vars = (
-    g_subj => {
+    subjective => {
         male        => "he",
         female      => "she",
         androgynous => "they",
@@ -90,7 +90,7 @@ my %gender_vars = (
         "full name" => "%N",
         aliases     => [qw/he she they it heshe shehe/]
     },
-    g_obj => {
+    objective => {
         male        => "him",
         female      => "her",
         androgynous => "them",
@@ -98,7 +98,7 @@ my %gender_vars = (
         "full name" => "%N",
         aliases     => [qw/him her them himher herhim/]
     },
-    g_ref => {
+    reflexive => {
         male        => "himself",
         female      => "herself",
         androgynous => "themself",
@@ -107,7 +107,7 @@ my %gender_vars = (
         aliases =>
           [qw/himself herself themself itself himselfherself herselfhimself/]
     },
-    g_pos => {
+    posessive => {
         male        => "his",
         female      => "hers",
         androgynous => "theirs",
@@ -115,7 +115,7 @@ my %gender_vars = (
         "full name" => "%N's",
         aliases     => [qw/hers theirs hishers hershis/]
     },
-    g_det => {
+    determiner => {
         male        => "his",
         female      => "her",
         androgynous => "their",
@@ -2338,7 +2338,7 @@ sub expand {
 
     if ($gender) {
         foreach my $gvar ( keys %gender_vars ) {
-            next unless $msg =~ /\$$gvar/i;
+            next unless $msg =~ /\$$gvar\b/i;
 
             Log "Replacing gvar $gvar...";
             if ( exists $gender_vars{$gvar}{$gender} ) {
@@ -2348,7 +2348,7 @@ sub expand {
                     $g_v =~ s/%N/$target/;
                     Log " => $g_v";
                 }
-                $msg =~ s/\$$gvar/$g_v/gi;
+                $msg =~ s/\$$gvar\b/$g_v/gi;
             }
         }
     }
