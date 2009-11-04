@@ -31,7 +31,7 @@ use Data::Dumper;
 use Fcntl qw/:seek/;
 $Data::Dumper::Indent = 1;
 
-use constant { DEBUG => 0 };
+use constant { DEBUG => 1 };
 
 # work around a bug: https://rt.cpan.org/Ticket/Display.html?id=50991
 sub s_form { return Lingua::EN::Conjugate::s_form(@_); }
@@ -63,11 +63,13 @@ my %last_activity;
 my @inventory;
 my @random_items;
 my %replacables;
+my %history;
 
 my %config_keys = (
     bananas_chance         => "p",
     band_name              => "p",
     ex_to_sex              => "p",
+    history_size           => "i",
     idle_source            => "s",
     increase_mute          => "i",
     inventory_preload      => "i",
@@ -79,20 +81,50 @@ my %config_keys = (
     your_mom_is            => "p",
 );
 
-#<<<
 my %gender_vars = (
-  g_subj => { male => "he" ,     female => "she",     androgynous => "they",     inanimate => "it",
-              aliases => [ qw/he she they it heshe shehe/ ]},
-  g_obj  => { male => "him",     female => "her",     androgynous => "them",     inanimate => "it",
-              aliases => [ qw/him her them himher herhim/ ]},
-  g_ref  => { male => "himself", female => "herself", androgynous => "themself", inanimate => "itself",
-              aliases => [ qw/himself herself themself itself himselfherself herselfhimself/ ]},
-  g_pos  => { male => "his",     female => "hers",    androgynous => "theirs",   inanimate => "its",
-              aliases => [ qw/hers theirs hishers hershis/ ]},
-  g_det  => { male => "his",     female => "her",     androgynous => "their",    inanimate => "its",
-              aliases => [ qw/their hisher herhis/ ]},
+    g_subj => {
+        male        => "he",
+        female      => "she",
+        androgynous => "they",
+        inanimate   => "it",
+        "full name" => "%N",
+        aliases     => [qw/he she they it heshe shehe/]
+    },
+    g_obj => {
+        male        => "him",
+        female      => "her",
+        androgynous => "them",
+        inanimate   => "it",
+        "full name" => "%N",
+        aliases     => [qw/him her them himher herhim/]
+    },
+    g_ref => {
+        male        => "himself",
+        female      => "herself",
+        androgynous => "themself",
+        inanimate   => "itself",
+        "full name" => "%N",
+        aliases =>
+          [qw/himself herself themself itself himselfherself herselfhimself/]
+    },
+    g_pos => {
+        male        => "his",
+        female      => "hers",
+        androgynous => "theirs",
+        inanimate   => "its",
+        "full name" => "%N's",
+        aliases     => [qw/hers theirs hishers hershis/]
+    },
+    g_det => {
+        male        => "his",
+        female      => "her",
+        androgynous => "their",
+        inanimate   => "its",
+        "full name" => "%N's",
+        aliases     => [qw/their hisher herhis/]
+    },
 );
-#>>>
+
 # set up gender aliases
 foreach my $type ( keys %gender_vars ) {
     foreach my $alias ( @{ $gender_vars{$type}{aliases} } ) {
@@ -125,6 +157,7 @@ POE::Session->create(
         irc_disconnected => \&irc_on_disconnect,
         irc_topic        => \&irc_on_topic,
         irc_join         => \&irc_on_join,
+        irc_nick         => \&irc_on_nick,
         irc_chan_sync    => \&irc_on_chan_sync,
         db_success       => \&db_success,
         delayed_post     => \&delayed_post,
@@ -143,15 +176,14 @@ sub Log {
 }
 
 sub Report {
-    my $kernel     = shift;
-    my $delay      = shift if $_[0] =~ /^\d+$/;
+    my $delay = shift if $_[0] =~ /^\d+$/;
     my $logchannel = DEBUG ? $channel : $config->{logchannel};
     unshift @_, "REPORT:" if DEBUG;
 
     if ( $logchannel and $irc ) {
         if ($delay) {
             Log "Delayed msg ($delay): @_";
-            $kernel->delay_add(
+            POE::Kernel->delay_add(
                 delayed_post => 2 * $delay => $logchannel => "@_" );
         } else {
             &say( $logchannel, "@_" );
@@ -208,10 +240,18 @@ sub irc_on_public {
         return;
     }
 
+    if ( $config->{history_size} and $config->{history_size} > 0 ) {
+        push @{$history{$chl}}, [$who, $msg];
+
+        if (@{$history{$chl}} > $config->{history_size}) {
+            shift @{$history{$chl}};
+        }
+    }
+
     # keep track of who's active in each channel
     $stats{users}{$chl}{$who} = time;
 
-    unless ( exists $stats{users}{genders}{$who} ) {
+    unless ( exists $stats{users}{genders}{ lc $who } ) {
         &load_gender($who);
     }
 
@@ -243,8 +283,7 @@ sub irc_on_public {
     unless ( $talking{$chl} == -1 or ( $operator and $addressed ) ) {
         if ( $addressed and $config->{increase_mute} and $talking{$chl} > 0 ) {
             $talking{$chl} += $config->{increase_mute};
-            Report $_[KERNEL],
-                "Shutting up longer in $chl - "
+            Report "Shutting up longer in $chl - "
               . ( $talking{$chl} - time )
               . " seconds remaining";
         }
@@ -293,8 +332,7 @@ sub irc_on_public {
       )
     {
         my ( $fact, $old, $new, $flag ) = ( $1, $2, $3, $4 );
-        Report $_[KERNEL],
-          "$who is editing $fact in $chl: replacing '$old' with '$new'";
+        Report "$who is editing $fact in $chl: replacing '$old' with '$new'";
         Log "Editing $fact: replacing '$old' with '$new'";
         $_[KERNEL]->post(
             db  => 'MULTIPLE',
@@ -412,7 +450,7 @@ sub irc_on_public {
                 $target += $num * 60           if $unit eq 'm';
                 $target += $num * 60 * 60      if $unit eq 'h';
                 $target += $num * 60 * 60 * 24 if $unit eq 'd';
-                Report $_[KERNEL],
+                Report
                   "Shutting up in $chl at ${who}'s request for $target seconds";
                 &say( $chl => "Okay $who.  I'll be back later" );
                 $talking{$chl} = time + $target;
@@ -421,7 +459,7 @@ sub irc_on_public {
                 $target += 30 + int( rand(60) )           if $word eq 'moment';
                 $target += 4 * 60 + int( rand( 4 * 60 ) ) if $word eq 'bit';
                 $target += 30 * 60 + int( rand( 30 * 60 ) ) if $word eq 'while';
-                Report $_[KERNEL],
+                Report
                   "Shutting up in $chl at ${who}'s request for $target seconds";
                 &say( $chl => "Okay $who.  I'll be back later" );
                 $talking{$chl} = time + $target;
@@ -444,14 +482,14 @@ sub irc_on_public {
         }
         $irc->yield( $cmd => $dst );
         &say( $chl => "$who: ${cmd}ing $dst" );
-        Report $_[KERNEL], "${cmd}ing $dst at ${who}'s request";
+        Report "${cmd}ing $dst at ${who}'s request";
     } elsif ( $addressed and $operator and lc $msg eq 'list ignored' ) {
         &say(
             $chl => "Currently ignored: ",
             join ", ", sort keys %{ $config->{ignore} }
         );
     } elsif ( $addressed and $operator and $msg =~ /^(un)?ignore (\S+)/i ) {
-        Report $_[KERNEL], "$who is $1ignoring $2";
+        Report "$who is $1ignoring $2";
         if ($1) {
             delete $config->{ignore}{ lc $2 };
         } else {
@@ -460,7 +498,7 @@ sub irc_on_public {
         &save;
         &say( $chl => "Okay, $who.  Ignore list updated." );
     } elsif ( $addressed and $operator and $msg =~ /^(un)?exclude (\S+)/i ) {
-        Report $_[KERNEL], "$who is $1excluding $2";
+        Report "$who is $1excluding $2";
         if ($1) {
             delete $config->{exclude}{ lc $2 };
         } else {
@@ -470,7 +508,7 @@ sub irc_on_public {
         &say( $chl => "Okay, $who.  Exclude list updated." );
     } elsif ( $addressed and $operator and $msg =~ /^(un)?protect (.+)/i ) {
         my ( $protect, $fact ) = ( ( $1 ? 0 : 1 ), $2 );
-        Report $_[KERNEL], "$who is $1protecting $fact";
+        Report "$who is $1protecting $fact";
         Log "$1protecting $fact";
 
         if ( $fact =~ s/^\$// ) {    # it's a variable!
@@ -519,7 +557,7 @@ sub irc_on_public {
                 PLACEHOLDERS => [ $undo->[2] ],
                 EVENT        => "db_success",
             );
-            Report $_[KERNEL], "$who called undo: deleted $undo->[3].";
+            Report "$who called undo: deleted $undo->[3].";
             &say( $chl => "Okay, $who, deleted $undo->[3]." );
             delete $undo{$uchannel};
         } elsif ( $undo->[0] eq 'insert' ) {
@@ -540,7 +578,7 @@ sub irc_on_public {
                         EVENT => "db_success",
                     );
                 }
-                Report $_[KERNEL], "$who called undo: undeleted $undo->[3].";
+                Report "$who called undo: undeleted $undo->[3].";
                 &say( $chl => "Okay, $who, undeleted $undo->[3]." );
             } elsif ( $undo->[2] and ref $undo->[2] eq 'HASH' ) {
                 my %old = %{ $undo->[2] };
@@ -556,7 +594,7 @@ sub irc_on_public {
                     ],
                     EVENT => "db_success",
                 );
-                Report $_[KERNEL], "$who called undo:",
+                Report "$who called undo:",
                   "unforgot $old{fact} $old{verb} $old{tidbit}.";
                 &say( $chl =>
                       "Okay, $who, unforgot $old{fact} $old{verb} $old{tidbit}."
@@ -596,7 +634,7 @@ sub irc_on_public {
                         );
                     }
                 }
-                Report $_[KERNEL], "$who called undo: undone $undo->[3].";
+                Report "$who called undo: undone $undo->[3].";
                 &say( $chl => "Okay, $who, undone $undo->[3]." );
             } else {
                 &say( $chl => "Sorry, $who, that's an invalid undo structure."
@@ -771,6 +809,7 @@ sub irc_on_public {
                 my $dump = Dumper( $stats{$key} );
                 $dump =~ s/[\s\n]+/ /g;
                 &say( $chl => "$who: $key: $dump." );
+                Log $dump;
             } else {
                 &say( $chl => "$who: $key: $stats{$key}." );
             }
@@ -778,7 +817,7 @@ sub irc_on_public {
             &say( $chl => "Sorry, $who, I don't have statistics for '$key'." );
         }
     } elsif ( $operator and $addressed and $msg eq 'restart' ) {
-        Report $_[KERNEL], "Restarting at ${who}'s request";
+        Report "Restarting at ${who}'s request";
         Log "Restarting at ${who}'s request";
         &say( $chl => "Okay, $who, I'll be right back." );
         $irc->yield( quit => "OHSHI--" );
@@ -806,7 +845,7 @@ sub irc_on_public {
         }
 
         &say( $chl => "Okay, $who." );
-        Report $_[KERNEL], "$who set '$key' to '$val'";
+        Report "$who set '$key' to '$val'";
 
         &save;
         return;
@@ -909,7 +948,7 @@ sub irc_on_public {
 
         $replacables{$var} = { vals => [], perms => "read-only" };
         Log "$who created a new variable '$var' in $chl";
-        Report $_[KERNEL], "$who created a new variable '$var' in $chl";
+        Report "$who created a new variable '$var' in $chl";
         $undo{$chl} = [ 'newvar', $who, $var, "new variable '$var'." ];
         &say( $chl => "Okay, $who." );
 
@@ -937,6 +976,46 @@ sub irc_on_public {
         delete $replacables{$var};
     } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?$/i ) {
         &cached_reply( $chl, $who, "", "list items" );
+    } elsif ( $addressed and ref $history{$chl} and
+              $msg =~ /^remember ([-\w]+) (.*)/ ) {
+        my ($target, $re) = ($1, $2);
+        my $match;
+        foreach my $line (@{$history{$chl}}) {
+            next unless lc $line->[0] eq lc $1;
+            next unless $line->[1] =~ /\Q$2/i;
+
+            $match = $line;
+            last;
+        }
+
+        unless ($match) {
+            &say( $chl => "Sorry, $who, I don't remember what $target said about '$re'." );
+            return;
+        }
+
+        Log "Remembering '$target quotes' '<reply>' '<$target> $match->[1]'";
+        $_[KERNEL]->post(
+            db  => 'SINGLE',
+            SQL => 'select id, tidbit from bucket_facts 
+                    where fact = ? and verb = "<alias>"',
+            PLACEHOLDERS => ["$target quotes"],
+            BAGGAGE      => {
+                chl       => $chl,
+                msg       => "$target quotes <reply> <$target> $match->[1]",
+                orig      => "$target quotes <reply> <$target> $match->[1]",
+                who       => $who,
+                addressed => 1,
+                editable  => $editable,
+                op        => $operator,
+                type      => $type,
+                fact      => "$target quotes",
+                verb      => "<reply>",
+                tidbit    => "<$target> $match->[1]",
+                cmd       => "unalias",
+            },
+            EVENT => 'db_success'
+        );
+
     } elsif (
         $addressed
         and $msg =~ /^(I|[-\w]+) \s (?:am|is) \s
@@ -947,14 +1026,14 @@ sub irc_on_public {
                          inanimate     |
                          full \s name  |
                          random gender
-                       )\.?$/x
+                       )\.?$/ix
         or $msg =~ / ^(I|[-\w]+) \s (am|is) \s an? \s
                        ( he | she | him | her | it )\.?$
-                     /x
+                     /ix
       )
     {
         my ( $target, $gender, $pronoun ) = ( $1, $2, $3 );
-        if ( $target ne "I" and not $operator ) {
+        if ( $target ne "I" and lc $target ne lc $who and not $operator ) {
             &say(
                 $chl => "$who, you should let $target set their own gender." );
             return;
@@ -964,7 +1043,7 @@ sub irc_on_public {
 
         if ($pronoun) {
             $gender = undef;
-            $gender = "male"   if $pronoun eq 'him' or $pronoun eq 'he';
+            $gender = "male" if $pronoun eq 'him' or $pronoun eq 'he';
             $gender = "female" if $pronoun eq 'her' or $pronoun eq 'she';
             $gender = "inanimate" if $pronoun eq 'it';
 
@@ -975,16 +1054,16 @@ sub irc_on_public {
         }
 
         Log "$who set ${target}'s gender to $gender";
-        $stats{users}{genders}{$target} = $gender;
+        $stats{users}{genders}{ lc $target } = $gender;
         &sql( "replace genders (nick, gender, stamp) values (?, ?, ?)",
             [ $target, $gender, undef ] );
         &say( $chl => "Okay, $who" );
     } elsif ( $addressed and $msg =~ /^what is my gender\??$/i ) {
-        if ( exists $stats{users}{genders}{$who} ) {
+        if ( exists $stats{users}{genders}{ lc $who } ) {
             &say(
                 $chl => "$who: Grammatically, I refer to you as",
-                $stats{users}{genders}{$who} . ".  See",
-                "http://wiki.xkcd.com/Bucket#Docs for information on",
+                $stats{users}{genders}{ lc $who } . ".  See",
+                "http://wiki.xkcd.com/irc/Bucket#Docs for information on",
                 "setting this."
             );
 
@@ -993,8 +1072,8 @@ sub irc_on_public {
             &say( $chl => "$who: I don't know how to refer to you!" );
         }
     } elsif ( $addressed and $msg =~ /^what gender is ([-\w]+)\??$/ ) {
-        if ( exists $stats{users}{genders}{$1} ) {
-            &say( $chl => "$who: $1 is $stats{users}{genders}{$1}." );
+        if ( exists $stats{users}{genders}{ lc $1 } ) {
+            &say( $chl => "$who: $1 is $stats{users}{genders}{lc $1}." );
         } else {
             &load_gender($1);
             &say( $chl => "$who: I don't know how to refer to $1!" );
@@ -1028,7 +1107,7 @@ sub db_success {
     print Dumper $res;
     my %bag = ref $res->{BAGGAGE} ? %{ $res->{BAGGAGE} } : {};
     if ( $res->{ERROR} ) {
-        Report $_[KERNEL], "DB Error: $res->{QUERY} -> $res->{ERROR}";
+        Report "DB Error: $res->{QUERY} -> $res->{ERROR}";
         Log "DB Error: $res->{QUERY} -> $res->{ERROR}";
         &error( $bag{chl}, $bag{who} ) if $bag{chl};
         return;
@@ -1040,7 +1119,7 @@ sub db_success {
 
             if ( $line{verb} eq '<alias>' ) {
                 if ( $bag{aliases}{ $line{tidbit} } ) {
-                    Report $_[KERNEL], "Alias loop detected when '$line{fact}'"
+                    Report "Alias loop detected when '$line{fact}'"
                       . " is aliased to '$line{tidbit}'";
                     Log "Alias loop detected when '$line{fact}'"
                       . " is aliased to '$line{tidbit}'";
@@ -1293,7 +1372,8 @@ sub db_success {
         }
     } elsif ( $bag{cmd} eq 'load_gender' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
-        $stats{users}{genders}{ $bag{nick} } = $line{gender} || "androgynous";
+        $stats{users}{genders}{ lc $bag{nick} } = $line{gender}
+          || "androgynous";
     } elsif ( $bag{cmd} eq 'load_vars' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
 
@@ -1341,7 +1421,7 @@ sub db_success {
             );
 
             $bag{name} =~ s/(^| )(\w)/$1\u$2/g;
-            Report $_[KERNEL],
+            Report
               "Learned a new band name from $bag{who} in $bag{chl}: $bag{name}";
             &cached_reply( $bag{chl}, $bag{who}, $bag{name},
                 "band name reply" );
@@ -1385,7 +1465,7 @@ sub db_success {
 
             if ( $fact =~ /\S/ ) {
                 $stats{edited}++;
-                Report $_[KERNEL], "$bag{who} edited $bag{fact}($line->{id})"
+                Report "$bag{who} edited $bag{fact}($line->{id})"
                   . " in $bag{chl}: New values: $fact";
                 Log
                   "$bag{who} edited $bag{fact}($line->{id}): New values: $fact";
@@ -1406,7 +1486,7 @@ sub db_success {
                   [ 'update', $line->{id}, $line->{verb}, $line->{tidbit} ];
             } elsif ( $bag{op} ) {
                 $stats{deleted}++;
-                Report $_[KERNEL], "$bag{who} deleted $bag{fact}($line->{id})"
+                Report "$bag{who} deleted $bag{fact}($line->{id})"
                   . " in $bag{chl}: $line->{verb} $line->{tidbit}";
                 Log "$bag{who} deleted $bag{fact}($line->{id}):"
                   . " $line->{verb} $line->{tidbit}";
@@ -1460,7 +1540,7 @@ sub db_success {
         }
 
         $undo{ $bag{chl} } = [ 'insert', $bag{who}, \%line ];
-        Report $_[KERNEL], "$bag{who} called forget to delete "
+        Report "$bag{who} called forget to delete "
           . "'$line{fact}', '$line{verb}', '$line{tidbit}'";
         Log "forgetting $bag{fact}";
         $_[KERNEL]->post(
@@ -1482,8 +1562,7 @@ sub db_success {
         }
 
         $undo{ $bag{chl} } = [ 'insert', $bag{who}, \%line, $bag{fact} ];
-        Report $_[KERNEL],
-          "$bag{who} deleted '$line{fact}' (#$bag{fact}) in $bag{chl}";
+        Report "$bag{who} deleted '$line{fact}' (#$bag{fact}) in $bag{chl}";
         Log "deleting $bag{fact}";
         &sql( 'delete from bucket_facts where id=?', [ $bag{fact} ], );
         &say( $bag{chl} => "Okay, $bag{who}, deleted "
@@ -1497,7 +1576,7 @@ sub db_success {
         }
 
         $undo{ $bag{chl} } = [ 'insert', $bag{who}, \@lines, $bag{fact} ];
-        Report $_[KERNEL], "$bag{who} deleted '$bag{fact}' in $bag{chl}";
+        Report "$bag{who} deleted '$bag{fact}' in $bag{chl}";
         Log "deleting $bag{fact}";
         $_[KERNEL]->post(
             db           => "DO",
@@ -1569,7 +1648,7 @@ sub db_success {
             delete $bag{also};
         }
 
-        Report $_[KERNEL], "$bag{who} taught in $bag{chl}:"
+        Report "$bag{who} taught in $bag{chl}:"
           . " '$bag{fact}', '$bag{verb}', '$bag{tidbit}'";
         Log "$bag{who} taught '$bag{fact}', '$bag{verb}', '$bag{tidbit}'";
         &sql(
@@ -1604,8 +1683,7 @@ sub db_success {
             return;
         }
 
-        Report $_[KERNEL],
-          "$bag{who} aliased in $bag{chl} '$bag{src}' to '$bag{dst}'";
+        Report "$bag{who} aliased in $bag{chl} '$bag{src}' to '$bag{dst}'";
         Log "$bag{who} aliased '$bag{src}' to '$bag{dst}'";
         &sql(
             'insert bucket_facts (fact, verb, tidbit, protected)
@@ -1770,10 +1848,22 @@ sub irc_on_notice {
     }
 }
 
+sub irc_on_nick {
+    my ($who) = split /!/, $_[ARG0];
+    my $newnick = $_[ARG1];
+
+    return unless exists $stats{users}{genders}{ lc $who };
+    $stats{users}{genders}{ lc $newnick } =
+      delete $stats{users}{genders}{ lc $who };
+    &sql( "update genders set nick=? where nick=? limit 1",
+        [ $newnick, $who ] );
+    &load_gender($newnick);
+}
+
 sub irc_on_join {
     my ($who) = split /!/, $_[ARG0];
 
-    return if exists $stats{users}{genders}{$who};
+    return if exists $stats{users}{genders}{ lc $who };
 
     &load_gender($who);
 }
@@ -1921,7 +2011,7 @@ sub tail {
         chomp;
         s/^[\d-]+ [\d:]+ //;
         s/from [\d.]+ //;
-        Report $kernel, $time++, $_;
+        Report $time++, $_;
     }
     seek BLOG, 0, SEEK_CUR;
 }
@@ -1932,29 +2022,36 @@ sub check_idle {
     my $chl = DEBUG ? $channel : $mainchannel;
     return if time - $last_activity{$chl} < 60 * $config->{random_wait};
 
-    $last_activity{$chl} = time;
+    return if $stats{last_idle_time}{$chl} > $last_activity{$chl};
 
-    if ( $config->{idle_source} and $config->{idle_source} eq 'MLIA' ) {
+    $stats{last_idle_time}{$chl} = time;
+
+    my @sources = qw/MLIA SMDS factoid/;
+    my $source = $config->{idle_source} || "factoid";
+    if ( $source eq 'random' ) {
+        $source = $sources[ rand @sources ];
+    }
+
+    $stats{chatter_source}{$source}++;
+
+    if ( $source eq 'MLIA' ) {
         Log "Looking up MLIA story";
-        require LWP::Simple;
-        require XML::Simple;
-
-        $LWP::Simple::ua->timeout(10);
-        my $rss = LWP::Simple::get("http://feeds.feedburner.com/mlia");
-        if ($rss) {
-            Log "Retrieved RSS";
-            my $xml = XML::Simple::XMLin($rss);
-            for ( 1 .. 5 ) {
-                if ( $xml and my $story = $xml->{channel}{item}[ rand(40) ] ) {
-                    $story->{description} =~ s/<.*//s;
-                    $story->{description} =~ s/MLIA\W*$//;
-                    next if length $story->{description} > 400;
-
-                    &say( $chl => $story->{description} );
-                    $stats{last_fact}{$chl} = $story->{"feedburner:origLink"};
-                    return;
-                }
-            }
+        my ( $story, $url ) = &read_rss( "http://feeds.feedburner.com/mlia",
+            qr/(?s)MLIA\W*<.*/, "feedburner:origLink" );
+        if ($story) {
+            &say( $chl => $story );
+            $stats{last_fact}{$chl} = $url;
+            return;
+        }
+    } elsif ( $source eq 'SMDS' ) {
+        Log "Looking up SMDS story";
+        my ( $story, $url ) =
+          &read_rss( "http://twitter.com/statuses/user_timeline/62581962.rss",
+            qr/^shitmydadsays: "|"$/, "link" );
+        if ($story) {
+            &say( $chl => $story );
+            $stats{last_fact}{$chl} = $url;
+            return;
         }
     }
 
@@ -2202,7 +2299,8 @@ sub expand {
     my $chl = shift;
     my $msg = "@_";
 
-    my $gender = $stats{users}{genders}{$who};
+    my $gender = $stats{users}{genders}{ lc $who };
+    my $target = $who;
     if ( $msg =~ /\$who/ ) {
         $msg =~ s/\$who/$who/gi;
     }
@@ -2212,7 +2310,8 @@ sub expand {
             my $rnick = &someone($chl);
             $msg =~ s/\$someone/$rnick/i;
 
-            $gender ||= $stats{users}{genders}{$rnick};
+            $gender = $stats{users}{genders}{ lc $rnick };
+            $target = $rnick;
         }
     }
 
@@ -2238,14 +2337,18 @@ sub expand {
     }
 
     if ($gender) {
-        Log "Gender = $gender";
         foreach my $gvar ( keys %gender_vars ) {
             next unless $msg =~ /\$$gvar/i;
 
-            Log "Replacing $gvar...";
+            Log "Replacing gvar $gvar...";
             if ( exists $gender_vars{$gvar}{$gender} ) {
-                Log " => $gender_vars{$gvar}{$gender}";
-                $msg =~ s/\$$gvar/$gender_vars{$gvar}{$gender}/gi;
+                my $g_v = $gender_vars{$gvar}{$gender};
+                Log " => $g_v";
+                if ( $g_v =~ /%N/ ) {
+                    $g_v =~ s/%N/$target/;
+                    Log " => $g_v";
+                }
+                $msg =~ s/\$$gvar/$g_v/gi;
             }
         }
     }
@@ -2345,5 +2448,27 @@ sub set_case {
         return uc $value;
     } elsif ( $case eq 'u' ) {
         return ucfirst $value;
+    }
+}
+
+sub read_rss {
+    my ( $url, $re, $tag ) = @_;
+
+    require LWP::Simple;
+    require XML::Simple;
+
+    $LWP::Simple::ua->timeout(10);
+    my $rss = LWP::Simple::get($url);
+    if ($rss) {
+        Log "Retrieved RSS";
+        my $xml = XML::Simple::XMLin($rss);
+        for ( 1 .. 5 ) {
+            if ( $xml and my $story = $xml->{channel}{item}[ rand(40) ] ) {
+                $story->{description} =~ s/$re//g if $re;
+                next if length $story->{description} > 400;
+
+                return ( $story->{description}, $story->{$tag} );
+            }
+        }
     }
 }
