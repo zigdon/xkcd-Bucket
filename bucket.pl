@@ -31,7 +31,7 @@ use Data::Dumper;
 use Fcntl qw/:seek/;
 $Data::Dumper::Indent = 1;
 
-use constant { DEBUG => 0 };
+use constant { DEBUG => 1 };
 
 # work around a bug: https://rt.cpan.org/Ticket/Display.html?id=50991
 sub s_form { return Lingua::EN::Conjugate::s_form(@_); }
@@ -885,7 +885,7 @@ sub irc_on_public {
 
         my @vals = @{ $replacables{$var}{vals} };
         &say( $chl => "$var:", &make_list( sort @vals ) );
-    } elsif ( $addressed and $msg =~ /^remove value (\w+) (\S+)$/ ) {
+    } elsif ( $addressed and $msg =~ /^remove value (\w+) (.+)$/ ) {
         my ( $var, $value ) = ( lc $1, lc $2 );
         unless ( exists $replacables{$var} ) {
             &say( $chl => "Sorry, $who, I don't know of a variable '$var'." );
@@ -913,7 +913,7 @@ sub irc_on_public {
         }
 
         &say( $chl => "$who, '$value' isn't a valid value for \$$var!" );
-    } elsif ( $addressed and $msg =~ /^add value (\w+) (\S+)$/ ) {
+    } elsif ( $addressed and $msg =~ /^add value (\w+) (.+)$/ ) {
         my ( $var, $value ) = ( lc $1, lc $2 );
         unless ( exists $replacables{$var} ) {
             &say( $chl => "Sorry, $who, I don't know of a variable '$var'." );
@@ -923,6 +923,11 @@ sub irc_on_public {
         if ( $replacables{$var}{perms} ne "editable" and not $operator ) {
             &say( $chl =>
                   "Sorry, $who, you don't have permissions to edit '$var'." );
+            return;
+        }
+
+        if ($value =~ /\$/) {
+            &say( $chl => "Sorry, $who, no nested values please." );
             return;
         }
 
