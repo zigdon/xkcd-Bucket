@@ -241,10 +241,10 @@ sub irc_on_public {
     }
 
     if ( $config->{history_size} and $config->{history_size} > 0 ) {
-        push @{$history{$chl}}, [$who, $msg];
+        push @{ $history{$chl} }, [ $who, $msg ];
 
-        if (@{$history{$chl}} > $config->{history_size}) {
-            shift @{$history{$chl}};
+        if ( @{ $history{$chl} } > $config->{history_size} ) {
+            shift @{ $history{$chl} };
         }
     }
 
@@ -976,11 +976,13 @@ sub irc_on_public {
         delete $replacables{$var};
     } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?$/i ) {
         &cached_reply( $chl, $who, "", "list items" );
-    } elsif ( $addressed and ref $history{$chl} and
-              $msg =~ /^remember ([-\w]+) (.*)/ ) {
-        my ($target, $re) = ($1, $2);
+    } elsif ( $addressed
+        and ref $history{$chl}
+        and $msg =~ /^remember ([-\w]+) (.*)/ )
+    {
+        my ( $target, $re ) = ( $1, $2 );
         my $match;
-        foreach my $line (@{$history{$chl}}) {
+        foreach my $line ( @{ $history{$chl} } ) {
             next unless lc $line->[0] eq lc $1;
             next unless $line->[1] =~ /\Q$2/i;
 
@@ -989,7 +991,9 @@ sub irc_on_public {
         }
 
         unless ($match) {
-            &say( $chl => "Sorry, $who, I don't remember what $target said about '$re'." );
+            &say( $chl =>
+                  "Sorry, $who, I don't remember what $target said about '$re'."
+            );
             return;
         }
 
@@ -2026,7 +2030,7 @@ sub check_idle {
 
     $stats{last_idle_time}{$chl} = time;
 
-    my @sources = qw/MLIA SMDS factoid/;
+    my @sources = qw/MLIA SMDS IMMD factoid/;
     my $source = $config->{idle_source} || "factoid";
     if ( $source eq 'random' ) {
         $source = $sources[ rand @sources ];
@@ -2034,10 +2038,13 @@ sub check_idle {
 
     $stats{chatter_source}{$source}++;
 
-    if ( $source eq 'MLIA' ) {
-        Log "Looking up MLIA story";
-        my ( $story, $url ) = &read_rss( "http://feeds.feedburner.com/mlia",
-            qr/(?s)MLIA\W*<.*/, "feedburner:origLink" );
+    if ( $source eq 'MLIA' or $source eq 'IMMD' ) {
+        Log "Looking up $source story";
+        my ( $story, $url ) = &read_rss(
+            "http://feeds.feedburner.com/" . lc $source,
+            qr/(?s)$source\W*(?:<.*)?/,
+            "feedburner:origLink"
+        );
         if ($story) {
             &say( $chl => $story );
             $stats{last_fact}{$chl} = $url;
