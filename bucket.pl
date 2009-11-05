@@ -1325,7 +1325,7 @@ sub db_success {
 
             Log "Taking $item from $bag{who}: " . join ", ", @inventory;
             &sql(
-                'insert into bucket_items (what, user, channel)
+                'insert ignore into bucket_items (what, user, channel)
                          values (?, ?, ?)',
                 [ $item, $bag{who}, $bag{chl} ]
             );
