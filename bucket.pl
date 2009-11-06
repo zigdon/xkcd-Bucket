@@ -31,7 +31,7 @@ use Data::Dumper;
 use Fcntl qw/:seek/;
 $Data::Dumper::Indent = 1;
 
-use constant { DEBUG => 0 };
+use constant { DEBUG => 1 };
 
 # work around a bug: https://rt.cpan.org/Ticket/Display.html?id=50991
 sub s_form { return Lingua::EN::Conjugate::s_form(@_); }
@@ -1022,6 +1022,7 @@ sub irc_on_public {
                 verb      => "<reply>",
                 tidbit    => "<$target> $match->[1]",
                 cmd       => "unalias",
+                ack       => "Okay, $who, remembering \"$match->[1]\".",
             },
             EVENT => 'db_success'
         );
@@ -1676,11 +1677,18 @@ sub db_success {
 
             $stats{last_fact}{ $bag{chl} } = $res->{INSERTID};
         }
+        my $ack;
         if ( $bag{also} ) {
-            &say( $bag{chl} => "Okay, $bag{who} (added as only factoid)." );
+            $ack = "Okay, $bag{who} (added as only factoid).";
         } else {
-            &say( $bag{chl} => "Okay, $bag{who}." );
+            $ack = "Okay, $bag{who}.";
         }
+
+        if ($bag{ack}) {
+            $ack = $bag{ack};
+        }
+        &say( $bag{chl} => $ack );
+
         if ( exists $fcache{ lc $bag{fact} } ) {
             Log "Updating cache for '$bag{fact}'";
             &cache( $_[KERNEL], $bag{fact} );
