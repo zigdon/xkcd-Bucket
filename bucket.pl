@@ -1042,7 +1042,7 @@ sub irc_on_public {
       )
     {
         my ( $target, $gender, $pronoun ) = ( $1, $2, $3 );
-        if ( $target ne "I" and lc $target ne lc $who and not $operator ) {
+        if ( uc $target ne "I" and lc $target ne lc $who and not $operator ) {
             &say(
                 $chl => "$who, you should let $target set their own gender." );
             return;
