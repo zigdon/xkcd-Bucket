@@ -385,7 +385,7 @@ sub irc_on_public {
         Log "Literal[$page] $fact";
         $_[KERNEL]->post(
             db  => 'MULTIPLE',
-            SQL => 'select verb, tidbit, mood, chance, protected
+            SQL => 'select id, verb, tidbit, mood, chance, protected
                                 from bucket_facts where fact = ? order by id',
             PLACEHOLDERS => [$fact],
             BAGGAGE      => {
@@ -393,7 +393,8 @@ sub irc_on_public {
                 who  => $who,
                 chl  => $chl,
                 page => $page,
-                fact => $fact
+                fact => $fact,
+                op   => $operator,
             },
             EVENT => 'db_success'
         );
@@ -1735,7 +1736,11 @@ sub db_success {
         while ( $bag{page}-- ) {
             $answer = "";
             while ( my $fact = shift @lines ) {
-                my $bit = "$fact->{verb} $fact->{tidbit}";
+                my $bit;
+                if ($bag{op}) {
+                    $bit = "(#$fact->{id}) ";
+                }
+                $bit .= "$fact->{verb} $fact->{tidbit}";
                 $bit =~ s/\|/\\|/g;
                 if ( length( $answer . $bit ) > $linelen and $answer ) {
                     unshift @lines, $fact;
