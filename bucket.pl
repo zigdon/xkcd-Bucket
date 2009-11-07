@@ -31,7 +31,7 @@ use Data::Dumper;
 use Fcntl qw/:seek/;
 $Data::Dumper::Indent = 1;
 
-use constant { DEBUG => 1 };
+use constant { DEBUG => 0 };
 
 # work around a bug: https://rt.cpan.org/Ticket/Display.html?id=50991
 sub s_form { return Lingua::EN::Conjugate::s_form(@_); }
@@ -2060,7 +2060,7 @@ sub check_idle {
         Log "Looking up $source story";
         my ( $story, $url ) = &read_rss(
             "http://feeds.feedburner.com/" . lc $source,
-            qr/(?s)$source\W*(?:<.*)?/,
+            qr/$source\W*(?:<.*)?/,
             "feedburner:origLink"
         );
         if ($story) {
@@ -2489,7 +2489,7 @@ sub read_rss {
         my $xml = XML::Simple::XMLin($rss);
         for ( 1 .. 5 ) {
             if ( $xml and my $story = $xml->{channel}{item}[ rand(40) ] ) {
-                $story->{description} =~ s/$re//g if $re;
+                $story->{description} =~ s/$re//isg if $re;
                 next if length $story->{description} > 400;
 
                 return ( $story->{description}, $story->{$tag} );
