@@ -2352,7 +2352,7 @@ sub expand {
 
     while ( $msg =~ /\$(give)?item/i ) {
         if (@inventory) {
-            my $give = $editable & $1;
+            my $give = $editable && $1;
             my $item = &get_item($give);
             $msg =~ s/\$$1item/$item/i;
         } else {
