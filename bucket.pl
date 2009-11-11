@@ -1159,6 +1159,7 @@ sub db_success {
             }
 
             $line{tidbit} = &expand( $bag{who}, $bag{chl}, $line{tidbit}, $bag{editable} );
+            return unless $line{tidbit};
 
             if ( $line{verb} eq '<reply>' ) {
                 &say( $bag{chl} => $line{tidbit} );
@@ -1987,6 +1988,7 @@ sub cached_reply {
     }
 
     $tidbit = &expand( $who, $chl, $tidbit, 0 );
+    return unless $tidbit;
 
     if ( $line->{verb} eq '<action>' ) {
         &do( $chl => $tidbit );
