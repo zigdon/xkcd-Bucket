@@ -1156,7 +1156,7 @@ sub db_success {
                 $line{tidbit} =~ s/\$who/\$someone/gi;
             }
 
-            $line{tidbit} = &expand( $bag{who}, $bag{chl}, $line{tidbit} );
+            $line{tidbit} = &expand( $bag{who}, $bag{chl}, $line{tidbit}, $bag{editable} );
 
             if ( $line{verb} eq '<reply>' ) {
                 &say( $bag{chl} => $line{tidbit} );
@@ -1976,7 +1976,7 @@ sub cached_reply {
         $extra = "";
     }
 
-    $tidbit = &expand( $who, $chl, $tidbit );
+    $tidbit = &expand( $who, $chl, $tidbit, 0 );
 
     if ( $line->{verb} eq '<action>' ) {
         &do( $chl => $tidbit );
@@ -2320,9 +2320,7 @@ sub sql {
 }
 
 sub expand {
-    my $who = shift;
-    my $chl = shift;
-    my $msg = "@_";
+    my ($who, $chl, $msg, $editable) = @_;
 
     my $gender = $stats{users}{genders}{ lc $who };
     my $target = $who;
@@ -2342,7 +2340,7 @@ sub expand {
 
     while ( $msg =~ /\$(give)?item/i ) {
         if (@inventory) {
-            my $give = $1;
+            my $give = $editable & $1;
             my $item = &get_item($give);
             $msg =~ s/\$$1item/$item/i;
         } else {
@@ -2351,14 +2349,18 @@ sub expand {
     }
 
     while ( $msg =~ /\$newitem/i ) {
-        my $newitem = shift @random_items || 'bananas';
-        my ( $rc, @dropped ) = &put_item( $newitem, 1 );
-        if ( $rc == 2 ) {
-            &cached_reply( $chl, $who, \@dropped, "drops item" );
-            return;
-        }
+        if ($editable) {
+            my $newitem = shift @random_items || 'bananas';
+            my ( $rc, @dropped ) = &put_item( $newitem, 1 );
+            if ( $rc == 2 ) {
+                &cached_reply( $chl, $who, \@dropped, "drops item" );
+                return;
+            }
 
-        $msg =~ s/\$newitem/$newitem/i;
+            $msg =~ s/\$newitem/$newitem/i;
+        } else {
+            $msg =~ s/\$newitem/bananas/ig;
+        }
     }
 
     if ($gender) {
