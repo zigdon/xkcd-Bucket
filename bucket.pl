@@ -157,6 +157,8 @@ POE::Session->create(
         irc_disconnected => \&irc_on_disconnect,
         irc_topic        => \&irc_on_topic,
         irc_join         => \&irc_on_join,
+        irc_332          => \&irc_on_jointopic,
+        irc_331          => \&irc_on_jointopic,
         irc_nick         => \&irc_on_nick,
         irc_chan_sync    => \&irc_on_chan_sync,
         db_success       => \&db_success,
@@ -534,7 +536,7 @@ sub irc_on_public {
         and $msg =~ /^restore topic(?: (#\S+))?/ )
     {
         my $tchl = $1 || $chl;
-        unless ( exists $stats{topics}{$tchl}{old} ) {
+        unless ( $stats{topics}{$tchl}{old} ) {
             &say( $chl =>
                   "Sorry, $who, I don't know what was the earlier topic!" );
             return;
@@ -1880,6 +1882,14 @@ sub irc_on_nick {
     &sql( "update genders set nick=? where nick=? limit 1",
         [ $newnick, $who ] );
     &load_gender($newnick);
+}
+
+sub irc_on_jointopic {
+    my ( $chl, $topic ) = @{ $_[ARG2] }[ 0, 1 ];
+    $topic =~ s/ ARRAY\(0x\w+\)$//;
+
+    Log "Topic in $chl: '$topic'";
+    $stats{topics}{$chl}{old} = $topic;
 }
 
 sub irc_on_join {
