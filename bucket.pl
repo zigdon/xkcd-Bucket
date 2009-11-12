@@ -790,8 +790,8 @@ sub irc_on_public {
           . "about %d subject%s. ",
           $stats{rows},     &s( $stats{rows} ),
           $stats{triggers}, &s( $stats{triggers} );
-        $reply .= sprintf "I have carried a total of %d item%s"
-          . " in my inventory, %d of which I still have. ",
+        $reply .= sprintf "I know of %d object%s"
+          . " and am carrying %d of them. ",
           $stats{items}, &s( $stats{items} ), scalar @inventory;
         if ( $talking{$chl} == 0 ) {
             $reply .= "I'm being quiet right now. ";
@@ -984,11 +984,28 @@ sub irc_on_public {
         delete $replacables{$var};
     } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?$/i ) {
         &cached_reply( $chl, $who, "", "list items" );
+    } elsif ( $addressed and $operator and $msg =~ /^do(n't)? quote ([\w\-]+)\W*$/ ) {
+        my ($bit, $target) = ($1, $2);
+        if ($bit) {
+            $config->{protected_quotes}{lc $target} = 1;
+        } else {
+            delete $config->{protected_quotes}{lc $target};
+        }
+        &say( $chl => "Okay, $who." );
+        Report "$who asked to", ($bit ? "protect" : "unprotect"),
+               "the '$target quotes' factoid.";
+        &save;
     } elsif ( $addressed
         and ref $history{$chl}
         and $msg =~ /^remember ([-\w]+) ([^<>]+)$/ )
     {
         my ( $target, $re ) = ( $1, $2 );
+        if ( exists $config->{protected_quotes} and 
+             $config->{protected_quotes}{lc $target} ) {
+            &say( $chl => "Sorry, $who, you can't use remember for $target quotes." );
+            return;
+        }
+
         my $match;
         foreach my $line ( reverse @{ $history{$chl} } ) {
             next unless lc $line->[0] eq lc $1;
