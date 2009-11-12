@@ -1302,9 +1302,9 @@ sub db_success {
         } elsif (
             $bag{orig} !~ /\?\s*$/
             and $bag{orig} =~ /^(?:
-                               puts \s (.+) \s in \s $nick\b .* 
+                               puts \s (.+) \s in \s (the \s)? $nick\b
                              | gives \s $nick \s (.+)
-                             | gives \s (.+) \s to $nick\b .*
+                             | gives \s (.+) \s to $nick\b
                             )/ix
             or (
                     $bag{addressed}
