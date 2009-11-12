@@ -986,11 +986,11 @@ sub irc_on_public {
         &cached_reply( $chl, $who, "", "list items" );
     } elsif ( $addressed
         and ref $history{$chl}
-        and $msg =~ /^remember ([-\w]+) (.*)/ )
+        and $msg =~ /^remember ([-\w]+) ([^<>]+)/ )
     {
         my ( $target, $re ) = ( $1, $2 );
         my $match;
-        foreach my $line ( @{ $history{$chl} } ) {
+        foreach my $line ( reverse @{ $history{$chl} } ) {
             next unless lc $line->[0] eq lc $1;
             next unless $line->[1] =~ /\Q$2/i;
 
