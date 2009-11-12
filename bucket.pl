@@ -1007,26 +1007,26 @@ sub irc_on_public {
 
         my $quote;
         if ($match->[1] eq 'irc_ctcp_action') {
-            $quote = "* $target $match->[2]";
+            $quote = "* $match->[0] $match->[2]";
         } else {
-            $quote = "<$target> $match->[2]";
+            $quote = "<$match->[0]> $match->[2]";
         }
-        Log "Remembering '$target quotes' '<reply>' '$quote'";
+        Log "Remembering '$match->[0] quotes' '<reply>' '$quote'";
         $_[KERNEL]->post(
             db  => 'SINGLE',
             SQL => 'select id, tidbit from bucket_facts 
                     where fact = ? and verb = "<alias>"',
-            PLACEHOLDERS => ["$target quotes"],
+            PLACEHOLDERS => ["$match->[0] quotes"],
             BAGGAGE      => {
                 chl       => $chl,
-                msg       => "$target quotes <reply> $quote",
-                orig      => "$target quotes <reply> $quote",
+                msg       => "$match->[0] quotes <reply> $quote",
+                orig      => "$match->[0] quotes <reply> $quote",
                 who       => $who,
                 addressed => 1,
                 editable  => $editable,
                 op        => $operator,
                 type      => $type,
-                fact      => "$target quotes",
+                fact      => "$match->[0] quotes",
                 verb      => "<reply>",
                 tidbit    => $quote,
                 cmd       => "unalias",
