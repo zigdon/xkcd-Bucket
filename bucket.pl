@@ -243,7 +243,7 @@ sub irc_on_public {
     }
 
     if ( $config->{history_size} and $config->{history_size} > 0 ) {
-        push @{ $history{$chl} }, [ $who, $msg ];
+        push @{ $history{$chl} }, [ $who, $type, $msg ];
 
         if ( @{ $history{$chl} } > $config->{history_size} ) {
             shift @{ $history{$chl} };
@@ -992,7 +992,7 @@ sub irc_on_public {
         my $match;
         foreach my $line ( reverse @{ $history{$chl} } ) {
             next unless lc $line->[0] eq lc $1;
-            next unless $line->[1] =~ /\Q$2/i;
+            next unless $line->[2] =~ /\Q$2/i;
 
             $match = $line;
             last;
@@ -1005,7 +1005,13 @@ sub irc_on_public {
             return;
         }
 
-        Log "Remembering '$target quotes' '<reply>' '<$target> $match->[1]'";
+        my $quote;
+        if ($match->[1] eq 'irc_ctcp_action') {
+            $quote = "* $target $match->[2]";
+        } else {
+            $quote = "<$target> $match->[2]";
+        }
+        Log "Remembering '$target quotes' '<reply>' '$quote'";
         $_[KERNEL]->post(
             db  => 'SINGLE',
             SQL => 'select id, tidbit from bucket_facts 
@@ -1013,8 +1019,8 @@ sub irc_on_public {
             PLACEHOLDERS => ["$target quotes"],
             BAGGAGE      => {
                 chl       => $chl,
-                msg       => "$target quotes <reply> <$target> $match->[1]",
-                orig      => "$target quotes <reply> <$target> $match->[1]",
+                msg       => "$target quotes <reply> $quote",
+                orig      => "$target quotes <reply> $quote",
                 who       => $who,
                 addressed => 1,
                 editable  => $editable,
@@ -1022,9 +1028,9 @@ sub irc_on_public {
                 type      => $type,
                 fact      => "$target quotes",
                 verb      => "<reply>",
-                tidbit    => "<$target> $match->[1]",
+                tidbit    => $quote,
                 cmd       => "unalias",
-                ack       => "Okay, $who, remembering \"$match->[1]\".",
+                ack       => "Okay, $who, remembering \"$match->[2]\".",
             },
             EVENT => 'db_success'
         );
@@ -2250,6 +2256,7 @@ sub say {
     my $chl  = shift;
     my $text = "@_";
 
+    push @{ $history{$chl} }, [ $nick, 'irc_public', $text ];
     $irc->yield( privmsg => $chl => $text );
 }
 
@@ -2257,6 +2264,7 @@ sub do {
     my $chl    = shift;
     my $action = "@_";
 
+    push @{ $history{$chl} }, [ $nick, 'irc_ctcp_action', $action ];
     $irc->yield( ctcp => $chl => "ACTION $action" );
 }
 
