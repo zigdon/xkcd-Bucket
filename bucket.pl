@@ -79,6 +79,8 @@ my %config_keys = (
     random_wait            => "i",
     user_activity_timeout  => "i",
     your_mom_is            => "p",
+    www_root               => "s",
+    www_url                => "s",
 );
 
 my %gender_vars = (
@@ -380,7 +382,7 @@ sub irc_on_public {
             op        => $operator,
             search    => $search,
         );
-    } elsif ( $msg =~ /^literal(?:\[(\d+)\])?\s+(.*)/i ) {
+    } elsif ( $msg =~ /^literal(?:\[([*\d]+)\])?\s+(.*)/i ) {
         my ( $page, $fact ) = ( $1 || 1, $2 );
         $stats{literal}++;
         $fact = &trim($fact);
@@ -929,7 +931,7 @@ sub irc_on_public {
             return;
         }
 
-        if ($value =~ /\$/) {
+        if ( $value =~ /\$/ ) {
             &say( $chl => "Sorry, $who, no nested values please." );
             return;
         }
@@ -984,25 +986,30 @@ sub irc_on_public {
         delete $replacables{$var};
     } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?$/i ) {
         &cached_reply( $chl, $who, "", "list items" );
-    } elsif ( $addressed and $operator and $msg =~ /^do(n't)? quote ([\w\-]+)\W*$/ ) {
-        my ($bit, $target) = ($1, $2);
+    } elsif ( $addressed
+        and $operator
+        and $msg =~ /^do(n't)? quote ([\w\-]+)\W*$/ )
+    {
+        my ( $bit, $target ) = ( $1, $2 );
         if ($bit) {
-            $config->{protected_quotes}{lc $target} = 1;
+            $config->{protected_quotes}{ lc $target } = 1;
         } else {
-            delete $config->{protected_quotes}{lc $target};
+            delete $config->{protected_quotes}{ lc $target };
         }
         &say( $chl => "Okay, $who." );
-        Report "$who asked to", ($bit ? "protect" : "unprotect"),
-               "the '$target quotes' factoid.";
+        Report "$who asked to", ( $bit ? "protect" : "unprotect" ),
+          "the '$target quotes' factoid.";
         &save;
     } elsif ( $addressed
         and ref $history{$chl}
         and $msg =~ /^remember ([-\w]+) ([^<>]+)$/ )
     {
         my ( $target, $re ) = ( $1, $2 );
-        if ( exists $config->{protected_quotes} and 
-             $config->{protected_quotes}{lc $target} ) {
-            &say( $chl => "Sorry, $who, you can't use remember for $target quotes." );
+        if ( exists $config->{protected_quotes}
+            and $config->{protected_quotes}{ lc $target } )
+        {
+            &say( $chl =>
+                  "Sorry, $who, you can't use remember for $target quotes." );
             return;
         }
 
@@ -1023,7 +1030,7 @@ sub irc_on_public {
         }
 
         my $quote;
-        if ($match->[1] eq 'irc_ctcp_action') {
+        if ( $match->[1] eq 'irc_ctcp_action' ) {
             $quote = "* $match->[0] $match->[2]";
         } else {
             $quote = "<$match->[0]> $match->[2]";
@@ -1181,7 +1188,8 @@ sub db_success {
                 $line{tidbit} =~ s/\$who/\$someone/gi;
             }
 
-            $line{tidbit} = &expand( $bag{who}, $bag{chl}, $line{tidbit}, $bag{editable} );
+            $line{tidbit} =
+              &expand( $bag{who}, $bag{chl}, $line{tidbit}, $bag{editable} );
             return unless $line{tidbit};
 
             if ( $line{verb} eq '<reply>' ) {
@@ -1710,7 +1718,7 @@ sub db_success {
             $ack = "Okay, $bag{who}.";
         }
 
-        if ($bag{ack}) {
+        if ( $bag{ack} ) {
             $ack = $bag{ack};
         }
         &say( $bag{chl} => $ack );
@@ -1760,6 +1768,39 @@ sub db_success {
             return;
         }
 
+        if (    $bag{page} eq '*'
+            and $config->{www_url}
+            and $config->{www_root}
+            and -w $config->{www_root} )
+        {
+            Report
+"Dumping out $bag{fact} to $config->{www_url}/literal_$bag{fact}.txt";
+            if (
+                open( DUMP, ">", $config->{www_root} . "/literal_$bag{fact}.txt"
+                )
+              )
+            {
+                while ( my $fact = shift @lines ) {
+                    if ( $bag{op} ) {
+                        print DUMP "#$fact->{id}\t";
+                    }
+
+                    print DUMP join "\t", $fact->{verb}, $fact->{tidbit};
+                    print DUMP "\n";
+                }
+                close DUMP;
+                &say( $bag{chl} => "$bag{who}: Here's the full list: "
+                      . "$config->{www_url}/literal_$bag{fact}.txt" );
+                return;
+            } else {
+                Log "Failed to write dump file: $!";
+                &error( $bag{chl}, $bag{who} );
+                return;
+            }
+        }
+
+        $bag{page} = 1 if $bag{page} eq '*';
+
         my $prefix = "$bag{fact}";
         if ( $lines[0]->{protected} ) {
             $prefix .= " (protected)";
@@ -1771,7 +1812,7 @@ sub db_success {
             $answer = "";
             while ( my $fact = shift @lines ) {
                 my $bit;
-                if ($bag{op}) {
+                if ( $bag{op} ) {
                     $bit = "(#$fact->{id}) ";
                 }
                 $bit .= "$fact->{verb} $fact->{tidbit}";
@@ -2357,7 +2398,7 @@ sub sql {
 }
 
 sub expand {
-    my ($who, $chl, $msg, $editable) = @_;
+    my ( $who, $chl, $msg, $editable ) = @_;
 
     my $gender = $stats{users}{genders}{ lc $who };
     my $target = $who;
