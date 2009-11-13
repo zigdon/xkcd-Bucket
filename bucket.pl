@@ -1754,8 +1754,8 @@ sub db_success {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
 
         if ( $line{id} ) {
-            &say( $bag{chl} =>
-"$bag{who}: That was '$line{fact}' (#$bag{id}): $line{verb} $line{tidbit}"
+            &say( $bag{chl} => "$bag{who}: That was '$line{fact}' ".
+                               "(#$bag{id}): $line{verb} $line{tidbit}"
             );
         } else {
             &say( $bag{chl} => "$bag{who}: No idea!" );
@@ -1773,8 +1773,10 @@ sub db_success {
             and $config->{www_root}
             and -w $config->{www_root} )
         {
+            my $url = "$config->{www_url}/literal_$bag{fact}.txt";
+            $url =~ s/ /%20/g;
             Report
-"Dumping out $bag{fact} to $config->{www_url}/literal_$bag{fact}.txt";
+              "$bag{who} asked in $bag{chl} to dump out $bag{fact} -> $url";
             if (
                 open( DUMP, ">", $config->{www_root} . "/literal_$bag{fact}.txt"
                 )
@@ -1789,8 +1791,7 @@ sub db_success {
                     print DUMP "\n";
                 }
                 close DUMP;
-                &say( $bag{chl} => "$bag{who}: Here's the full list: "
-                      . "$config->{www_url}/literal_$bag{fact}.txt" );
+                &say( $bag{chl} => "$bag{who}: Here's the full list: $url" );
                 return;
             } else {
                 Log "Failed to write dump file: $!";
