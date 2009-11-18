@@ -29,6 +29,7 @@ use Lingua::EN::Inflect qw/A PL_N/;
 use YAML qw/LoadFile DumpFile/;
 use Data::Dumper;
 use Fcntl qw/:seek/;
+use HTML::Entities;
 $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
@@ -1754,9 +1755,8 @@ sub db_success {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
 
         if ( $line{id} ) {
-            &say( $bag{chl} => "$bag{who}: That was '$line{fact}' ".
-                               "(#$bag{id}): $line{verb} $line{tidbit}"
-            );
+            &say( $bag{chl} => "$bag{who}: That was '$line{fact}' "
+                  . "(#$bag{id}): $line{verb} $line{tidbit}" );
         } else {
             &say( $bag{chl} => "$bag{who}: No idea!" );
         }
@@ -2135,11 +2135,9 @@ sub check_idle {
 
     if ( $source eq 'MLIA' or $source eq 'IMMD' ) {
         Log "Looking up $source story";
-        my ( $story, $url ) = &read_rss(
-            "http://feeds.feedburner.com/" . lc $source,
-            qr/$source\W*(?:<.*)?/,
-            "feedburner:origLink"
-        );
+        my ( $story, $url ) =
+          &read_rss( "http://feeds.feedburner.com/" . lc $source,
+            qr/$source.*/, "feedburner:origLink" );
         if ($story) {
             &say( $chl => $story );
             $stats{last_fact}{$chl} = $url;
@@ -2570,8 +2568,11 @@ sub read_rss {
         my $xml = XML::Simple::XMLin($rss);
         for ( 1 .. 5 ) {
             if ( $xml and my $story = $xml->{channel}{item}[ rand(40) ] ) {
+                $story->{description} =
+                  HTML::Entities::decode_entities( $story->{description} );
                 $story->{description} =~ s/$re//isg if $re;
                 next if length $story->{description} > 400;
+                next if $story->{description} =~ /\[\.\.\.\]/;
 
                 return ( $story->{description}, $story->{$tag} );
             }
