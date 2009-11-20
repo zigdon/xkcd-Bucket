@@ -1820,7 +1820,7 @@ sub db_success {
                 }
                 $bit .= "$fact->{verb} $fact->{tidbit}";
                 $bit =~ s/\|/\\|/g;
-                if ( length( $answer . $bit ) > $linelen and $answer ) {
+                if ( length( "$prefix $answer|$bit" ) > $linelen and $answer ) {
                     unshift @lines, $fact;
                     last;
                 }
