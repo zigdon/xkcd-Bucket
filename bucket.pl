@@ -51,7 +51,7 @@ my $pass       = $config->{password} || "somethingsecret";
 $nick = DEBUG ? ( $config->{debug_nick} || "bucketgoat" ) : $nick;
 my $channel =
   DEBUG
-  ? ( $config->{debug_channel} || "#zigdon" )
+  ? ( $config->{debug_channel} || "#bucket" )
   : ( $config->{controll_channel} || "#billygoat" );
 my ($irc) = POE::Component::IRC::State->spawn();
 my %channels = ( $channel => 1 );
@@ -905,7 +905,7 @@ sub irc_on_public {
         }
 
         foreach my $i ( 0 .. @{ $replacables{$var}{vals} } - 1 ) {
-            next unless $replacables{$var}{vals}[$i] eq $value;
+            next unless lc $replacables{$var}{vals}[$i] eq $value;
 
             Log "found!";
             splice( @{ $replacables{$var}{vals} }, $i, 1, () );
@@ -920,7 +920,7 @@ sub irc_on_public {
 
         &say( $chl => "$who, '$value' isn't a valid value for \$$var!" );
     } elsif ( $addressed and $msg =~ /^add value (\w+) (.+)$/ ) {
-        my ( $var, $value ) = ( lc $1, lc $2 );
+        my ( $var, $value ) = ( lc $1, $2 );
         unless ( exists $replacables{$var} ) {
             &say( $chl => "Sorry, $who, I don't know of a variable '$var'." );
             return;
@@ -938,7 +938,7 @@ sub irc_on_public {
         }
 
         foreach my $v ( @{ $replacables{$var}{vals} } ) {
-            next unless $v eq $value;
+            next unless lc $v eq lc $value;
 
             &say( $chl => "$who, I had it that way!" );
             return;
@@ -976,10 +976,11 @@ sub irc_on_public {
         $undo{$chl} = [
             'delvar', $who, $var, $replacables{$var},
             "deletion of variable '$var'."
-          ] &say(
+        ];
+        &say(
             $chl => "Okay, $who, removed variable \$$var with",
             scalar @{ $replacables{$var}{vals} }, "values."
-          );
+        );
         &sql( "delete from bucket_values where var_id = ?",
             [ $replacables{$var}{id} ] );
         &sql( "delete from bucket_vars where id = ?",
@@ -1335,8 +1336,8 @@ sub db_success {
             $bag{orig} !~ /\?\s*$/
             and $bag{orig} =~ /^(?:
                                puts \s (.+) \s in \s (the \s)? $nick\b
-                             | gives \s $nick \s (.+)
-                             | gives \s (.+) \s to $nick\b
+                             | (?:gives|hands) \s $nick \s (.+)
+                             | (?:gives|hands) \s (.+) \s to $nick\b
                             )/ix
             or (
                     $bag{addressed}
@@ -1350,6 +1351,7 @@ sub db_success {
             my $item = ( $1 || $2 || $3 );
             $item =~ s/\b(?:his|her)\b/$bag{who}\'s/;
             $item =~ s/[ .?!]+$//;
+            $item =~ s/\$([a-zA-Z])/$1/g;
 
             my ( $rc, @dropped ) = &put_item( $item, 0 );
             if ( $rc == 1 ) {
@@ -2458,7 +2460,7 @@ sub expand {
     }
 
     my $oldmsg = "";
-    while ( $oldmsg ne $msg and $msg =~ /\$(\w+)/ ) {
+    while ( $oldmsg ne $msg and $msg =~ /\$([a-zA-Z_]\w+)/ ) {
         $oldmsg = $msg;
         my $var = $1;
         Log "Found variable \$$var";
@@ -2546,12 +2548,13 @@ sub set_case {
         Log " => $value";
     }
 
-    if ( $case eq "l" ) {
+    # values that already include capitals are never modified
+    if ( $value =~ /[A-Z]/ or $case eq "l" ) {
         return $value;
     } elsif ( $case eq 'U' ) {
         return uc $value;
     } elsif ( $case eq 'u' ) {
-        return ucfirst $value;
+        return join " ", map { ucfirst } split ' ', $value;
     }
 }
 
