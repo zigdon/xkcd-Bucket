@@ -957,7 +957,7 @@ sub irc_on_public {
             return;
         }
 
-        $replacables{$var} = { vals => [], perms => "read-only" };
+        $replacables{$var} = { vals => [], perms => "read-only", type => "var" };
         Log "$who created a new variable '$var' in $chl";
         Report "$who created a new variable '$var' in $chl";
         $undo{$chl} = [ 'newvar', $who, $var, "new variable '$var'." ];
@@ -986,6 +986,17 @@ sub irc_on_public {
         &sql( "delete from bucket_vars where id = ?",
             [ $replacables{$var}{id} ] );
         delete $replacables{$var};
+    } elsif ( $operator and $addressed and $msg =~ /^var (\w+) type (var|verb|noun)$/ ) {
+        my ($var, $type) = ($1, $2);
+        unless ( exists $replacables{$var} ) {
+            &say( $chl => "Sorry, $who, there isn't a variable '$var'!" );
+            return;
+        }
+
+        Log "$who set var $var type to $type";
+        $replacables{$var}{type} = $type;
+        &sql( "update bucket_vars set type=? where id = ?",
+            [ $type, $replacables{$var}{id} ] );
     } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?$/i ) {
         &cached_reply( $chl, $who, "", "list items" );
     } elsif ( $addressed
@@ -1431,7 +1442,8 @@ sub db_success {
                 $replacables{ $line->{name} } = {
                     vals  => [],
                     perms => $line->{perms},
-                    id    => $line->{id}
+                    id    => $line->{id},
+                    type  => $line->{type}
                 };
             }
 
@@ -1891,7 +1903,7 @@ sub irc_start {
     # load the variables
     $_[KERNEL]->post(
         db  => 'MULTIPLE',
-        SQL => 'select vars.id id, name, perms, value 
+        SQL => 'select vars.id id, name, perms, type, value 
                 from bucket_vars vars 
                      left join bucket_values vals 
                      on vars.id = vals.var_id  
@@ -2471,37 +2483,55 @@ sub expand {
 
         # yay for special cases!
         my $conjugate;
-        my $record;
-        if ( $var eq 'verbed' ) {
-            $conjugate = \&past;
-            $record    = $replacables{verb};
-            Log "Special case verbed";
-        } elsif ( $var eq 'verbs' ) {
-            $conjugate = \&s_form;
-            $record    = $replacables{verb};
-            Log "Special case verbs";
-        } elsif ( $var eq 'verbing' ) {
-            $conjugate = \&gerund;
-            $record    = $replacables{verb};
-            Log "Special case verbing";
-        } elsif ( $var eq 'nouns' ) {
-            $conjugate = \&PL_N;
-            $record    = $replacables{noun};
-            Log "Special case nouns";
-        } elsif ( $var eq 'noun' ) {
-            Log "Special case noun";
-            $record = $replacables{noun};
+        my $record = $replacables{ lc $var };
+        my $full = $var;
+        if (not $record and $var =~ s/ed$//) {
+            $record    = $replacables{$var};
+            if ($record and $record->{type} eq 'verb') {
+                $conjugate = \&past;
+                Log "Special case *ed";
+            } else {
+                undef $record;
+                $var = $full;
+            }
+        }
 
-            while ( $msg =~ /\ba \$noun\b/i ) {
+        if (not $record and $var =~ s/ing$//) {
+            $record    = $replacables{$var};
+            if ($record and $record->{type} eq 'verb') {
+                $conjugate = \&gerund;
+                Log "Special case *ing";
+            } else {
+                undef $record;
+                $var = $full;
+            }
+        }
+
+        if (not $record and $var =~ s/s$//) {
+            $record    = $replacables{$var};
+            if ($record and $record->{type} eq 'verb') {
+                $conjugate = \&s_form;
+                Log "Special case *s (verb)";
+            } elsif ($record and $record->{type} eq 'noun') {
+                $conjugate = \&PL_N;
+                Log "Special case *s (noun)";
+            } else {
+                undef $record;
+                $var = $full;
+            }
+        }
+
+        if ( $record and $record->{type} eq 'noun' ) {
+            Log "Special case noun";
+
+            while ( $msg =~ /\ba \$$full\b/i ) {
                 my $replacement = &set_case( $record, $var, $conjugate );
                 $replacement = A($replacement);
-                Log "Replacing 'a \$noun' with $replacement";
+                Log "Replacing 'a \$$full' with $replacement";
                 last if $replacement =~ /\$/;
 
-                $msg =~ s/\ba \$noun\b/$replacement/i;
+                $msg =~ s/\ba \$$full\b/$replacement/i;
             }
-        } else {
-            $record = $replacables{ lc $var };
         }
 
         unless ($record) {
@@ -2511,12 +2541,12 @@ sub expand {
 
         Log Dumper $record;
 
-        while ( $msg =~ /\$$var\b/i ) {
+        while ( $msg =~ /\$$full\b/i ) {
             my $replacement = &set_case( $record, $var, $conjugate );
-            Log "Replacing \$$var with $replacement";
+            Log "Replacing \$$full with $replacement";
             last if $replacement =~ /\$/;
 
-            $msg =~ s/\$$var\b/$replacement/i;
+            $msg =~ s/\$$full\b/$replacement/i;
         }
 
         Log " => $msg";
