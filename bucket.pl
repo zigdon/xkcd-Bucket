@@ -1770,6 +1770,10 @@ sub db_success {
             return;
         }
 
+        if ($bag{page} > 10) {
+            $bag{page} = "*";
+        }
+
         if (    $bag{page} eq '*'
             and $config->{www_url}
             and $config->{www_root}
