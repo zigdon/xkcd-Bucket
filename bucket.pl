@@ -957,7 +957,8 @@ sub irc_on_public {
             return;
         }
 
-        $replacables{$var} = { vals => [], perms => "read-only", type => "var" };
+        $replacables{$var} =
+          { vals => [], perms => "read-only", type => "var" };
         Log "$who created a new variable '$var' in $chl";
         Report "$who created a new variable '$var' in $chl";
         $undo{$chl} = [ 'newvar', $who, $var, "new variable '$var'." ];
@@ -986,14 +987,18 @@ sub irc_on_public {
         &sql( "delete from bucket_vars where id = ?",
             [ $replacables{$var}{id} ] );
         delete $replacables{$var};
-    } elsif ( $operator and $addressed and $msg =~ /^var (\w+) type (var|verb|noun)$/ ) {
-        my ($var, $type) = ($1, $2);
+    } elsif ( $operator
+        and $addressed
+        and $msg =~ /^var (\w+) type (var|verb|noun)$/ )
+    {
+        my ( $var, $type ) = ( $1, $2 );
         unless ( exists $replacables{$var} ) {
             &say( $chl => "Sorry, $who, there isn't a variable '$var'!" );
             return;
         }
 
         Log "$who set var $var type to $type";
+        &say( $chl => "Okay, $who" );
         $replacables{$var}{type} = $type;
         &sql( "update bucket_vars set type=? where id = ?",
             [ $type, $replacables{$var}{id} ] );
@@ -1782,7 +1787,7 @@ sub db_success {
             return;
         }
 
-        if ($bag{page} > 10) {
+        if ( $bag{page} > 10 ) {
             $bag{page} = "*";
         }
 
@@ -1836,7 +1841,7 @@ sub db_success {
                 }
                 $bit .= "$fact->{verb} $fact->{tidbit}";
                 $bit =~ s/\|/\\|/g;
-                if ( length( "$prefix $answer|$bit" ) > $linelen and $answer ) {
+                if ( length("$prefix $answer|$bit") > $linelen and $answer ) {
                     unshift @lines, $fact;
                     last;
                 }
@@ -2484,10 +2489,10 @@ sub expand {
         # yay for special cases!
         my $conjugate;
         my $record = $replacables{ lc $var };
-        my $full = $var;
-        if (not $record and $var =~ s/ed$//) {
-            $record    = $replacables{$var};
-            if ($record and $record->{type} eq 'verb') {
+        my $full   = $var;
+        if ( not $record and $var =~ s/ed$// ) {
+            $record = $replacables{$var};
+            if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&past;
                 Log "Special case *ed";
             } else {
@@ -2496,9 +2501,9 @@ sub expand {
             }
         }
 
-        if (not $record and $var =~ s/ing$//) {
-            $record    = $replacables{$var};
-            if ($record and $record->{type} eq 'verb') {
+        if ( not $record and $var =~ s/ing$// ) {
+            $record = $replacables{$var};
+            if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&gerund;
                 Log "Special case *ing";
             } else {
@@ -2507,12 +2512,12 @@ sub expand {
             }
         }
 
-        if (not $record and $var =~ s/s$//) {
-            $record    = $replacables{$var};
-            if ($record and $record->{type} eq 'verb') {
+        if ( not $record and $var =~ s/s$// ) {
+            $record = $replacables{$var};
+            if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&s_form;
                 Log "Special case *s (verb)";
-            } elsif ($record and $record->{type} eq 'noun') {
+            } elsif ( $record and $record->{type} eq 'noun' ) {
                 $conjugate = \&PL_N;
                 Log "Special case *s (noun)";
             } else {
