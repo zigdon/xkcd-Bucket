@@ -873,7 +873,15 @@ sub irc_on_public {
         }
         &say(
             $chl => "Known variables:",
-            &make_list( sort keys %replacables ) . "."
+            &make_list(
+                map {
+                        $replacables{$_}->{type} eq 'noun' ? "$_(n)"
+                      : $replacables{$_}->{type} eq 'verb' ? "$_(v)"
+                      : $_
+                  }
+                  sort keys %replacables
+              )
+              . "."
         );
     } elsif ( $addressed and $msg =~ /^list var (\w+)$/ ) {
         my $var = $1;
