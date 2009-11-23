@@ -918,6 +918,7 @@ sub irc_on_public {
             Log "found!";
             splice( @{ $replacables{$var}{vals} }, $i, 1, () );
             &say( $chl => "Okay, $who." );
+            Report "$who removed a value from \$$var in $chl: $value";
 
             &sql(
                 "delete from bucket_values where var_id=? and value=? limit 1",
@@ -954,6 +955,7 @@ sub irc_on_public {
 
         push @{ $replacables{$var}{vals} }, $value;
         &say( $chl => "Okay, $who." );
+        Report "$who added a value to \$$var in $chl: $value";
 
         &sql( "insert into bucket_values (var_id, value) values (?, ?)",
             [ $replacables{$var}{id}, $value ] );
