@@ -2501,7 +2501,7 @@ sub expand {
         my $record = $replacables{ lc $var };
         my $full   = $var;
         if ( not $record and $var =~ s/ed$// ) {
-            $record = $replacables{$var};
+            $record = $replacables{lc $var};
             if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&past;
                 Log "Special case *ed";
@@ -2512,7 +2512,7 @@ sub expand {
         }
 
         if ( not $record and $var =~ s/ing$// ) {
-            $record = $replacables{$var};
+            $record = $replacables{lc $var};
             if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&gerund;
                 Log "Special case *ing";
@@ -2523,7 +2523,7 @@ sub expand {
         }
 
         if ( not $record and $var =~ s/s$// ) {
-            $record = $replacables{$var};
+            $record = $replacables{lc $var};
             if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&s_form;
                 Log "Special case *s (verb)";
