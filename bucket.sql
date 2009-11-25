@@ -106,3 +106,16 @@ CREATE TABLE IF NOT EXISTS `bucket_vars` (
   PRIMARY KEY  (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=MyISAM  DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `genders`
+--
+
+CREATE TABLE IF NOT EXISTS `genders` (
+  `id` int(10) unsigned NOT NULL auto_increment,
+  `nick` varchar(30) NOT NULL,
+  `gender` enum('male','female','Androgynous','inanimate','full name') NOT NULL default 'Androgynous',
+  `stamp` timestamp NOT NULL default CURRENT_TIMESTAMP,
+  PRIMARY KEY  (`id`),
+  UNIQUE KEY `nick` (`nick`)
+) ENGINE=MyISAM  DEFAULT CHARSET=latin1;
