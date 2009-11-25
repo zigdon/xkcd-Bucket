@@ -2501,7 +2501,7 @@ sub expand {
         my $record = $replacables{ lc $var };
         my $full   = $var;
         if ( not $record and $var =~ s/ed$// ) {
-            $record = $replacables{lc $var};
+            $record = $replacables{ lc $var };
             if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&past;
                 Log "Special case *ed";
@@ -2512,7 +2512,7 @@ sub expand {
         }
 
         if ( not $record and $var =~ s/ing$// ) {
-            $record = $replacables{lc $var};
+            $record = $replacables{ lc $var };
             if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&gerund;
                 Log "Special case *ing";
@@ -2523,7 +2523,7 @@ sub expand {
         }
 
         if ( not $record and $var =~ s/s$// ) {
-            $record = $replacables{lc $var};
+            $record = $replacables{ lc $var };
             if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&s_form;
                 Log "Special case *s (verb)";
@@ -2536,19 +2536,6 @@ sub expand {
             }
         }
 
-        if ( $record and $record->{type} eq 'noun' ) {
-            Log "Special case noun";
-
-            while ( $msg =~ /\ba \$$full\b/i ) {
-                my $replacement = &set_case( $record, $var, $conjugate );
-                $replacement = A($replacement);
-                Log "Replacing 'a \$$full' with $replacement";
-                last if $replacement =~ /\$/;
-
-                $msg =~ s/\ba \$$full\b/$replacement/i;
-            }
-        }
-
         unless ($record) {
             Log "Can't find a record for \$$var";
             last;
@@ -2556,12 +2543,14 @@ sub expand {
 
         Log Dumper $record;
 
-        while ( $msg =~ /\$$full\b/i ) {
+        while ( $msg =~ /((\ban? )?\$$full\b)/i ) {
             my $replacement = &set_case( $record, $var, $conjugate );
-            Log "Replacing \$$full with $replacement";
+            $replacement = A($replacement) if $2;
+
+            Log "Replacing $1 with $replacement";
             last if $replacement =~ /\$/;
 
-            $msg =~ s/\$$full\b/$replacement/i;
+            $msg =~ s/(?:\ban? )?\$$full\b/$replacement/i;
         }
 
         Log " => $msg";
