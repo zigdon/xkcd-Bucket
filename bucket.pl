@@ -2158,29 +2158,35 @@ sub check_idle {
 
     $stats{last_idle_time}{$chl} = time;
 
-    my @sources = qw/MLIA SMDS IMMD factoid/;
+    my %sources = (
+        MLIA => [
+            "http://feeds.feedburner.com/mlia", qr/MLIA.*/,
+            "feedburner:origLink"
+        ],
+        SMDS => [
+            "http://twitter.com/statuses/user_timeline/62581962.rss",
+            qr/^shitmydadsays: "|"$/, "link"
+        ],
+        IMMD => [
+            "http://feeds.feedburner.com/immd", qr/IMMD.*/,
+            "feedburner:origLink"
+        ],
+        FAPSB => [
+            "http://twitter.com/statuses/user_timeline/83883736.rss",
+            qr/^FakeAPStylebook: /, "link"
+        ],
+        factoid => 1
+    );
     my $source = $config->{idle_source} || "factoid";
     if ( $source eq 'random' ) {
-        $source = $sources[ rand @sources ];
+        $source = ( keys %sources )[ rand keys %sources ];
     }
 
     $stats{chatter_source}{$source}++;
 
-    if ( $source eq 'MLIA' or $source eq 'IMMD' ) {
+    if ( $source ne 'factoid' ) {
         Log "Looking up $source story";
-        my ( $story, $url ) =
-          &read_rss( "http://feeds.feedburner.com/" . lc $source,
-            qr/$source.*/, "feedburner:origLink" );
-        if ($story) {
-            &say( $chl => $story );
-            $stats{last_fact}{$chl} = $url;
-            return;
-        }
-    } elsif ( $source eq 'SMDS' ) {
-        Log "Looking up SMDS story";
-        my ( $story, $url ) =
-          &read_rss( "http://twitter.com/statuses/user_timeline/62581962.rss",
-            qr/^shitmydadsays: "|"$/, "link" );
+        my ( $story, $url ) = &read_rss( @{ $sources{$source} } );
         if ($story) {
             &say( $chl => $story );
             $stats{last_fact}{$chl} = $url;
