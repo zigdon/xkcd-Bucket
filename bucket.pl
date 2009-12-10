@@ -313,7 +313,7 @@ sub irc_on_public {
 
     my $editable = 0;
     $editable = 1
-      if ( $type eq 'irc_public' and $chl ne '#bots' )
+      if ( $type ne 'irc_msg' and $chl ne '#bots' )
       or ( $type eq 'irc_msg' and $operator );
     Log("$type($chl): $who(o=$operator, a=$addressed, e=$editable): $msg");
 
