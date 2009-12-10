@@ -2553,6 +2553,10 @@ sub expand {
             my $replacement = &set_case( $record, $var, $conjugate );
             $replacement = A($replacement) if $2;
 
+            if ( $2 and substr( $2, 0, 1 ) eq 'A' ) {
+                $replacement = ucfirst $replacement;
+            }
+
             Log "Replacing $1 with $replacement";
             last if $replacement =~ /\$/;
 
@@ -2618,6 +2622,7 @@ sub read_rss {
                 $story->{description} =
                   HTML::Entities::decode_entities( $story->{description} );
                 $story->{description} =~ s/$re//isg if $re;
+                next if $url =~ /twitter/ and $story->{description} =~ /^@/;
                 next if length $story->{description} > 400;
                 next if $story->{description} =~ /\[\.\.\.\]/;
 
