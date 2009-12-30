@@ -898,7 +898,28 @@ sub irc_on_public {
         }
 
         my @vals = @{ $replacables{$var}{vals} };
-        &say( $chl => "$var:", &make_list( sort @vals ) );
+        if (    @vals > 30
+            and $config->{www_url}
+            and $config->{www_root}
+            and -w $config->{www_root} )
+        {
+            my $url = "$config->{www_url}/var_$var.txt";
+            $url =~ s/ /%20/g;
+            if ( open( DUMP, ">", $config->{www_root} . "/var_$var.txt" ) ) {
+                foreach ( sort @vals ) {
+                    print DUMP "$_\n";
+                }
+                close DUMP;
+                &say(
+                    $chl => "$who: Here's the full list (",
+                    scalar @vals, "): $url"
+                );
+            } else {
+                &say( $chl => "Sorry, $who, failed to dump out $var: $!" );
+            }
+        } else {
+            &say( $chl => "$var:", &make_list( sort @vals ) );
+        }
     } elsif ( $addressed and $msg =~ /^remove value (\w+) (.+)$/ ) {
         my ( $var, $value ) = ( lc $1, lc $2 );
         unless ( exists $replacables{$var} ) {
@@ -1154,7 +1175,7 @@ sub irc_on_public {
         $msg = &trim($msg);
         if ( $addressed or length $msg >= 6 or $msg eq '...' ) {
             if ( $addressed and length $msg == 0 ) {
-                $msg = "Bucket";
+                $msg = $nick;
             }
 
             #Log "Looking up $msg";
@@ -1264,7 +1285,7 @@ sub db_success {
             }
 
             if ( $fact eq 'you' and $verb eq 'are' ) {
-                $fact = "Bucket";
+                $fact = $nick;
                 $verb = "is";
             } elsif ( $fact eq 'I' and $verb eq 'am' ) {
                 $fact = $bag{who};
