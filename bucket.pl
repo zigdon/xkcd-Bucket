@@ -1079,6 +1079,7 @@ sub irc_on_public {
         }
 
         my $quote;
+        $match->[2] =~ s/^\S: //;
         if ( $match->[1] eq 'irc_ctcp_action' ) {
             $quote = "* $match->[0] $match->[2]";
         } else {
@@ -1541,7 +1542,7 @@ sub db_success {
         }
 
         my ( $gflag, $iflag );
-        $gflag = $bag{op} and $bag{flag} =~ s/g//g;
+        $gflag = ($bag{op} and $bag{flag} =~ s/g//g);
         $iflag = ( $bag{flag} =~ s/i//g ? "i" : "" );
         my $count = 0;
         $undo{ $bag{chl} } =
