@@ -219,7 +219,7 @@ sub irc_on_kick {
     &lookup(
         msgs => [ "$kicker kicked $kickee", "$kicker kicked someone" ],
         chl  => $chl,
-        who  => $kicker,
+        who  => $kickee,
         op   => 1,
         type => 'irc_kick',
     );
