@@ -534,11 +534,17 @@ sub irc_on_public {
             );
         }
         &say( $chl => "Okay, $who, updated the protection bit." );
-    } elsif ( $operator
-        and $addressed
-        and $msg =~ /^restore topic(?: (#\S+))?/ )
-    {
-        my $tchl = $1 || $chl;
+    } elsif ( $addressed and $msg =~ /^restore topic(?: (#\S+))?/ ) {
+        my $tchl = $chl;
+        if ($1) {
+            if ($operator) {
+                $tchl = $1;
+            } else {
+                &say( $chl => "Sorry, $who, "
+                      . "you can't change the topic for another channel!" );
+                return;
+            }
+        }
         unless ( $stats{topics}{$tchl}{old} ) {
             &say( $chl =>
                   "Sorry, $who, I don't know what was the earlier topic!" );
@@ -1542,7 +1548,7 @@ sub db_success {
         }
 
         my ( $gflag, $iflag );
-        $gflag = ($bag{op} and $bag{flag} =~ s/g//g);
+        $gflag = ( $bag{op} and $bag{flag} =~ s/g//g );
         $iflag = ( $bag{flag} =~ s/i//g ? "i" : "" );
         my $count = 0;
         $undo{ $bag{chl} } =
