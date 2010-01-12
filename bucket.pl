@@ -69,6 +69,7 @@ my %history;
 my %config_keys = (
     bananas_chance         => "p",
     band_name              => "p",
+    band_var               => "s",
     ex_to_sex              => "p",
     history_size           => "i",
     idle_source            => "s",
@@ -741,22 +742,6 @@ sub irc_on_public {
         } else {
             &say( $chl => "$who: that was $id" );
         }
-    } elsif ( $addressed and $msg =~ /suggest a band name/i ) {
-        $_[KERNEL]->post(
-            db  => 'SINGLE',
-            SQL => 'select band from band_names 
-                            order by rand(' . int( rand(1e6) ) . ') limit 1 ',
-            BAGGAGE => {
-                cmd       => "band_name_suggest",
-                chl       => $chl,
-                who       => $who,
-                addressed => 0,
-                editable  => 0,
-                op        => 0,
-                type      => 'irc_public',
-            },
-            EVENT => 'db_success'
-        );
     } elsif ( $addressed and $msg eq 'something random' ) {
         &lookup(
             chl => $chl,
@@ -1450,7 +1435,11 @@ sub db_success {
                     {
                         $_[KERNEL]->post(
                             db  => 'SINGLE',
-                            SQL => 'select id from band_names where band = ?',
+                            SQL => 'select value 
+                                    from bucket_values left join bucket_vars 
+                                         on bucket_vars.id = bucket_values.var_id
+                                    where name = "band" and value = ?
+                                    limit 1',
                             PLACEHOLDERS => [$stripped_name],
                             BAGGAGE      => {
                                 %bag,
@@ -1500,7 +1489,7 @@ sub db_success {
           );
     } elsif ( $bag{cmd} eq 'band_name' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
-        unless ( $line{id} ) {
+        unless ( $line{value} ) {
             my @words = sort { length $b <=> length $a } @{ $bag{words} };
             $_[KERNEL]->post(
                 db  => 'SINGLE',
@@ -1518,8 +1507,9 @@ sub db_success {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
         unless ( $line{id} ) {
             &sql(
-                'insert band_names (band) values (?)',
-                [ $bag{stripped_name} ],
+                'insert into bucket_values (var_id, value) 
+                 values ( (select id from bucket_vars where name = ? limit 1), ?);',
+                [ $config->{band_var} || "band", $bag{stripped_name} ],
                 { %bag, cmd => "new band name" }
             );
 
@@ -1529,10 +1519,6 @@ sub db_success {
             &cached_reply( $bag{chl}, $bag{who}, $bag{name},
                 "band name reply" );
         }
-    } elsif ( $bag{cmd} eq 'band_name_suggest' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
-
-        &say( $bag{chl} => "How about '$line{band}'?" );
     } elsif ( $bag{cmd} eq 'edit' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
 
