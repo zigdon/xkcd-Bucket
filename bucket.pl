@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-#  Copyright (C) 2009  Dan Boger - zigdon+bot@gmail.com
+#  Copyright (C) 2010  Dan Boger - zigdon+bot@gmail.com
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -883,42 +883,42 @@ sub irc_on_public {
             return;
         }
 
-        if ( exists $replacables{$var}{cache} ) {
-            &say(
-                $chl => "Sorry, $who, dumping cached vars isn't implemented." );
-            return;
-        }
-
-        unless ( ref $replacables{$var}{vals} eq 'ARRAY'
-            and @{ $replacables{$var}{vals} } )
+        unless (
+            $replacables{$var}{cache}
+            or ( ref $replacables{$var}{vals} eq 'ARRAY'
+                and @{ $replacables{$var}{vals} } )
+          )
         {
             &say( $chl => "$who: \$$var has no values defined!" );
             return;
         }
 
-        my @vals = @{ $replacables{$var}{vals} };
-        if (    @vals > 30
-            and &config("www_url")
-            and &config("www_root")
-            and -w &config("www_root") )
+        if ( exists $replacables{$var}{cache}
+            or ref $replacables{$var}{vals} eq 'ARRAY'
+            and @{ $replacables{$var}{vals} } > 30 )
         {
-            my $url = &config("www_url") . "/var_$var.txt";
-            $url =~ s/ /%20/g;
-            if ( open( DUMP, ">", &config("www_root") . "/var_$var.txt" ) ) {
-                foreach ( sort @vals ) {
-                    print DUMP "$_\n";
-                }
-                close DUMP;
-                &say(
-                    $chl => "$who: Here's the full list (",
-                    scalar @vals, "): $url"
-                );
-            } else {
-                &say( $chl => "Sorry, $who, failed to dump out $var: $!" );
-            }
-        } else {
-            &say( $chl => "$var:", &make_list( sort @vals ) );
+            $_[KERNEL]->post(
+                db  => 'MULTIPLE',
+                SQL => 'select value 
+                      from bucket_vars vars 
+                           left join bucket_values vals 
+                           on vars.id = vals.var_id  
+                      where name = ?
+                      order by value',
+                PLACEHOLDERS => [$var],
+                BAGGAGE      => {
+                    cmd  => "dump_var",
+                    name => $var,
+                    who  => $who,
+                    chl  => $chl
+                },
+                EVENT => 'db_success'
+            );
+            return;
         }
+
+        my @vals = @{ $replacables{$var}{vals} };
+        &say( $chl => "$var:", &make_list( sort @vals ) );
     } elsif ( $addressed and $msg =~ /^remove value (\w+) (.+)$/ ) {
         my ( $var, $value ) = ( lc $1, lc $2 );
         unless ( exists $replacables{$var} ) {
@@ -1581,6 +1581,27 @@ sub db_success {
             map { "$_ (" . scalar @{ $replacables{$_}{vals} } . ")" }
               sort keys %replacables
           );
+    } elsif ( $bag{cmd} eq 'dump_var' ) {
+        unless ( ref $res->{RESULT} ) {
+            &say( $bag{chl} => "Sorry, $bag{who}, something went wrong!" );
+            return;
+        }
+
+        my $url = &config("www_url") . "/var_$bag{name}.txt";
+        $url =~ s/ /%20/g;
+        if ( open( DUMP, ">", &config("www_root") . "/var_$bag{name}.txt" ) ) {
+            my $count = 0;
+            foreach ( @{ $res->{RESULT} } ) {
+                print DUMP "$_->{value}\n";
+                $count++;
+            }
+            close DUMP;
+            &say( $bag{chl} =>
+                  "$bag{who}: Here's the full list ( $count ): $url" );
+        } else {
+            &say( $bag{chl} =>
+                  "Sorry, $bag{who}, failed to dump out $bag{name}: $!" );
+        }
     } elsif ( $bag{cmd} eq 'band_name' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
         unless ( $line{value} ) {
