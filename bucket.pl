@@ -46,16 +46,16 @@ $|++;
 ### IRC portion
 my $configfile = "/home/bucket/bucket.yml";
 my $config     = LoadFile($configfile);
-my $nick       = $config->{nick} || "Bucket";
-my $pass       = $config->{password} || "somethingsecret";
-$nick = DEBUG ? ( $config->{debug_nick} || "bucketgoat" ) : $nick;
+my $nick       = &config("nick") || "Bucket";
+my $pass       = &config("password") || "somethingsecret";
+$nick = DEBUG ? ( &config("debug_nick") || "bucketgoat" ) : $nick;
 my $channel =
   DEBUG
-  ? ( $config->{debug_channel} || "#bucket" )
-  : ( $config->{controll_channel} || "#billygoat" );
+  ? ( &config("debug_channel") || "#bucket" )
+  : ( &config("controll_channel") || "#billygoat" );
 my ($irc) = POE::Component::IRC::State->spawn();
 my %channels = ( $channel => 1 );
-my $mainchannel = $config->{main_channel} || "#xkcd";
+my $mainchannel = &config("main_channel") || "#xkcd";
 my %talking;
 my %fcache;
 my %stats;
@@ -67,22 +67,23 @@ my %replacables;
 my %history;
 
 my %config_keys = (
-    bananas_chance         => "p",
-    band_name              => "p",
-    band_var               => "s",
-    ex_to_sex              => "p",
-    history_size           => "i",
-    idle_source            => "s",
-    increase_mute          => "i",
-    inventory_preload      => "i",
-    inventory_size         => "i",
-    item_drop_rate         => "i",
-    random_item_cache_size => "i",
-    random_wait            => "i",
-    user_activity_timeout  => "i",
-    your_mom_is            => "p",
-    www_root               => "s",
-    www_url                => "s",
+    bananas_chance         => [ "p", 0.02 ],
+    band_name              => [ "p", 5 ],
+    band_var               => [ "s", 'band' ],
+    ex_to_sex              => [ "p", 1 ],
+    history_size           => [ "i", 30 ],
+    idle_source            => [ "s", 'factoid' ],
+    increase_mute          => [ "i", 60 ],
+    inventory_preload      => [ "i", 0 ],
+    inventory_size         => [ "i", 20 ],
+    item_drop_rate         => [ "i", 3 ],
+    random_item_cache_size => [ "i", 20 ],
+    random_wait            => [ "i", 3 ],
+    user_activity_timeout  => [ "i", 360 ],
+    value_cache_limit      => [ "i", 1000 ],
+    your_mom_is            => [ "p", 5 ],
+    www_root               => [ "s", "" ],
+    www_url                => [ "s", "" ],
 );
 
 my %gender_vars = (
@@ -139,9 +140,10 @@ foreach my $type ( keys %gender_vars ) {
 
 $stats{startup_time} = time;
 
-if ( $config->{logfile} ) {
-    open( LOG, ">>$config->{logfile}" )
-      or die "Can't write $config->{logfile}: $!";
+if ( &config("logfile") ) {
+    open( LOG, ">>",
+        DEBUG ? &config("logfile") . ".debug" : &config("logfile") )
+      or die "Can't write " . &config("logfile") . ": $!";
 }
 
 $irc->plugin_add( 'NickServID',
@@ -176,14 +178,14 @@ print "POE::Kernel has left the building.\n";
 
 sub Log {
     print scalar localtime, " - @_\n";
-    if ( $config->{logfile} ) {
+    if ( &config("logfile") ) {
         print LOG scalar localtime, " - @_\n";
     }
 }
 
 sub Report {
     my $delay = shift if $_[0] =~ /^\d+$/;
-    my $logchannel = DEBUG ? $channel : $config->{logchannel};
+    my $logchannel = DEBUG ? $channel : &config("logchannel");
     unshift @_, "REPORT:" if DEBUG;
 
     if ( $logchannel and $irc ) {
@@ -246,10 +248,10 @@ sub irc_on_public {
         return;
     }
 
-    if ( $config->{history_size} and $config->{history_size} > 0 ) {
+    if ( &config("history_size") and &config("history_size") > 0 ) {
         push @{ $history{$chl} }, [ $who, $type, $msg ];
 
-        if ( @{ $history{$chl} } > $config->{history_size} ) {
+        if ( @{ $history{$chl} } > &config("history_size") ) {
             shift @{ $history{$chl} };
         }
     }
@@ -287,8 +289,8 @@ sub irc_on_public {
     $talking{$chl} = -1 unless exists $talking{$chl};
     $talking{$chl} = -1 if ( $talking{$chl} > 0 and $talking{$chl} < time );
     unless ( $talking{$chl} == -1 or ( $operator and $addressed ) ) {
-        if ( $addressed and $config->{increase_mute} and $talking{$chl} > 0 ) {
-            $talking{$chl} += $config->{increase_mute};
+        if ( $addressed and &config("increase_mute") and $talking{$chl} > 0 ) {
+            $talking{$chl} += &config("increase_mute");
             Report "Shutting up longer in $chl - "
               . ( $talking{$chl} - time )
               . " seconds remaining";
@@ -306,8 +308,8 @@ sub irc_on_public {
         $chl = $who;
     }
 
-    if ( $config->{bananas_chance}
-        and rand(100) < $config->{bananas_chance} )
+    if ( &config("bananas_chance")
+        and rand(100) < &config("bananas_chance") )
     {
         &say( $chl => "Bananas!" );
     }
@@ -473,7 +475,7 @@ sub irc_on_public {
             }
         } else {
             &say( $chl => "Okay, $who - be back in a bit!" );
-            $talking{$chl} = time + $config->{timeout};
+            $talking{$chl} = time + &config("timeout");
         }
     } elsif ( $addressed
         and $operator
@@ -829,11 +831,11 @@ sub irc_on_public {
             return;
         }
 
-        if ( $config_keys{$key} eq 'p' and $val =~ /^(\d+)%?$/ ) {
+        if ( $config_keys{$key}[0] eq 'p' and $val =~ /^(\d+)%?$/ ) {
             $config->{$key} = $1;
-        } elsif ( $config_keys{$key} eq 'i' and $val =~ /^(\d+)$/ ) {
+        } elsif ( $config_keys{$key}[0] eq 'i' and $val =~ /^(\d+)$/ ) {
             $config->{$key} = $1;
-        } elsif ( $config_keys{$key} eq 's' ) {
+        } elsif ( $config_keys{$key}[0] eq 's' ) {
             $val =~ s/^\s+|\s+$//g;
             $config->{$key} = $val;
         } else {
@@ -856,7 +858,7 @@ sub irc_on_public {
             return;
         }
 
-        &say( $chl => "$key is $config->{$key}." );
+        &say( $chl => "$key is", &config("$key") . "." );
     } elsif ( $addressed and $msg eq 'list vars' ) {
         unless ( keys %replacables ) {
             &say( $chl => "Sorry, $who, there are no defined variables!" );
@@ -881,6 +883,12 @@ sub irc_on_public {
             return;
         }
 
+        if ( exists $replacables{$var}{cache} ) {
+            &say(
+                $chl => "Sorry, $who, dumping cached vars isn't implemented." );
+            return;
+        }
+
         unless ( ref $replacables{$var}{vals} eq 'ARRAY'
             and @{ $replacables{$var}{vals} } )
         {
@@ -890,13 +898,13 @@ sub irc_on_public {
 
         my @vals = @{ $replacables{$var}{vals} };
         if (    @vals > 30
-            and $config->{www_url}
-            and $config->{www_root}
-            and -w $config->{www_root} )
+            and &config("www_url")
+            and &config("www_root")
+            and -w &config("www_root") )
         {
-            my $url = "$config->{www_url}/var_$var.txt";
+            my $url = &config("www_url") . "/var_$var.txt";
             $url =~ s/ /%20/g;
-            if ( open( DUMP, ">", $config->{www_root} . "/var_$var.txt" ) ) {
+            if ( open( DUMP, ">", &config("www_root") . "/var_$var.txt" ) ) {
                 foreach ( sort @vals ) {
                     print DUMP "$_\n";
                 }
@@ -921,6 +929,14 @@ sub irc_on_public {
         if ( $replacables{$var}{perms} ne "editable" and not $operator ) {
             &say( $chl =>
                   "Sorry, $who, you don't have permissions to edit '$var'." );
+            return;
+        }
+
+        if ( exists $replacables{$var}{cache} ) {
+            &say(
+                $chl => "Sorry, $who, deleting values from",
+                "cached vars isn't implemented."
+            );
             return;
         }
 
@@ -965,7 +981,11 @@ sub irc_on_public {
             return;
         }
 
-        push @{ $replacables{$var}{vals} }, $value;
+        if ( exists $replacables{$var}{vals} ) {
+            push @{ $replacables{$var}{vals} }, $value;
+        } else {
+            push @{ $replacables{$var}{cache} }, $value;
+        }
         &say( $chl => "Okay, $who." );
         Report "$who added a value to \$$var in $chl: $value";
 
@@ -992,6 +1012,12 @@ sub irc_on_public {
         my $var = $1;
         unless ( exists $replacables{$var} ) {
             &say( $chl => "Sorry, $who, there isn't a variable '$var'!" );
+            return;
+        }
+
+        if ( exists $replacables{$var}{cache} ) {
+            &say( $chl =>
+                  "Sorry, $who, deleting cached vars isn't implemented." );
             return;
         }
 
@@ -1188,7 +1214,16 @@ sub irc_on_public {
 sub db_success {
     my $res = $_[ARG0];
 
-    print Dumper $res;
+    foreach ( keys %$res ) {
+        if (    $_ eq 'RESULT'
+            and ref $res->{RESULT} eq 'ARRAY'
+            and @{ $res->{RESULT} } > 50 )
+        {
+            print "RESULT: ", scalar @{ $res->{RESULT} }, "\n";
+        } else {
+            print "$_:\n", Dumper $res->{$_};
+        }
+    }
     my %bag = ref $res->{BAGGAGE} ? %{ $res->{BAGGAGE} } : {};
     if ( $res->{ERROR} ) {
         Report "DB Error: $res->{QUERY} -> $res->{ERROR}";
@@ -1305,10 +1340,10 @@ sub db_success {
             }
             $fact = &trim($fact);
 
-            if (    $config->{your_mom_is}
+            if (    &config("your_mom_is")
                 and not $bag{op}
                 and $verb eq 'is'
-                and rand(100) < $config->{your_mom_is} )
+                and rand(100) < &config("your_mom_is") )
             {
                 $tidbit =~ s/\W+$//;
                 &say( $bag{chl} => "$bag{who}: Your mom is $tidbit!" );
@@ -1364,7 +1399,7 @@ sub db_success {
             &say( $bag{chl} => $bag{orig} );
         } elsif (
             $bag{orig} !~ /extra|except/
-            and rand(100) < $config->{ex_to_sex}
+            and rand(100) < &config("ex_to_sex")
             and (  $bag{orig} =~ s/\ban ex/a sex/
                 or $bag{orig} =~ s/\bex/sex/ )
           )
@@ -1414,9 +1449,9 @@ sub db_success {
             );
             &random_item_cache( $_[KERNEL] );
         } else {    # lookup band name!
-            if (    $config->{band_name}
+            if (    &config("band_name")
                 and $bag{type} eq 'irc_public'
-                and rand(100) < $config->{band_name} )
+                and rand(100) < &config("band_name") )
             {
                 my $name = $bag{orig};
                 my $nicks = join "|", map { "\Q$_" } $irc->nicks();
@@ -1467,8 +1502,67 @@ sub db_success {
           || "androgynous";
     } elsif ( $bag{cmd} eq 'load_vars' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
+        my ( @small, @large );
+        foreach my $line (@lines) {
+            if ( $line->{num} > &config("value_cache_limit") ) {
+                push @large, $line->{name};
+            } else {
+                push @small, $line->{name};
+            }
+        }
+        Log "Small vars: @small";
+        Log "Large vars: @large";
 
-        Log "Loading replacables";
+        # load the smaller variables
+        $_[KERNEL]->post(
+            db  => 'MULTIPLE',
+            SQL => 'select vars.id id, name, perms, type, value 
+                    from bucket_vars vars 
+                         left join bucket_values vals 
+                         on vars.id = vals.var_id  
+                    where name in (' . join( ",", map { "?" } @small ) . ')
+                    order by vars.id',
+            PLACEHOLDERS => \@small,
+            BAGGAGE      => { cmd => "load_vars_cache", },
+            EVENT        => 'db_success'
+        );
+
+        # make note of the larger variables, and preload a cache
+        foreach my $var (@large) {
+            $_[KERNEL]->post(
+                db  => 'MULTIPLE',
+                SQL => 'select vars.id id, name, perms, type, value 
+                      from bucket_vars vars 
+                           left join bucket_values vals 
+                           on vars.id = vals.var_id  
+                      where name = ?
+                      order by rand()
+                      limit 10',
+                PLACEHOLDERS => [$var],
+                BAGGAGE      => { cmd => "load_vars_large", },
+                EVENT        => 'db_success'
+            );
+        }
+    } elsif ( $bag{cmd} eq 'load_vars_large' ) {
+        my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
+
+        Log "Loading large replacables: $lines[0]{name}";
+        foreach my $line (@lines) {
+            unless ( exists $replacables{ $line->{name} } ) {
+                $replacables{ $line->{name} } = {
+                    cache => [],
+                    perms => $line->{perms},
+                    id    => $line->{id},
+                    type  => $line->{type}
+                };
+            }
+
+            push @{ $replacables{ $line->{name} }{cache} }, $line->{value};
+        }
+    } elsif ( $bag{cmd} eq 'load_vars_cache' ) {
+        my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
+
+        Log "Loading small replacables";
         foreach my $line (@lines) {
             unless ( exists $replacables{ $line->{name} } ) {
                 $replacables{ $line->{name} } = {
@@ -1509,7 +1603,7 @@ sub db_success {
             &sql(
                 'insert into bucket_values (var_id, value) 
                  values ( (select id from bucket_vars where name = ? limit 1), ?);',
-                [ $config->{band_var} || "band", $bag{stripped_name} ],
+                [ &config("band_var"), $bag{stripped_name} ],
                 { %bag, cmd => "new band name" }
             );
 
@@ -1816,16 +1910,16 @@ sub db_success {
         }
 
         if (    $bag{page} eq '*'
-            and $config->{www_url}
-            and $config->{www_root}
-            and -w $config->{www_root} )
+            and &config("www_url")
+            and &config("www_root")
+            and -w &config("www_root") )
         {
-            my $url = "$config->{www_url}/literal_$bag{fact}.txt";
+            my $url = &config("www_url") . "/literal_$bag{fact}.txt";
             $url =~ s/ /%20/g;
             Report
               "$bag{who} asked in $bag{chl} to dump out $bag{fact} -> $url";
             if (
-                open( DUMP, ">", $config->{www_root} . "/literal_$bag{fact}.txt"
+                open( DUMP, ">", &config("www_root") . "/literal_$bag{fact}.txt"
                 )
               )
             {
@@ -1919,9 +2013,9 @@ sub irc_start {
     Log "DB Connect...";
     $_[KERNEL]->post(
         db       => 'CONNECT',
-        DSN      => $config->{db_dsn},
-        USERNAME => $config->{db_username},
-        PASSWORD => $config->{db_password},
+        DSN      => &config("db_dsn"),
+        USERNAME => &config("db_username"),
+        PASSWORD => &config("db_password"),
         EVENT    => 'db_success',
     );
 
@@ -1929,15 +2023,15 @@ sub irc_start {
     $_[HEAP]->{connector} = POE::Component::IRC::Plugin::Connector->new();
     $irc->plugin_add( Connector => $_[HEAP]->{connector} );
 
-    # load the variables
+    # find out which variables should be preloaded
     $_[KERNEL]->post(
         db  => 'MULTIPLE',
-        SQL => 'select vars.id id, name, perms, type, value 
-                from bucket_vars vars 
-                     left join bucket_values vals 
-                     on vars.id = vals.var_id  
-                order by vars.id',
-        BAGGAGE => { cmd => "load_vars", },
+        SQL => 'select name, count(value) num
+                from bucket_vars vars
+                     left join bucket_values 
+                     on vars.id = var_id
+                group by name',
+        BAGGAGE => { cmd => "load_vars" },
         EVENT   => 'db_success'
     );
 
@@ -1949,21 +2043,21 @@ sub irc_start {
     &cache( $_[KERNEL], "duplicate item" );
     &cache( $_[KERNEL], "band name reply" );
     &random_item_cache( $_[KERNEL] );
-    $stats{preloaded_items} = $config->{inventory_preload} || 0;
+    $stats{preloaded_items} = &config("inventory_preload");
 
     $irc->yield(
         connect => {
             Nick     => $nick,
-            Username => $config->{username} || "bucket",
-            Ircname  => $config->{irc_name} || "YABI",
-            Server   => $config->{server} || "irc.foonetic.net",
+            Username => &config("username") || "bucket",
+            Ircname  => &config("irc_name") || "YABI",
+            Server   => &config("server") || "irc.foonetic.net",
             Flood    => 0,
         }
     );
 
     $_[KERNEL]->delay( check_idle => 60 );
 
-    if ( -f $config->{bucketlog} and open BLOG, $config->{bucketlog} ) {
+    if ( -f &config("bucketlog") and open BLOG, &config("bucketlog") ) {
         seek BLOG, 0, SEEK_END;
     }
 }
@@ -1977,7 +2071,7 @@ sub irc_on_notice {
         and $msg =~ /Password accepted|isn't registered/ )
     {
         $irc->yield( mode => $nick => "+B" );
-        unless ( $config->{hide_hostmask} ) {
+        unless ( &config("hide_hostmask") ) {
             $irc->yield( mode => $nick => "-x" );
         }
 
@@ -2019,7 +2113,7 @@ sub irc_on_chan_sync {
 
     if ( not DEBUG and $chl eq $channel ) {
         Log("Autojoining channels");
-        foreach my $chl ( $config->{logchannel}, keys %{ $config->{autojoin} } )
+        foreach my $chl ( &config("logchannel"), keys %{ $config->{autojoin} } )
         {
             $irc->yield( join => $chl );
             Log("... $chl");
@@ -2166,7 +2260,7 @@ sub check_idle {
     $_[KERNEL]->delay( check_idle => 60 );
 
     my $chl = DEBUG ? $channel : $mainchannel;
-    return if time - $last_activity{$chl} < 60 * $config->{random_wait};
+    return if time - $last_activity{$chl} < 60 * &config("random_wait");
 
     return if $stats{last_idle_time}{$chl} > $last_activity{$chl};
 
@@ -2191,7 +2285,7 @@ sub check_idle {
         ],
         factoid => 1
     );
-    my $source = $config->{idle_source} || "factoid";
+    my $source = &config("idle_source");
     if ( $source eq 'random' ) {
         $source = ( keys %sources )[ rand keys %sources ];
     }
@@ -2250,7 +2344,7 @@ sub clear_cache {
         foreach my $user ( keys %{ $stats{users}{$channel} } ) {
             delete $stats{users}{$channel}{$user}
               if $stats{users}{$channel}{$user} <
-                  time - $config->{user_activity_timeout};
+                  time - &config("user_activity_timeout");
         }
     }
 }
@@ -2258,7 +2352,7 @@ sub clear_cache {
 sub random_item_cache {
     my $kernel = shift;
     my $force  = shift;
-    my $limit  = $config->{random_item_cache_size} || 20;
+    my $limit  = &config("random_item_cache_size");
     $limit =~ s/\D//g;
 
     if ( not $force and @random_items >= $limit ) {
@@ -2299,13 +2393,13 @@ sub put_item {
     if ($dup) {
         return -1;
     } else {
-        if (   ( $crafted and @inventory >= 2 * $config->{inventory_size} )
-            or ( not $crafted and @inventory >= $config->{inventory_size} ) )
+        if (   ( $crafted and @inventory >= 2 * &config("inventory_size") )
+            or ( not $crafted and @inventory >= &config("inventory_size") ) )
         {
 
-            my $dropping_rate = $config->{item_drop_rate} || 3;
+            my $dropping_rate = &config("item_drop_rate");
             my @drop;
-            while ( @inventory >= $config->{inventory_size}
+            while ( @inventory >= &config("inventory_size")
                 and $dropping_rate-- > 0 )
             {
                 push @drop, &get_item(1);
@@ -2561,11 +2655,26 @@ sub expand {
             last;
         }
 
-        Log Dumper $record;
-
         while ( $msg =~ /((\ban? )?\$$full\b)/i ) {
             my $replacement = &set_case( $record, $var, $conjugate );
             $replacement = A($replacement) if $2;
+
+            if ( exists $record->{cache} and not @{ $record->{cache} } ) {
+                Log "Refilling cache for $full";
+                POE::Kernel->post(
+                    db  => 'MULTIPLE',
+                    SQL => 'select vars.id id, name, perms, type, value 
+                            from bucket_vars vars 
+                                 left join bucket_values vals 
+                                 on vars.id = vals.var_id  
+                            where name = ?
+                            order by rand()
+                            limit 20',
+                    PLACEHOLDERS => [$full],
+                    BAGGAGE      => { cmd => "load_vars_large", },
+                    EVENT        => 'db_success'
+                );
+            }
 
             if ( $2 and substr( $2, 0, 1 ) eq 'A' ) {
                 $replacement = ucfirst $replacement;
@@ -2596,8 +2705,11 @@ sub set_case {
     }
     $var = lc $var;
 
-    return "\$$var" unless $record->{vals};
-    my @values = @{ $record->{vals} };
+    return "\$$var" unless $record->{vals} or $record->{cache};
+    my @values =
+      exists $record->{vals}
+      ? @{ $record->{vals} }
+      : ( shift @{ $record->{cache} } );
     return "\$$var" unless @values;
     my $value = $values[ rand @values ];
     $value =~ s/\$//g;
@@ -2643,5 +2755,17 @@ sub read_rss {
                 return ( $story->{description}, $story->{$tag} );
             }
         }
+    }
+}
+
+sub config {
+    my $key = shift;
+
+    if ( defined $config->{$key} ) {
+        return $config->{$key};
+    } elsif ( exists $config_keys{$key} ) {
+        return $config_keys{$key}[1];
+    } else {
+        return undef;
     }
 }

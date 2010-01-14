@@ -16,19 +16,6 @@ SET SQL_MODE="NO_AUTO_VALUE_ON_ZERO";
 -- --------------------------------------------------------
 
 --
--- Table structure for table `band_names`
---
-
-CREATE TABLE IF NOT EXISTS `band_names` (
-  `id` int(10) unsigned NOT NULL auto_increment,
-  `band` varchar(32) NOT NULL,
-  PRIMARY KEY  (`id`),
-  UNIQUE KEY `band` (`band`)
-) ENGINE=MyISAM  DEFAULT CHARSET=latin1;
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `bucket_facts`
 --
 
