@@ -30,6 +30,7 @@ use YAML qw/LoadFile DumpFile/;
 use Data::Dumper;
 use Fcntl qw/:seek/;
 use HTML::Entities;
+use URI::Escape;
 $Data::Dumper::Indent = 1;
 
 use constant { DEBUG => 0 };
@@ -138,8 +139,8 @@ foreach my $type ( keys %gender_vars ) {
     }
 }
 
-$stats{startup_time} = time;
-$stats{modified_time} = (stat($0))[9];
+$stats{startup_time}  = time;
+$stats{modified_time} = ( stat($0) )[9];
 
 if ( &config("logfile") ) {
     open( LOG, ">>",
@@ -755,12 +756,12 @@ sub irc_on_public {
             &say( $chl => "$who: Hold on, I'm still counting" );
             return;
         }
-        my ( $awake, $units )  = &round_time( time - $stats{startup_time} );
-        my ( $mod,   $modu )   = &round_time( time - $stats{modified_time} );
+        my ( $awake, $units ) = &round_time( time - $stats{startup_time} );
+        my ( $mod,   $modu )  = &round_time( time - $stats{modified_time} );
 
         my $reply;
-        $reply = sprintf "I've been awake since %s (about %d %s), " .
-                         "and was last changed about %d %s ago. ",
+        $reply = sprintf "I've been awake since %s (about %d %s), "
+          . "and was last changed about %d %s ago. ",
           scalar localtime( $stats{startup_time} ),
           $awake, $units, $mod, $modu;
         if ( $stats{learn} + $stats{edited} + $stats{deleted} ) {
@@ -1590,8 +1591,7 @@ sub db_success {
             return;
         }
 
-        my $url = &config("www_url") . "/var_$bag{name}.txt";
-        $url =~ s/ /%20/g;
+        my $url = &config("www_url") . "/" . uri_escape("var_$bag{name}.txt");
         if ( open( DUMP, ">", &config("www_root") . "/var_$bag{name}.txt" ) ) {
             my $count = 0;
             foreach ( @{ $res->{RESULT} } ) {
@@ -1938,8 +1938,8 @@ sub db_success {
             and &config("www_root")
             and -w &config("www_root") )
         {
-            my $url = &config("www_url") . "/literal_$bag{fact}.txt";
-            $url =~ s/ /%20/g;
+            my $url =
+              &config("www_url") . "/" . uri_escape("literal_$bag{fact}.txt");
             Report
               "$bag{who} asked in $bag{chl} to dump out $bag{fact} -> $url";
             if (
