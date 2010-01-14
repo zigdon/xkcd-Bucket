@@ -139,6 +139,7 @@ foreach my $type ( keys %gender_vars ) {
 }
 
 $stats{startup_time} = time;
+$stats{modified_time} = (stat($0))[9];
 
 if ( &config("logfile") ) {
     open( LOG, ">>",
@@ -754,12 +755,14 @@ sub irc_on_public {
             &say( $chl => "$who: Hold on, I'm still counting" );
             return;
         }
-        my ( $awake, $units ) = &round_time( time - $stats{startup_time} );
+        my ( $awake, $units )  = &round_time( time - $stats{startup_time} );
+        my ( $mod,   $modu )   = &round_time( time - $stats{modified_time} );
 
         my $reply;
-        $reply = sprintf "I've been awake since %s (about %d %s). ",
+        $reply = sprintf "I've been awake since %s (about %d %s), " .
+                         "and was last changed about %d %s ago. ",
           scalar localtime( $stats{startup_time} ),
-          $awake, $units;
+          $awake, $units, $mod, $modu;
         if ( $stats{learn} + $stats{edited} + $stats{deleted} ) {
             $reply .= "In that time, I ";
             my @fact_stats;
