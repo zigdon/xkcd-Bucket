@@ -954,7 +954,7 @@ sub irc_on_public {
             Log "found!";
             splice( @{ $replacables{$var}{vals} }, $i, 1, () );
 
-            return if ($key eq 'cache');
+            return if ( $key eq 'cache' );
 
             &say( $chl => "Okay, $who." );
             Report "$who removed a value from \$$var in $chl: $value";
@@ -1021,7 +1021,10 @@ sub irc_on_public {
 
         &sql( 'insert into bucket_vars (name, perms) values (?, "read-only")',
             [$var], { cmd => "create_var", var => $var } );
-    } elsif ( $operator and $addressed and $msg =~ /^remove var (\w+)\s*(!+)?$/ ) {
+    } elsif ( $operator
+        and $addressed
+        and $msg =~ /^remove var (\w+)\s*(!+)?$/ )
+    {
         my $var = $1;
         unless ( exists $replacables{$var} ) {
             &say( $chl => "Sorry, $who, there isn't a variable '$var'!" );
@@ -1030,13 +1033,13 @@ sub irc_on_public {
 
         if ( exists $replacables{$var}{cache} and not $2 ) {
             &say( $chl =>
-                  "$who, this action cannot be undone.  If you want to proceed " .
-                  "append a '!'" );
+                  "$who, this action cannot be undone.  If you want to proceed "
+                  . "append a '!'" );
 
             return;
         }
 
-        if (exists $replacables{$var}{vals}) {
+        if ( exists $replacables{$var}{vals} ) {
             $undo{$chl} = [
                 'delvar', $who, $var, $replacables{$var},
                 "deletion of variable '$var'."
@@ -1046,7 +1049,7 @@ sub irc_on_public {
                 scalar @{ $replacables{$var}{vals} }, "values."
             );
         } else {
-            &say( $chl => "Okay, $who, removed variable \$$var.");
+            &say( $chl => "Okay, $who, removed variable \$$var." );
         }
 
         &sql( "delete from bucket_values where var_id = ?",
@@ -1931,8 +1934,18 @@ sub db_success {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
 
         if ( $line{id} ) {
-            &say( $bag{chl} => "$bag{who}: That was '$line{fact}' "
-                  . "(#$bag{id}): $line{verb} $line{tidbit}" );
+            if ( $stats{last_vars}{ $bag{chl} } ) {
+                my $report = Dumper( $stats{last_vars}{ $bag{chl} } );
+                $report =~ s/\n//g;
+                $report =~ s/\$VAR1 = //;
+                $report =~ s/  +/ /g;
+                &say(   $bag{chl} => "$bag{who}: That was '$line{fact}' "
+                      . "(#$bag{id}): $line{verb} $line{tidbit};  "
+                      . "vars used: $report." );
+            } else {
+                &say( $bag{chl} => "$bag{who}: That was '$line{fact}' "
+                      . "(#$bag{id}): $line{verb} $line{tidbit}" );
+            }
         } else {
             &say( $bag{chl} => "$bag{who}: No idea!" );
         }
@@ -2585,46 +2598,62 @@ sub sql {
 sub expand {
     my ( $who, $chl, $msg, $editable ) = @_;
 
+    $stats{last_vars}{$chl} = {};
+
     my $gender = $stats{users}{genders}{ lc $who };
     my $target = $who;
     if ( $msg =~ /\$who/ ) {
         $msg =~ s/\$who/$who/gi;
+        $stats{last_vars}{$chl}{who} = $who;
     }
 
     if ( $msg =~ /\$someone/i ) {
+        $stats{last_vars}{$chl}{someone} = [];
         while ( $msg =~ /\$someone/i ) {
             my $rnick = &someone($chl);
             $msg =~ s/\$someone/$rnick/i;
+            push @{ $stats{last_vars}{$chl}{someone} }, $rnick;
 
             $gender = $stats{users}{genders}{ lc $rnick };
             $target = $rnick;
         }
     }
 
+    $stats{last_vars}{$chl}{item} = [];
     while ( $msg =~ /\$(give)?item/i ) {
         if (@inventory) {
             my $give = $editable && $1;
             my $item = &get_item($give);
+            push @{ $stats{last_vars}{$chl}{item} },
+              $give ? "$item (given)" : $item;
             $msg =~ s/\$$1item/$item/i;
         } else {
             $msg =~ s/\$$1item/bananas/i;
+            push @{ $stats{last_vars}{$chl}{item} }, "(bananas)";
         }
     }
+    delete $stats{last_vars}{$chl}{item}
+      unless @{ $stats{last_vars}{$chl}{item} };
 
+    $stats{last_vars}{$chl}{newitem} = [];
     while ( $msg =~ /\$newitem/i ) {
         if ($editable) {
             my $newitem = shift @random_items || 'bananas';
             my ( $rc, @dropped ) = &put_item( $newitem, 1 );
             if ( $rc == 2 ) {
+                $stats{last_vars}{$chl}{dropped} = \@dropped;
                 &cached_reply( $chl, $who, \@dropped, "drops item" );
                 return;
             }
 
             $msg =~ s/\$newitem/$newitem/i;
+            push @{ $stats{last_vars}{$chl}{newitem} }, $newitem;
         } else {
             $msg =~ s/\$newitem/bananas/ig;
         }
     }
+    delete $stats{last_vars}{$chl}{newitem}
+      unless @{ $stats{last_vars}{$chl}{newitem} };
 
     if ($gender) {
         foreach my $gvar ( keys %gender_vars ) {
@@ -2639,6 +2668,7 @@ sub expand {
                     Log " => $g_v";
                 }
                 $msg =~ s/\$$gvar\b/$g_v/gi;
+                $stats{last_vars}{$chl}{$gvar} = $g_v;
             }
         }
     }
@@ -2694,6 +2724,7 @@ sub expand {
             last;
         }
 
+        $stats{last_vars}{$chl}{$full} = [];
         while ( $msg =~ /((\ban? )?\$$full\b)/i ) {
             my $replacement = &set_case( $record, $var, $conjugate );
             $replacement = A($replacement) if $2;
@@ -2723,6 +2754,7 @@ sub expand {
             last if $replacement =~ /\$/;
 
             $msg =~ s/(?:\ban? )?\$$full\b/$replacement/i;
+            push @{ $stats{last_vars}{$chl}{$full} }, $replacement;
         }
 
         Log " => $msg";
