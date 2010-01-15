@@ -936,28 +936,37 @@ sub irc_on_public {
             return;
         }
 
+        my $key = "vals";
         if ( exists $replacables{$var}{cache} ) {
-            &say(
-                $chl => "Sorry, $who, deleting values from",
-                "cached vars isn't implemented."
-            );
-            return;
-        }
-
-        foreach my $i ( 0 .. @{ $replacables{$var}{vals} } - 1 ) {
-            next unless lc $replacables{$var}{vals}[$i] eq $value;
-
-            Log "found!";
-            splice( @{ $replacables{$var}{vals} }, $i, 1, () );
-            &say( $chl => "Okay, $who." );
-            Report "$who removed a value from \$$var in $chl: $value";
+            $key = "cache";
 
             &sql(
                 "delete from bucket_values where var_id=? and value=? limit 1",
                 [ $replacables{$var}{id}, $value ]
             );
+            &say( $chl => "Okay, $who." );
+            Report "$who removed a value from \$$var in $chl: $value";
+        }
+
+        foreach my $i ( 0 .. @{ $replacables{$var}{$key} } - 1 ) {
+            next unless lc $replacables{$var}{$key}[$i] eq $value;
+
+            Log "found!";
+            splice( @{ $replacables{$var}{vals} }, $i, 1, () );
+
+            return if ($key eq 'cache');
+
+            &say( $chl => "Okay, $who." );
+            Report "$who removed a value from \$$var in $chl: $value";
+            &sql(
+                "delete from bucket_values where var_id=? and value=? limit 1",
+                [ $replacables{$var}{id}, $value ]
+            );
+
             return;
         }
+
+        return if $key eq 'cache';
 
         &say( $chl => "$who, '$value' isn't a valid value for \$$var!" );
     } elsif ( $addressed and $msg =~ /^add value (\w+) (.+)$/ ) {
@@ -1012,28 +1021,34 @@ sub irc_on_public {
 
         &sql( 'insert into bucket_vars (name, perms) values (?, "read-only")',
             [$var], { cmd => "create_var", var => $var } );
-    } elsif ( $operator and $addressed and $msg =~ /^remove var (\w+)$/ ) {
+    } elsif ( $operator and $addressed and $msg =~ /^remove var (\w+)\s*(!+)?$/ ) {
         my $var = $1;
         unless ( exists $replacables{$var} ) {
             &say( $chl => "Sorry, $who, there isn't a variable '$var'!" );
             return;
         }
 
-        if ( exists $replacables{$var}{cache} ) {
+        if ( exists $replacables{$var}{cache} and not $2 ) {
             &say( $chl =>
-                  "Sorry, $who, deleting cached vars isn't implemented." );
+                  "$who, this action cannot be undone.  If you want to proceed " .
+                  "append a '!'" );
+
             return;
         }
 
-        Log Dumper $replacables{$var};
-        $undo{$chl} = [
-            'delvar', $who, $var, $replacables{$var},
-            "deletion of variable '$var'."
-        ];
-        &say(
-            $chl => "Okay, $who, removed variable \$$var with",
-            scalar @{ $replacables{$var}{vals} }, "values."
-        );
+        if (exists $replacables{$var}{vals}) {
+            $undo{$chl} = [
+                'delvar', $who, $var, $replacables{$var},
+                "deletion of variable '$var'."
+            ];
+            &say(
+                $chl => "Okay, $who, removed variable \$$var with",
+                scalar @{ $replacables{$var}{vals} }, "values."
+            );
+        } else {
+            &say( $chl => "Okay, $who, removed variable \$$var.");
+        }
+
         &sql( "delete from bucket_values where var_id = ?",
             [ $replacables{$var}{id} ] );
         &sql( "delete from bucket_vars where id = ?",
