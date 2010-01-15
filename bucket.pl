@@ -1934,7 +1934,7 @@ sub db_success {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
 
         if ( $line{id} ) {
-            if ( $stats{last_vars}{ $bag{chl} } ) {
+            if ( keys $stats{last_vars}{ $bag{chl} } ) {
                 my $report = Dumper( $stats{last_vars}{ $bag{chl} } );
                 $report =~ s/\n//g;
                 $report =~ s/\$VAR1 = //;
