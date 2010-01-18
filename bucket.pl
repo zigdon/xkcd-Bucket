@@ -760,10 +760,16 @@ sub irc_on_public {
         my ( $mod,   $modu )  = &round_time( time - $stats{modified_time} );
 
         my $reply;
-        $reply = sprintf "I've been awake since %s (about %d %s), "
-          . "and was last changed about %d %s ago. ",
-          scalar localtime( $stats{startup_time} ),
-          $awake, $units, $mod, $modu;
+        $reply = sprintf "I've been awake since %s (about %d %s), ",
+            scalar localtime( $stats{startup_time} ),
+            $awake, $units;
+
+        if ($awake != $mod or $units ne $modu) {
+            $reply .= "and was last changed about %d %s ago. ", $mod, $modu;
+        } else {
+            $reply .= "and that was when I was last changed. ";
+        }
+
         if ( $stats{learn} + $stats{edited} + $stats{deleted} ) {
             $reply .= "In that time, I ";
             my @fact_stats;
