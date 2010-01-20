@@ -78,6 +78,7 @@ my %config_keys = (
     inventory_preload      => [ "i", 0 ],
     inventory_size         => [ "i", 20 ],
     item_drop_rate         => [ "i", 3 ],
+    max_sub_length         => [ "i", 80 ],
     random_item_cache_size => [ "i", 20 ],
     random_wait            => [ "i", 3 ],
     user_activity_timeout  => [ "i", 360 ],
@@ -761,11 +762,11 @@ sub irc_on_public {
 
         my $reply;
         $reply = sprintf "I've been awake since %s (about %d %s), ",
-            scalar localtime( $stats{startup_time} ),
-            $awake, $units;
+          scalar localtime( $stats{startup_time} ),
+          $awake, $units;
 
-        if ($awake != $mod or $units ne $modu) {
-            $reply .= "and was last changed about %d %s ago. ", $mod, $modu;
+        if ( $awake != $mod or $units ne $modu ) {
+            $reply .= sprintf "and was last changed about %d %s ago. ", $mod, $modu;
         } else {
             $reply .= "and that was when I was last changed. ";
         }
@@ -1419,13 +1420,23 @@ sub db_success {
         {
             $stats{hum}++;
             &say( $bag{chl} => "No, but if you hum a few bars I can fake it" );
-        } elsif ( $bag{orig} =~ s/(\w+)-ass (\w+)/$1 ass-$2/ ) {
+        } elsif ( &config("max_sub_length")
+            and length( $bag{orig} ) < &config("max_sub_length")
+            and $bag{orig} =~ s/(\w+)-ass (\w+)/$1 ass-$2/ )
+        {
             $stats{ass}++;
             &say( $bag{chl} => $bag{orig} );
-        } elsif ( $bag{orig} =~ s/\bthe fucking\b/fucking the/ ) {
+        } elsif ( &config("max_sub_length")
+            and length( $bag{orig} ) < &config("max_sub_length")
+            and $bag{orig} =~ s/\bthe fucking\b/fucking the/ )
+        {
             $stats{fucking}++;
             &say( $bag{chl} => $bag{orig} );
         } elsif (
+            &config("max_sub_length")
+            and length( $bag{orig} ) < &config("max_sub_length")
+            and
+
             $bag{orig} !~ /extra|except/
             and rand(100) < &config("ex_to_sex")
             and (  $bag{orig} =~ s/\ban ex/a sex/
