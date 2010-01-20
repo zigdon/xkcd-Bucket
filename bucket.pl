@@ -1319,13 +1319,13 @@ sub db_success {
         if (
                 $bag{editable}
             and $bag{addressed}
-            and (  $bag{orig} =~ /(.*?) (?:is ?|are ?)(<\w+>)\s*(.*)/i
-                or $bag{orig} =~ /(.*?)\s+(<\w+(?:'t)?>)\s*(.*)/i
-                or $bag{orig} =~ /(.*?)(<'s>)\s+(.*)/i
+            and (  $bag{orig} =~ /(.*?) (?:is ?|are ?)(<\w+>)\s*(.*)()/i
+                or $bag{orig} =~ /(.*?)\s+(<\w+(?:'t)?>)\s*(.*)()/i
+                or $bag{orig} =~ /(.*?)(<'s>)\s+(.*)()/i
                 or $bag{orig} =~ /(.*?)\s+(is(?: also)?|are)\s+(.*)/i )
           )
         {
-            my ( $fact, $verb, $tidbit ) = ( $1, $2, $3 );
+            my ( $fact, $verb, $tidbit, $forced ) = ( $1, $2, $3, defined $4 );
 
             if ( not $bag{addressed} and $fact =~ /^[^a-zA-Z]*<.?\S+>/ ) {
                 Log "Not learning from what seems to be an IRC quote: $fact";
@@ -1334,9 +1334,9 @@ sub db_success {
                 return;
             }
 
-            if ( $tidbit =~ m#=~\s*s/#i ) {
-                Log "Not learning what looks like a botched s/// query";
-                &say( $bag{chl} => "$bag{who}: Fix your s/// command." );
+            if ( $tidbit =~ /=~/ and not $forced) {
+                Log "Not learning what looks like a botched =~ query";
+                &say( $bag{chl} => "$bag{who}: Fix your =~ command." );
                 return;
             }
 
@@ -1355,7 +1355,7 @@ sub db_success {
             } elsif ( $verb eq 'is also' ) {
                 $also = 1;
                 $verb = 'is';
-            } elsif ( $verb =~ /^</ and $verb =~ />$/ ) {
+            } elsif ( $forced ) {
                 $bag{forced} = 1;
                 if ( $verb ne '<action>' and $verb ne '<reply>' ) {
                     $verb =~ s/^<|>$//g;
