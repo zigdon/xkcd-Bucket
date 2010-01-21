@@ -254,8 +254,8 @@ sub irc_on_public {
     if ( &config("history_size") and &config("history_size") > 0 ) {
         push @{ $history{$chl} }, [ $who, $type, $msg ];
 
-        if ( @{ $history{$chl} } > &config("history_size") ) {
-            shift @{ $history{$chl} };
+        while ( @{ $history{$chl} } > &config("history_size") ) {
+            last unless shift @{ $history{$chl} };
         }
     }
 
