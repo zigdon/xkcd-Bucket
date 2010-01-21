@@ -1919,8 +1919,8 @@ sub db_success {
         }
 
         if ( $line{id} ) {
-            &sql( 'update bucket_facts ignore set fact=? where fact=?',
-                [ $bag{src}, $bag{dst} ] );
+            &sql( 'update ignore bucket_facts set fact=? where fact=?',
+                [ $bag{dst}, $bag{src} ] );
             &sql( 'delete from bucket_facts where fact=?', [ $bag{src} ] );
         }
 
