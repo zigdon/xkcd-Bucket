@@ -532,12 +532,8 @@ sub irc_on_public {
             $replacables{ lc $fact }{perms} =
               $protect ? "read-only" : "editable";
         } else {
-            $_[KERNEL]->post(
-                db  => "DO",
-                SQL => 'update bucket_facts set protected=? where fact=?',
-                PLACEHOLDERS => [ $protect, $fact ],
-                EVENT        => "db_success",
-            );
+            &sql( 'update bucket_facts set protected=? where fact=?',
+                [ $protect, $fact ] );
         }
         &say( $chl => "Okay, $who, updated the protection bit." );
     } elsif ( $addressed and $msg =~ /^restore topic(?: (#\S+))?/ ) {
@@ -569,11 +565,9 @@ sub irc_on_public {
         }
         Log Dumper $undo;
         if ( $undo->[0] eq 'delete' ) {
-            $_[KERNEL]->post(
-                db           => "DO",
-                SQL          => 'delete from bucket_facts where id=? limit 1',
-                PLACEHOLDERS => [ $undo->[2] ],
-                EVENT        => "db_success",
+            &sql(
+                'delete from bucket_facts where id=? limit 1',
+                [ $undo->[2] ],
             );
             Report "$who called undo: deleted $undo->[3].";
             &say( $chl => "Okay, $who, deleted $undo->[3]." );
@@ -584,16 +578,11 @@ sub irc_on_public {
                     my %old = %$entry;
                     $old{RE}        = 0 unless $old{RE};
                     $old{protected} = 0 unless $old{protected};
-                    $_[KERNEL]->post(
-                        db  => "DO",
-                        SQL => 'insert bucket_facts 
-                                (fact, verb, tidbit, protected, RE, mood, chance)
-                                values(?, ?, ?, ?, ?, ?, ?)',
-                        PLACEHOLDERS => [
-                            @old{ qw/fact verb tidbit protected RE mood chance/
-                              }
-                        ],
-                        EVENT => "db_success",
+                    &sql(
+                        'insert bucket_facts 
+                          (fact, verb, tidbit, protected, RE, mood, chance)
+                          values(?, ?, ?, ?, ?, ?, ?)',
+                        [ @old{qw/fact verb tidbit protected RE mood chance/} ],
                     );
                 }
                 Report "$who called undo: undeleted $undo->[3].";
@@ -602,15 +591,11 @@ sub irc_on_public {
                 my %old = %{ $undo->[2] };
                 $old{RE}        = 0 unless $old{RE};
                 $old{protected} = 0 unless $old{protected};
-                $_[KERNEL]->post(
-                    db  => "DO",
-                    SQL => 'insert bucket_facts 
-                            (id, fact, verb, tidbit, protected, RE, mood, chance)
-                            values(?, ?, ?, ?, ?, ?, ?, ?)',
-                    PLACEHOLDERS => [
-                        @old{qw/id fact verb tidbit protected RE mood chance/}
-                    ],
-                    EVENT => "db_success",
+                &sql(
+                    'insert bucket_facts 
+                      (id, fact, verb, tidbit, protected, RE, mood, chance)
+                      values(?, ?, ?, ?, ?, ?, ?, ?)',
+                    [ @old{qw/id fact verb tidbit protected RE mood chance/} ],
                 );
                 Report "$who called undo:",
                   "unforgot $old{fact} $old{verb} $old{tidbit}.";
@@ -626,29 +611,24 @@ sub irc_on_public {
             if ( $undo->[2] and ref $undo->[2] eq 'ARRAY' ) {
                 foreach my $entry ( @{ $undo->[2] } ) {
                     if ( $entry->[0] eq 'update' ) {
-                        $_[KERNEL]->post(
-                            db  => "DO",
-                            SQL => 'update bucket_facts
-                                            set verb=?, tidbit=? where id=? limit 1',
-                            PLACEHOLDERS =>
-                              [ $entry->[2], $entry->[3], $entry->[1] ],
-                            EVENT => "db_success",
+                        &sql(
+                            'update bucket_facts set verb=?, tidbit=? 
+                              where id=? limit 1',
+                            [ $entry->[2], $entry->[3], $entry->[1] ],
                         );
                     } elsif ( $entry->[0] eq 'insert' ) {
                         my %old = %{ $entry->[1] };
                         $old{RE}        = 0 unless $old{RE};
                         $old{protected} = 0 unless $old{protected};
-                        $_[KERNEL]->post(
-                            db  => "DO",
-                            SQL => 'insert bucket_facts 
-                                    (fact, verb, tidbit, protected, RE, mood, chance)
-                                    values(?, ?, ?, ?, ?, ?, ?)',
-                            PLACEHOLDERS => [
+                        &sql(
+                            'insert bucket_facts 
+                              (fact, verb, tidbit, protected, RE, mood, chance)
+                              values(?, ?, ?, ?, ?, ?, ?)',
+                            [
                                 @old{
                                     qw/fact verb tidbit protected RE mood chance/
                                   }
                             ],
-                            EVENT => "db_success",
                         );
                     }
                 }
@@ -662,6 +642,24 @@ sub irc_on_public {
         } else {
             &say( $chl => "Sorry, $who, can't undo $undo->[0] yet" );
         }
+    } elsif ( $addressed and $operator and $msg =~ /^merge (.*) => (.*)/ ) {
+        my ( $src, $dst ) = ( $1, $2 );
+        $stats{merge}++;
+
+        $_[KERNEL]->post(
+            db  => 'SINGLE',
+            SQL => 'select id, verb, tidbit 
+                    from bucket_facts where fact = ? limit 1',
+            PLACEHOLDERS => [$src],
+            BAGGAGE      => {
+                cmd => "merge",
+                chl => $chl,
+                src => $src,
+                dst => $dst,
+                who => $who,
+            },
+            EVENT => 'db_success'
+        );
     } elsif ( $addressed and $operator and $msg =~ /^alias (.*) => (.*)/ ) {
         my ( $src, $dst ) = ( $1, $2 );
         $stats{alias}++;
@@ -766,7 +764,8 @@ sub irc_on_public {
           $awake, $units;
 
         if ( $awake != $mod or $units ne $modu ) {
-            $reply .= sprintf "and was last changed about %d %s ago. ", $mod, $modu;
+            $reply .= sprintf "and was last changed about %d %s ago. ", $mod,
+              $modu;
         } else {
             $reply .= "and that was when I was last changed. ";
         }
@@ -1334,7 +1333,7 @@ sub db_success {
                 return;
             }
 
-            if ( $tidbit =~ /=~/ and not $forced) {
+            if ( $tidbit =~ /=~/ and not $forced ) {
                 Log "Not learning what looks like a botched =~ query";
                 &say( $bag{chl} => "$bag{who}: Fix your =~ command." );
                 return;
@@ -1355,7 +1354,7 @@ sub db_success {
             } elsif ( $verb eq 'is also' ) {
                 $also = 1;
                 $verb = 'is';
-            } elsif ( $forced ) {
+            } elsif ($forced) {
                 $bag{forced} = 1;
                 if ( $verb ne '<action>' and $verb ne '<reply>' ) {
                     $verb =~ s/^<|>$//g;
@@ -1717,12 +1716,10 @@ sub db_success {
                 } else {
                     ( $verb, $tidbit ) = split ' ', $fact, 2;
                 }
-                $_[KERNEL]->post(
-                    db  => "DO",
-                    SQL => 'update bucket_facts set verb=?, tidbit=?
-                            where id=? limit 1',
-                    PLACEHOLDERS => [ $verb, $tidbit, $line->{id} ],
-                    EVENT        => "db_success",
+                &sql(
+                    'update bucket_facts set verb=?, tidbit=?
+                       where id=? limit 1',
+                    [ $verb, $tidbit, $line->{id} ],
                 );
                 push @{ $undo{ $bag{chl} }[2] },
                   [ 'update', $line->{id}, $line->{verb}, $line->{tidbit} ];
@@ -1732,11 +1729,9 @@ sub db_success {
                   . " in $bag{chl}: $line->{verb} $line->{tidbit}";
                 Log "$bag{who} deleted $bag{fact}($line->{id}):"
                   . " $line->{verb} $line->{tidbit}";
-                $_[KERNEL]->post(
-                    db  => "DO",
-                    SQL => 'delete from bucket_facts where id=? limit 1',
-                    PLACEHOLDERS => [ $line->{id} ],
-                    EVENT        => "db_success",
+                &sql(
+                    'delete from bucket_facts where id=? limit 1',
+                    [ $line->{id} ],
                 );
                 push @{ $undo{ $bag{chl} }[2] }, [ 'insert', {%$line} ];
             } else {
@@ -1785,12 +1780,7 @@ sub db_success {
         Report "$bag{who} called forget to delete "
           . "'$line{fact}', '$line{verb}', '$line{tidbit}'";
         Log "forgetting $bag{fact}";
-        $_[KERNEL]->post(
-            db           => "DO",
-            SQL          => 'delete from bucket_facts where id=?',
-            PLACEHOLDERS => [ $line{id} ],
-            EVENT        => "db_success",
-        );
+        &sql( 'delete from bucket_facts where id=?', [ $line{id} ], );
         &say(
             $bag{chl} => "Okay, $bag{who}, forgot that",
             "$line{fact} $line{verb} $line{tidbit}"
@@ -1820,12 +1810,7 @@ sub db_success {
         $undo{ $bag{chl} } = [ 'insert', $bag{who}, \@lines, $bag{fact} ];
         Report "$bag{who} deleted '$bag{fact}' in $bag{chl}";
         Log "deleting $bag{fact}";
-        $_[KERNEL]->post(
-            db           => "DO",
-            SQL          => 'delete from bucket_facts where fact=?',
-            PLACEHOLDERS => [ $bag{fact} ],
-            EVENT        => "db_success",
-        );
+        &sql( 'delete from bucket_facts where fact=?', [ $bag{fact} ], );
         my $s = "";
         $s = "s" unless @lines == 1;
         &say(   $bag{chl} => "Okay, $bag{who}, "
@@ -1924,6 +1909,29 @@ sub db_success {
             Log "Updating cache for '$bag{fact}'";
             &cache( $_[KERNEL], $bag{fact} );
         }
+    } elsif ( $bag{cmd} eq 'merge' ) {
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        Report "$bag{who} merged in $bag{chl} '$bag{src}' to '$bag{dst}'";
+        Log "$bag{who} merged '$bag{src}' to '$bag{dst}'";
+        if ( $line{id} and $line{verb} eq '<alias>' ) {
+            &say( $bag{chl} => "Sorry, $bag{who}, those are already merged." );
+            return;
+        }
+
+        if ( $line{id} ) {
+            &sql( 'update bucket_facts ignore set fact=? where fact=?',
+                [ $bag{src}, $bag{dst} ] );
+            &sql( 'delete from bucket_facts where fact=?', [ $bag{src} ] );
+        }
+
+        &sql(
+            'insert bucket_facts (fact, verb, tidbit, protected)
+                     values (?, "<alias>", ?, 1)',
+            [ $bag{src}, $bag{dst} ],
+        );
+
+        &say( $bag{chl} => "Okay, $bag{who}." );
+        $undo{ $bag{chl} } = ['merge'];
     } elsif ( $bag{cmd} eq 'alias1' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
         if ( $line{id} and $line{verb} ne '<alias>' ) {
