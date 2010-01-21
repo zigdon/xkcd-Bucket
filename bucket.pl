@@ -365,7 +365,7 @@ sub irc_on_public {
         $msg =~ m{ (.*?)             # $1 key to look up
                    \s+(?:=~|~=)\s+   # match operator
                    /                 # start match
-                     (               # $2 - string to replace
+                     (               # $2 - string to search
                       (?:
                         \\/ |        # escaped slashes are ok
                         [^/]         # anything but a slash
@@ -385,7 +385,7 @@ sub irc_on_public {
             msg       => $msg,
             who       => $who,
             addressed => $addressed,
-            editable  => $editable,
+            editable  => 0,
             op        => $operator,
             search    => $search,
         );
