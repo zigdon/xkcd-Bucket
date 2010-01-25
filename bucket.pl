@@ -2352,10 +2352,6 @@ sub check_idle {
             "http://twitter.com/statuses/user_timeline/62581962.rss",
             qr/^shitmydadsays: "|"$/, "link"
         ],
-        IMMD => [
-            "http://feeds.feedburner.com/immd", qr/IMMD.*/,
-            "feedburner:origLink"
-        ],
         FAPSB => [
             "http://twitter.com/statuses/user_timeline/83883736.rss",
             qr/^FakeAPStylebook: /, "link"
