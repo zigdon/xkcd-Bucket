@@ -792,13 +792,13 @@ sub irc_on_public {
             }
             $reply .= &make_list(@fact_stats) . ". ";
         }
-        $reply .= sprintf "I know now a total of %d thing%s "
-          . "about %d subject%s. ",
-          $stats{rows},     &s( $stats{rows} ),
-          $stats{triggers}, &s( $stats{triggers} );
-        $reply .= sprintf "I know of %d object%s"
+        $reply .= sprintf "I know now a total of %s thing%s "
+          . "about %s subject%s. ",
+          &commify($stats{rows}),     &s( $stats{rows} ),
+          &commify($stats{triggers}), &s( $stats{triggers} );
+        $reply .= sprintf "I know of %s object%s"
           . " and am carrying %d of them. ",
-          $stats{items}, &s( $stats{items} ), scalar @inventory;
+          &commify($stats{items}), &s( $stats{items} ), scalar @inventory;
         if ( $talking{$chl} == 0 ) {
             $reply .= "I'm being quiet right now. ";
         } elsif ( $talking{$chl} > 0 ) {
@@ -2502,6 +2502,12 @@ sub make_list {
 
 sub s {
     return $_[0] == 1 ? "" : "s";
+}
+
+sub commify {
+    my $num = shift;
+    1 while ($num =~ s/(\d)(\d\d\d)\b/$1,$2/);
+    return $num;
 }
 
 sub round_time {
