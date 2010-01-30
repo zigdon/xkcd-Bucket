@@ -2364,6 +2364,10 @@ sub check_idle {
             "http://twitter.com/statuses/user_timeline/83883736.rss",
             qr/^FakeAPStylebook: /, "link"
         ],
+        FAF => [
+            "http://twitter.com/statuses/user_timeline/14062390.rss",
+            qr/^fakeanimalfacts: /, "http"
+        ],
         factoid => 1
     );
     my $source = &config("idle_source");
