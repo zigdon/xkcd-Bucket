@@ -1254,6 +1254,14 @@ sub db_success {
     }
     my %bag = ref $res->{BAGGAGE} ? %{ $res->{BAGGAGE} } : {};
     if ( $res->{ERROR} ) {
+
+        if ($res->{ERROR} eq 'Lost connection to the database server.') {
+            Report "DB Error: $res->{ERROR}  Restarting.";
+            Log "DB Error: $res->{ERROR}";
+            &say( $channel => "Lost my database!  I'll be right back." );
+            $irc->yield( quit => "Eep, the house is on fire!" );
+            return;
+        }
         Report "DB Error: $res->{QUERY} -> $res->{ERROR}";
         Log "DB Error: $res->{QUERY} -> $res->{ERROR}";
         &error( $bag{chl}, $bag{who} ) if $bag{chl};
