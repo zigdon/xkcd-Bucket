@@ -1292,6 +1292,7 @@ sub db_success {
             $bag{msg}  = $line{fact} unless defined $bag{msg};
             $bag{orig} = $line{fact} unless defined $bag{orig};
 
+            $stats{last_vars}{ $bag{chl} } = {};
             $stats{last_fact}{ $bag{chl} } = $bag{alias_id} || $line{id};
             $stats{lookup}++;
 
@@ -2636,8 +2637,6 @@ sub sql {
 
 sub expand {
     my ( $who, $chl, $msg, $editable ) = @_;
-
-    $stats{last_vars}{$chl} = {};
 
     my $gender = $stats{users}{genders}{ lc $who };
     my $target = $who;
