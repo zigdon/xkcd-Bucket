@@ -1920,8 +1920,8 @@ sub db_success {
         }
     } elsif ( $bag{cmd} eq 'merge' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
-        Report "$bag{who} merged in $bag{chl} '$bag{src}' to '$bag{dst}'";
-        Log "$bag{who} merged '$bag{src}' to '$bag{dst}'";
+        Report "$bag{who} merged in $bag{chl} '$bag{src}' with '$bag{dst}'";
+        Log "$bag{who} merged '$bag{src}' with '$bag{dst}'";
         if ( $line{id} and $line{verb} eq '<alias>' ) {
             &say( $bag{chl} => "Sorry, $bag{who}, those are already merged." );
             return;
