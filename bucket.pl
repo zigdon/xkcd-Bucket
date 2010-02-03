@@ -678,7 +678,7 @@ sub irc_on_public {
             },
             EVENT => 'db_success'
         );
-    } elsif ( $operator and $addressed and $msg =~ /^lookup (\d+)$/ ) {
+    } elsif ( $operator and $addressed and $msg =~ /^lookup #?(\d+)$/ ) {
         $_[KERNEL]->post(
             db  => 'SINGLE',
             SQL => 'select id, fact, verb, tidbit from bucket_facts 
