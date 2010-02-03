@@ -2446,16 +2446,16 @@ sub clear_cache {
         }
     }
 
-    foreach my $channel ( keys %{ $stats{last_talk} } ) {
-        foreach my $user ( keys %{ $stats{last_talk}{$channel} } ) {
-            if ( not $stats{last_talk}{$channel}{$user}{when}
-                or $stats{last_talk}{$channel}{$user}{when} >
+    foreach my $chl ( keys %{ $stats{last_talk} } ) {
+        foreach my $user ( keys %{ $stats{last_talk}{$chl} } ) {
+            if ( not $stats{last_talk}{$chl}{$user}{when}
+                or $stats{last_talk}{$chl}{$user}{when} >
                 &config("user_activity_timeout") )
             {
-                if ( $stats{last_talk}{$chl}{$who}{count} > 20 ) {
-                    Report "Clearing flood flag for $user in $channel";
+                if ( $stats{last_talk}{$chl}{$user}{count} > 20 ) {
+                    Report "Clearing flood flag for $user in $chl";
                 }
-                delete $stats{last_talk}{$channel}{$user};
+                delete $stats{last_talk}{$chl}{$user};
             }
         }
     }
