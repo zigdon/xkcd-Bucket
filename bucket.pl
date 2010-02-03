@@ -2452,6 +2452,7 @@ sub clear_cache {
               or $stats{last_talk}{$channel}{$user}{when} >
               &config("user_activity_timeout") )
           {
+              Report "Clearing flood flag for $user in $channel";
               delete $stats{last_talk}{$channel}{$user};
           }
         }
