@@ -284,6 +284,18 @@ sub irc_on_public {
         $msg =~ s/^\S+://;
     }
 
+    # flood protection
+    if ( not $operator and $addressed ) {
+        if ( $stats{last_talk}{$chl}{$who}{count}++ > 20
+            and time - $stats{last_talk}{$chl}{$who}{when} <
+            &config("user_activity_timeout") )
+        {
+            Report "Ignoring $who who is flooding in $chl.";
+            return;
+        }
+        $stats{last_talk}{$chl}{$who}{when} = time;
+    }
+
     $msg =~ s/^\s+|\s+$//g;
 
     # == 0 - shut up by operator
@@ -794,11 +806,11 @@ sub irc_on_public {
         }
         $reply .= sprintf "I know now a total of %s thing%s "
           . "about %s subject%s. ",
-          &commify($stats{rows}),     &s( $stats{rows} ),
-          &commify($stats{triggers}), &s( $stats{triggers} );
+          &commify( $stats{rows} ),     &s( $stats{rows} ),
+          &commify( $stats{triggers} ), &s( $stats{triggers} );
         $reply .= sprintf "I know of %s object%s"
           . " and am carrying %d of them. ",
-          &commify($stats{items}), &s( $stats{items} ), scalar @inventory;
+          &commify( $stats{items} ), &s( $stats{items} ), scalar @inventory;
         if ( $talking{$chl} == 0 ) {
             $reply .= "I'm being quiet right now. ";
         } elsif ( $talking{$chl} > 0 ) {
@@ -1255,7 +1267,7 @@ sub db_success {
     my %bag = ref $res->{BAGGAGE} ? %{ $res->{BAGGAGE} } : {};
     if ( $res->{ERROR} ) {
 
-        if ($res->{ERROR} eq 'Lost connection to the database server.') {
+        if ( $res->{ERROR} eq 'Lost connection to the database server.' ) {
             Report "DB Error: $res->{ERROR}  Restarting.";
             Log "DB Error: $res->{ERROR}";
             &say( $channel => "Lost my database!  I'll be right back." );
@@ -2433,6 +2445,17 @@ sub clear_cache {
                   time - &config("user_activity_timeout");
         }
     }
+
+    foreach my $channel ( keys %{ $stats{last_talk} } ) {
+        foreach my $user ( keys %{ $stats{last_talk}{$channel} } ) {
+          if ( not $stats{last_talk}{$channel}{$user}{when}
+              or $stats{last_talk}{$channel}{$user}{when} >
+              &config("user_activity_timeout") )
+          {
+              delete $stats{last_talk}{$channel}{$user};
+          }
+        }
+    }
 }
 
 sub random_item_cache {
@@ -2519,7 +2542,7 @@ sub s {
 
 sub commify {
     my $num = shift;
-    1 while ($num =~ s/(\d)(\d\d\d)\b/$1,$2/);
+    1 while ( $num =~ s/(\d)(\d\d\d)\b/$1,$2/ );
     return $num;
 }
 
