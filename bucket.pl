@@ -45,7 +45,7 @@ $SIG{CHLD} = 'IGNORE';
 $|++;
 
 ### IRC portion
-my $configfile = "/home/bucket/bucket.yml";
+my $configfile = shift || "bucket.yml";
 my $config     = LoadFile($configfile);
 my $nick       = &config("nick") || "Bucket";
 my $pass       = &config("password") || "somethingsecret";
