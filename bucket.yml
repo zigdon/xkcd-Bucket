@@ -9,8 +9,15 @@ db_username: DBUsername
 password: NickservPassword
 logfile: /path/to/log/file
 logchannel: #logChannel
+control_channel: #InviteOnlyChannel
+main_channel: #xkcd
+nick: bucketClone
 bucketlog: /path/to/external/log
 timeout: 60
+server: irc.example.com
 ignore:
   billygoat: 1
   flyingferret: 1
+
+
+
