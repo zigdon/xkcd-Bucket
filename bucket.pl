@@ -53,7 +53,7 @@ $nick = DEBUG ? ( &config("debug_nick") || "bucketgoat" ) : $nick;
 my $channel =
   DEBUG
   ? ( &config("debug_channel") || "#bucket" )
-  : ( &config("controll_channel") || "#billygoat" );
+  : ( &config("control_channel") || "#billygoat" );
 my ($irc) = POE::Component::IRC::State->spawn();
 my %channels = ( $channel => 1 );
 my $mainchannel = &config("main_channel") || "#xkcd";
