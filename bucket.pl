@@ -1287,7 +1287,7 @@ sub db_success {
     return unless $bag{cmd};
 
     if ( $bag{cmd} eq 'fact' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         if ( defined $line{tidbit} ) {
 
             if ( $line{verb} eq '<alias>' ) {
@@ -1562,7 +1562,7 @@ sub db_success {
             Log "ERR: create_var called without an INSERTID!";
         }
     } elsif ( $bag{cmd} eq 'load_gender' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         $stats{users}{genders}{ lc $bag{nick} } = $line{gender}
           || "androgynous";
     } elsif ( $bag{cmd} eq 'load_vars' ) {
@@ -1669,7 +1669,7 @@ sub db_success {
                   "Sorry, $bag{who}, failed to dump out $bag{name}: $!" );
         }
     } elsif ( $bag{cmd} eq 'band_name' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         unless ( $line{value} ) {
             my @words = sort { length $b <=> length $a } @{ $bag{words} };
             $_[KERNEL]->post(
@@ -1685,7 +1685,7 @@ sub db_success {
             );
         }
     } elsif ( $bag{cmd} eq 'band_name2' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         unless ( $line{id} ) {
             &sql(
                 'insert into bucket_values (var_id, value) 
@@ -1798,7 +1798,7 @@ sub db_success {
         &error( $bag{chl}, $bag{who} );
         Log "$bag{who}: $bag{fact} =~ s/// failed";
     } elsif ( $bag{cmd} eq 'forget' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         unless ( keys %line ) {
             &error( $bag{chl}, $bag{who} );
             Log "Nothing to forget in '$bag{id}'";
@@ -1815,7 +1815,7 @@ sub db_success {
             "$line{fact} $line{verb} $line{tidbit}"
         );
     } elsif ( $bag{cmd} eq 'delete_id' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         unless ( $line{fact} ) {
             &error( $bag{chl}, $bag{who} );
             Log "Nothing found in id $bag{fact}";
@@ -1846,7 +1846,7 @@ sub db_success {
               . scalar @lines
               . " factoid$s deleted." );
     } elsif ( $bag{cmd} eq 'unalias' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         my $fact = $bag{fact};
         if ( $line{id} ) {
             Log "Dealiased $fact => $line{tidbit}";
@@ -1865,7 +1865,7 @@ sub db_success {
             EVENT => 'db_success'
         );
     } elsif ( $bag{cmd} eq 'learn1' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         if ( $line{id} ) {
             &say( $bag{chl} => "$bag{who}: I already had it that way" );
             return;
@@ -1879,7 +1879,7 @@ sub db_success {
             EVENT        => 'db_success'
         );
     } elsif ( $bag{cmd} eq 'learn2' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         if ( $line{protected} ) {
             if ( $bag{op} ) {
                 unless ( $bag{forced} ) {
@@ -1939,7 +1939,7 @@ sub db_success {
             &cache( $_[KERNEL], $bag{fact} );
         }
     } elsif ( $bag{cmd} eq 'merge' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         Report "$bag{who} merged in $bag{chl} '$bag{src}' with '$bag{dst}'";
         Log "$bag{who} merged '$bag{src}' with '$bag{dst}'";
         if ( $line{id} and $line{verb} eq '<alias>' ) {
@@ -1962,7 +1962,7 @@ sub db_success {
         &say( $bag{chl} => "Okay, $bag{who}." );
         $undo{ $bag{chl} } = ['merge'];
     } elsif ( $bag{cmd} eq 'alias1' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         if ( $line{id} and $line{verb} ne '<alias>' ) {
             &say( $bag{chl} => "Sorry, $bag{who}, "
                   . "there is already a factoid for '$bag{src}'." );
@@ -1985,7 +1985,7 @@ sub db_success {
         }
         Log "Cached " . scalar(@lines) . " factoids for $bag{key}";
     } elsif ( $bag{cmd} eq 'report' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
+        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
 
         if ( $line{id} ) {
             if ( keys %{ $stats{last_vars}{ $bag{chl} } } ) {
