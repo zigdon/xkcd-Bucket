@@ -286,14 +286,18 @@ sub irc_on_public {
 
     # flood protection
     if ( not $operator and $addressed ) {
+        $stats{last_talk}{$chl}{$who}{when} = time;
         if ( $stats{last_talk}{$chl}{$who}{count}++ > 20
             and time - $stats{last_talk}{$chl}{$who}{when} <
             &config("user_activity_timeout") )
         {
             Report "Ignoring $who who is flooding in $chl.";
+            if ( $stats{last_talk}{$chl}{$who}{count} == 21 ) {
+                &say( $chl =>
+                      "$who, I'm a bit busy now, try again in 5 minutes?" );
+            }
             return;
         }
-        $stats{last_talk}{$chl}{$who}{when} = time;
     }
 
     $msg =~ s/^\s+|\s+$//g;
