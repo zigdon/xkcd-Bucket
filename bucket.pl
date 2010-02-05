@@ -1576,19 +1576,21 @@ sub db_success {
         Log "Small vars: @small";
         Log "Large vars: @large";
 
-        # load the smaller variables
-        $_[KERNEL]->post(
-            db  => 'MULTIPLE',
-            SQL => 'select vars.id id, name, perms, type, value 
-                    from bucket_vars vars 
-                         left join bucket_values vals 
-                         on vars.id = vals.var_id  
-                    where name in (' . join( ",", map { "?" } @small ) . ')
-                    order by vars.id',
-            PLACEHOLDERS => \@small,
-            BAGGAGE      => { cmd => "load_vars_cache", },
-            EVENT        => 'db_success'
-        );
+        if (@small) {
+          # load the smaller variables
+          $_[KERNEL]->post(
+              db  => 'MULTIPLE',
+              SQL => 'select vars.id id, name, perms, type, value 
+                      from bucket_vars vars 
+                           left join bucket_values vals 
+                           on vars.id = vals.var_id  
+                      where name in (' . join( ",", map { "?" } @small ) . ')
+                      order by vars.id',
+              PLACEHOLDERS => \@small,
+              BAGGAGE      => { cmd => "load_vars_cache", },
+              EVENT        => 'db_success'
+          );
+        }
 
         # make note of the larger variables, and preload a cache
         foreach my $var (@large) {
