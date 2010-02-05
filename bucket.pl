@@ -2364,7 +2364,8 @@ sub check_idle {
     $_[KERNEL]->delay( check_idle => 60 );
 
     my $chl = DEBUG ? $channel : $mainchannel;
-    return if time - $last_activity{$chl} < 60 * &config("random_wait");
+    return if &config("random_wait") == 0 or
+              time - $last_activity{$chl} < 60 * &config("random_wait");
 
     return if $stats{last_idle_time}{$chl} > $last_activity{$chl};
 
