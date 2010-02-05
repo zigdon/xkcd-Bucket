@@ -1268,7 +1268,7 @@ sub db_success {
             print "$_:\n", Dumper $res->{$_};
         }
     }
-    my %bag = ref $res->{BAGGAGE} ? %{ $res->{BAGGAGE} } : {};
+    my %bag = ref $res->{BAGGAGE} ? %{ $res->{BAGGAGE} } : ();
     if ( $res->{ERROR} ) {
 
         if ( $res->{ERROR} eq 'Lost connection to the database server.' ) {
@@ -1283,6 +1283,8 @@ sub db_success {
         &error( $bag{chl}, $bag{who} ) if $bag{chl};
         return;
     }
+
+    return unless $bag{cmd};
 
     if ( $bag{cmd} eq 'fact' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : {};
@@ -2107,9 +2109,6 @@ sub db_success {
 
             &random_item_cache( $_[KERNEL] );
         }
-    } else {
-        Log "DB returned.",
-          "Query: $res->{QUERY}, Result: $res->{RESULT}, Bags: $res->{BAGGAGE}";
     }
 }
 
@@ -2161,7 +2160,8 @@ sub irc_start {
 
     $_[KERNEL]->delay( check_idle => 60 );
 
-    if ( -f &config("bucketlog") and open BLOG, &config("bucketlog") ) {
+    if ( &config("bucketlog") and -f &config("bucketlog")
+         and open BLOG, &config("bucketlog") ) {
         seek BLOG, 0, SEEK_END;
     }
 }
