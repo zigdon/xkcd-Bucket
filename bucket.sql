@@ -21,7 +21,7 @@ SET SQL_MODE="NO_AUTO_VALUE_ON_ZERO";
 
 CREATE TABLE IF NOT EXISTS `bucket_facts` (
   `id` int(10) unsigned NOT NULL auto_increment,
-  `fact` varchar(64) NOT NULL,
+  `fact` varchar(128) NOT NULL,
   `tidbit` text NOT NULL,
   `verb` varchar(16) NOT NULL default 'is',
   `RE` tinyint(1) NOT NULL,
