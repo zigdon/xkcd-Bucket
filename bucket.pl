@@ -79,6 +79,7 @@ my %config_keys = (
     inventory_size         => [ "i", 20 ],
     item_drop_rate         => [ "i", 3 ],
     max_sub_length         => [ "i", 80 ],
+    minimum_length         => [ "i", 6 ],
     random_item_cache_size => [ "i", 20 ],
     random_wait            => [ "i", 3 ],
     user_activity_timeout  => [ "i", 360 ],
@@ -1235,7 +1236,8 @@ sub irc_on_public {
     } else {
         my $orig = $msg;
         $msg = &trim($msg);
-        if ( $addressed or length $msg >= 6 or $msg eq '...' ) {
+        if ( $addressed or length $msg >= &config("minimum_length") or 
+             $msg eq '...' ) {
             if ( $addressed and length $msg == 0 ) {
                 $msg = $nick;
             }
