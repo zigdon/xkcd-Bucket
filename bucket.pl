@@ -340,26 +340,23 @@ sub irc_on_public {
       or ( $type eq 'irc_msg' and $operator );
     Log("$type($chl): $who(o=$operator, a=$addressed, e=$editable): $msg");
 
-    if (
-            $editable
+    if (    $addressed
+        and $editable
         and $msg =~ m{ (.*?)         # $1 key to edit
                    \s+(?:=~|~=)\s+   # match operator
-                   s/                # start match
-                     (               # $2 - string to replace
-                      (?:
-                        \\/ |        # escaped slashes are ok
-                        [^/]         # anything but a slash
-                      )+
-                     )               # end of $2
-                   /                 # separator
-                    (.*)             # $3 - text to replace with
-                   /
-                   ([gi]*)           # $4 - i/g flags
+                   s(\W)             # start match ($2 delimiter)
+                     (               # $3 - string to replace
+                       [^\2]+        # anything but a delimiter
+                     )               # end of $3
+                   \2                # separator
+                    (.*)             # $4 - text to replace with
+                   \2
+                   ([gi]*)           # $5 - i/g flags
                    \s* $             # trailing spaces
                  }x
       )
     {
-        my ( $fact, $old, $new, $flag ) = ( $1, $2, $3, $4 );
+        my ( $fact, $old, $new, $flag ) = ( $1, $3, $4, $5 );
         Report "$who is editing $fact in $chl: replacing '$old' with '$new'";
         Log "Editing $fact: replacing '$old' with '$new'";
         $_[KERNEL]->post(
@@ -381,21 +378,18 @@ sub irc_on_public {
     } elsif (
         $msg =~ m{ (.*?)             # $1 key to look up
                    \s+(?:=~|~=)\s+   # match operator
-                   /                 # start match
-                     (               # $2 - string to search
-                      (?:
-                        \\/ |        # escaped slashes are ok
-                        [^/]         # anything but a slash
-                      )+
-                     )               # end of $2
-                   /                 # separator
+                   (\W)              # start match (any delimiter, $2)
+                     (               # $3 - string to search
+                       [^\2]+        # anything but a delimiter
+                     )               # end of $3
+                   \2                # same delimiter that opened the match
             }x
       )
     {
-        my ( $fact, $search ) = ( $1, $2 );
-        $search =~ s{([\\/%?"'])}{\\$1}g;
+        my ( $fact, $search ) = ( $1, $3 );
+        $search =~ s{([%?"'])}{\\$1}g;
         $fact = &trim($fact);
-        $msg =~ s/ =~ \/$search\///;
+        $msg = $fact;
         Log "Looking up a particular factoid - '$search' in '$fact'";
         &lookup(
             chl       => $chl,
@@ -1724,7 +1718,6 @@ sub db_success {
           [ 'edit', $bag{who}, [], "$bag{fact} =~ s/$bag{old}/$bag{new}/" ];
 
         foreach my $line (@lines) {
-            $bag{old} =~ s{\\/}{/}g;
             my $fact = "$line->{verb} $line->{tidbit}";
             $fact = "$line->{verb} $line->{tidbit}" if $line->{verb} =~ /<.*>/;
             if ($gflag) {
