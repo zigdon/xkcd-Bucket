@@ -1,0 +1,14 @@
+Bucket is one of the 3 bots living in the IRC channel for #xkcd.  The source
+code for the bot is available here, as well as a sample database with a very
+minimal config.
+
+Note that the full database is not publicly available.
+
+For a sample of a few of the interactions Bucket is capable of, see the XKCD
+Quotes database: http://www.xkcdb.com/?search=bucket
+
+Bucket's documentation is (poorly) maintained here:
+http://wiki.xkcd.com/irc/Bucket#Docs
+
+Any bugs, feature requests or questions should be directed to zigdon at
+irc.foonetic.net.
