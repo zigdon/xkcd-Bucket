@@ -61,7 +61,7 @@ INSERT INTO `bucket_vars` (`id`, `name`, `perms`, `type`) VALUES
 (908, 'weekday', 'read-only', 'var'),
 (909, 'band', 'read-only', 'var');
 
-INSERT INTO `bucket_values` (`id`, `var_id`, `value`) VALUES
+INSERT INTO `bucket_values` (`var_id`, `value`) VALUES
 (901, 'hug'),
 (901, 'kiss'),
 (901, 'listen'),
