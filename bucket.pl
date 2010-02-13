@@ -26,6 +26,7 @@ use POE::Component::IRC::Plugin::Connector;
 use POE::Component::SimpleDBI;
 use Lingua::EN::Conjugate qw/past gerund/;
 use Lingua::EN::Inflect qw/A PL_N/;
+use Lingua::EN::Syllable qw//;    # don't import anything
 use YAML qw/LoadFile DumpFile/;
 use Data::Dumper;
 use Fcntl qw/:seek/;
@@ -72,6 +73,7 @@ my %config_keys = (
     band_name              => [ "p", 5 ],
     band_var               => [ "s", 'band' ],
     ex_to_sex              => [ "p", 1 ],
+    haiku_report           => [ "i", 1 ],
     history_size           => [ "i", 30 ],
     idle_source            => [ "s", 'factoid' ],
     increase_mute          => [ "i", 60 ],
@@ -326,6 +328,22 @@ sub irc_on_public {
         $chl = $who;
     }
 
+    if ( &config("haiku_report") ) {
+        $stats{haiku}{$chl} = [] unless $stats{haiku}{$chl};
+        push @{ $stats{haiku}{$chl} }, &count_syllables($msg);
+        shift @{ $stats{haiku}{$chl} } if @{ $stats{haiku}{$chl} } > 3;
+        Log "haiku tracking: ", join ", ", @{ $stats{haiku}{$chl} };
+        if (    $stats{haiku}{$chl}[0] == 5
+            and $stats{haiku}{$chl}[1] == 7
+            and $stats{haiku}{$chl}[2] == 5 )
+        {
+
+            &cached_reply( $chl, $who, "", "haiku detected" );
+            return;
+        }
+
+    }
+
     if ( &config("bananas_chance")
         and rand(100) < &config("bananas_chance") )
     {
@@ -338,7 +356,8 @@ sub irc_on_public {
       or ( $type eq 'irc_msg' and $operator );
     Log("$type($chl): $who(o=$operator, a=$addressed, e=$editable): $msg");
 
-    if (    $addressed
+    if (
+            $addressed
         and $editable
         and $msg =~ m{ (.*?)         # $1 key to edit
                    \s+(?:=~|~=)\s+   # match operator
@@ -387,7 +406,7 @@ sub irc_on_public {
         my ( $fact, $search ) = ( $1, $3 );
         $search =~ s{([%?"'])}{\\$1}g;
         $fact = &trim($fact);
-        $msg = $fact;
+        $msg  = $fact;
         Log "Looking up a particular factoid - '$search' in '$fact'";
         &lookup(
             chl       => $chl,
@@ -509,6 +528,13 @@ sub irc_on_public {
             $chl => "Currently ignored: ",
             join ", ", sort keys %{ $config->{ignore} }
         );
+    } elsif ( $addressed
+        and $operator
+        and $msg =~ /^(\w+) has (\d+) syllables?\W*$/i )
+    {
+        $config->{sylcheat}{ lc $1 } = $2;
+        &save;
+        &say( $chl => "Okay, $who.  Cheat sheet updated." );
     } elsif ( $addressed and $operator and $msg =~ /^(un)?ignore (\S+)/i ) {
         Report "$who is $1ignoring $2";
         if ($1) {
@@ -1228,8 +1254,10 @@ sub irc_on_public {
     } else {
         my $orig = $msg;
         $msg = &trim($msg);
-        if ( $addressed or length $msg >= &config("minimum_length") or 
-             $msg eq '...' ) {
+        if (   $addressed
+            or length $msg >= &config("minimum_length")
+            or $msg eq '...' )
+        {
             if ( $addressed and length $msg == 0 ) {
                 $msg = $nick;
             }
@@ -1573,19 +1601,20 @@ sub db_success {
         Log "Large vars: @large";
 
         if (@small) {
-          # load the smaller variables
-          $_[KERNEL]->post(
-              db  => 'MULTIPLE',
-              SQL => 'select vars.id id, name, perms, type, value 
+
+            # load the smaller variables
+            $_[KERNEL]->post(
+                db  => 'MULTIPLE',
+                SQL => 'select vars.id id, name, perms, type, value 
                       from bucket_vars vars 
                            left join bucket_values vals 
                            on vars.id = vals.var_id  
                       where name in (' . join( ",", map { "?" } @small ) . ')
                       order by vars.id',
-              PLACEHOLDERS => \@small,
-              BAGGAGE      => { cmd => "load_vars_cache", },
-              EVENT        => 'db_success'
-          );
+                PLACEHOLDERS => \@small,
+                BAGGAGE      => { cmd => "load_vars_cache", },
+                EVENT        => 'db_success'
+            );
         }
 
         # make note of the larger variables, and preload a cache
@@ -2138,6 +2167,7 @@ sub irc_start {
     &cache( $_[KERNEL], "list items" );
     &cache( $_[KERNEL], "duplicate item" );
     &cache( $_[KERNEL], "band name reply" );
+    &cache( $_[KERNEL], "haiku detected" );
     &random_item_cache( $_[KERNEL] );
     $stats{preloaded_items} = &config("inventory_preload");
 
@@ -2153,8 +2183,9 @@ sub irc_start {
 
     $_[KERNEL]->delay( check_idle => 60 );
 
-    if ( &config("bucketlog") and -f &config("bucketlog")
-         and open BLOG, &config("bucketlog") ) {
+    if ( &config("bucketlog") and -f &config("bucketlog") and open BLOG,
+        &config("bucketlog") )
+    {
         seek BLOG, 0, SEEK_END;
     }
 }
@@ -2357,8 +2388,9 @@ sub check_idle {
     $_[KERNEL]->delay( check_idle => 60 );
 
     my $chl = DEBUG ? $channel : $mainchannel;
-    return if &config("random_wait") == 0 or
-              time - $last_activity{$chl} < 60 * &config("random_wait");
+    return
+      if &config("random_wait") == 0
+          or time - $last_activity{$chl} < 60 * &config("random_wait");
 
     return if $stats{last_idle_time}{$chl} > $last_activity{$chl};
 
@@ -2903,4 +2935,196 @@ sub config {
     } else {
         return undef;
     }
+}
+
+sub count_syllables {
+    my $line = shift;
+
+    # add spaces to camelCased words
+    $line =~ s/([a-z])([A-Z])/\1 \2/g;
+
+    # then ignore case from here on
+    $line = lc $line;
+
+    # Deal with dates
+    # 1994 - nineteen ninty-four
+    # 2008 - two thousand eight or twenty oh eight
+    $line =~ s/\b(1[89]|20)(\d\d)\b/\1 \2/g;
+
+    # deal with comma-form numbers
+    $line =~ s/,(\d\d\d)/\1/g;
+
+    # Deal with > and < when in words or numbers, i.e. "sagan>all"
+    $line =~ s/([a-zA-Z\d ])>([a-zA-Z\d ])/\1 greater than \2/g;
+    $line =~ s/([a-zA-Z\d ])<([a-zA-Z\d ])/\1 less than \2/g;
+
+    # Deal with other crap like punctuation
+    $line =~ s/\.(com|org|net|info|biz|us)/ dot \1/g;
+    $line =~ s/www\./double you double you double you dot /g;
+    $line =~ s/[:,\/\*.!?]/ /g;
+
+    # Remove hyphens except when dealing with numbers
+    $line =~ s/-(\D|$)/ \1/g;
+
+    my @words = split ' ', $line;
+    my $syl = 0;
+    foreach my $word (@words) {
+
+        # The main call to syllablecount.
+        $syl += &syllables($word);
+    }
+
+    return $syl;
+}
+
+# Counts the syllables of a word passed to it.  Strips some formatting.
+sub syllables {
+    my $word = shift;
+
+    # Check against the cheat sheet dictionary for singular/plurals.
+    if ( $config->{sylcheat}{$word} ) {
+        return $config->{sylcheat}{$word};
+    }
+
+    if ( $word =~ /s$/ ) {
+        my $singular = $word;
+        $singular =~ s/'?s$//;
+        if ( $config->{sylcheat}{$singular} ) {
+            return $config->{sylcheat}{$singular};
+        }
+
+        $singular =~ s/se$/s/;
+        if ( $config->{sylcheat}{$singular} ) {
+            return $config->{sylcheat}{$singular};
+        }
+    }
+
+    if ( $word =~ /^([a-z])\1*$/ ) {    # Fixed for AAAAAAAAAAAAA and mmmmm
+        return 1;
+    }
+
+    # Check for non-words, just in case.  This is probably a bit too shotgun-y.
+    # Add special cases here or in the cheat sheet, but note that Some
+    # punctuation is already stripped.
+    if ( $word =~ /^[^a-zA-Z0-9]+$/ ) {
+        return 0;
+    }
+
+    # Check for likely acronyms (all-consonant string)
+    if ( $word =~ /^[bcdfghjklmnpqrstvwxz]+$/ ) {
+        return length($word);
+    }
+    $word =~ s/'//g;
+
+    # Handle numbers
+    if ( $word =~ /^[0-9]+$/ ) {
+        return &numbersyl($word);
+    }
+
+    # Handle negative numbers as "minus <num>"
+    if ( $word =~ /^-[0-9]+$/ ) {
+        $word =~ s/^-//;
+        return 2 + &numbersyl($word);
+    }
+
+    # These are all improvements to ths Syllable library which bring it
+    # from the author's estimated 85% accuracy to a much higher accuracy.
+
+    my $modsyl = 0;
+    $modsyl++ if ( $word =~ /e[^aeioun]eo/ );
+    $modsyl-- if ( $word =~ /e[^aeiou]eo([^s]$|u)/ );
+    $modsyl++ if ( $word =~ /[^aeiou]i[rl]e$/ );
+    $modsyl-- if ( $word =~ /[^cs]es$/ );
+    $modsyl++ if ( $word =~ /[cs]hes$/ );
+    $modsyl++ if ( $word =~ /[^aeiou][aeiou]ing/ );
+    $modsyl-- if ( $word =~ /[aeiou][^aeiou][e]ing/ );
+    $modsyl-- if ( $word =~ /(.[^adeiouyt])ed$/ );
+    $modsyl-- if ( $word =~ /[agq]ued$/ );
+    $modsyl++ if ( $word =~ /(oi|[gbfz])led/ );
+    $modsyl++ if ( $word =~ /[aeiou][^aeioub]le$/ );
+    $modsyl++ if ( $word =~ /ier$/ );
+    $modsyl-- if ( $word =~ /[cp]ally/ );
+
+    # force list context, there has to be a prettier way to do this?
+    $modsyl -= () = $word =~ m/eau/g;
+    $word =~ s/judgement/judgment/g;
+
+    return Lingua::EN::Syllable::syllable($word) + $modsyl;
+}
+
+# This routine pronounces numbers.
+# It should correctly handle all integers ranging 1 to 35 digits (hundreds of
+# decillions).  Higher than that would be more work and it will have too few
+# syllables by about (ln(n)/(3*ln(10))-35/3), and eventually more.
+
+# I'm not commenting it except to say it builds the total up from right to
+# left, and that it does not include the optional "and", saying "five hundred
+# six" instead of "five hundred and six".
+
+# If you'd like to understand how or why it works in more detail, you'll just
+# have to read it very carefully.
+
+sub numbersyl {
+    my $num = shift;
+    return 1 if ( $num eq "10" or $num eq "12" );
+    return 3 if ( $num eq "11" );
+    return 2 if ( $num eq "0" );
+    return 2 if ( $num eq "00" );
+
+    my $sylcount = 0;
+    if ( length $num > 15 ) {
+        $sylcount += int( ( length($num) - 13 ) / 3 );
+    }
+    my @chars = split //, $num;
+    if ( @chars == 2 ) {    # "03 == oh three"
+        if ( $chars[1] eq "0" ) {
+            return 1 + &seven( $chars[0] );
+        }
+    }
+    my $place          = 1;
+    my $futuresylcount = 0;
+    foreach my $digit ( reverse @chars ) {
+        if ($futuresylcount) {
+            $sylcount += $futuresylcount;
+            $futuresylcount = 0;
+        }
+        if ( $place == 1 ) {
+            $sylcount += &seven($digit);
+        }
+        if ( $place == 2 ) {
+            if ( $digit eq "0" ) {
+                $sylcount += 0;
+            } elsif ( $digit eq "1" ) {
+                $sylcount += 1;
+            } else {
+                $sylcount += 1 + &seven($digit);
+            }
+        }
+        if ( $place == 3 ) {
+            if ( $digit eq "0" ) {
+                $sylcount += 0;
+            } else {
+                $sylcount += 2 + &seven($digit);
+            }
+        }
+        if ( $place == 3 ) {
+            $futuresylcount += 2;
+            $place = 0;
+        }
+        $place++;
+    }
+    return $sylcount;
+}
+
+# Very simple routine.  Number of syllables in a single digit, except for 0
+# which is a special case in the routines it's used in.
+sub seven {
+    my $digit = shift;
+    if ( $digit eq "7" ) {
+        return 2;
+    }
+    if ( $digit eq "0" ) {
+        return 0;
+    }
+    return 1;
 }
