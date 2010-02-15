@@ -255,7 +255,34 @@ sub irc_on_public {
     }
 
     if ( &config("history_size") and &config("history_size") > 0 ) {
-        push @{ $history{$chl} }, [ $who, $type, $msg ];
+        if ( &config("haiku_report") ) {
+            push @{ $history{$chl} }, [ $who, $type, $msg, &count_syllables($msg) ];
+            if (    @{$history{$chl}} > 3
+                and $history{$chl}[-1][3] == 5
+                and $history{$chl}[-2][3] == 7
+                and $history{$chl}[-3][3] == 5 )
+            {
+                my @haiku;
+                push @haiku, [ @{$history{$chl}[-3]}[0, 2] ];
+                push @haiku, [ @{$history{$chl}[-2]}[0, 2] ];
+                push @haiku, [ @{$history{$chl}[-1]}[0, 2] ];
+                Report "Haiku found in $chl:";
+                Report sprintf "<%s> %s", @{$haiku[0]};
+                Report sprintf "<%s> %s", @{$haiku[1]};
+                Report sprintf "<%s> %s", @{$haiku[2]};
+                &cached_reply( $chl, $who, "", "haiku detected" );
+
+                &sql(
+                    'insert bucket_facts (fact, verb, tidbit, protected)
+                             values (?, ?, ?, 1)',
+                    [ "Automatic Haiku", "<reply>", 
+                        join " / ", $haiku[0][1], $haiku[1][1], $haiku[2][1],
+                    ]
+                );
+            }
+        } else {
+            push @{ $history{$chl} }, [ $who, $type, $msg ];
+        }
 
         while ( @{ $history{$chl} } > &config("history_size") ) {
             last unless shift @{ $history{$chl} };
@@ -326,22 +353,6 @@ sub irc_on_public {
 
     if ( $type eq 'irc_msg' ) {
         $chl = $who;
-    }
-
-    if ( &config("haiku_report") ) {
-        $stats{haiku}{$chl} = [] unless $stats{haiku}{$chl};
-        push @{ $stats{haiku}{$chl} }, &count_syllables($msg);
-        shift @{ $stats{haiku}{$chl} } if @{ $stats{haiku}{$chl} } > 3;
-        Log "haiku tracking: ", join ", ", @{ $stats{haiku}{$chl} };
-        if (    $stats{haiku}{$chl}[0] == 5
-            and $stats{haiku}{$chl}[1] == 7
-            and $stats{haiku}{$chl}[2] == 5 )
-        {
-
-            &cached_reply( $chl, $who, "", "haiku detected" );
-            return;
-        }
-
     }
 
     if ( &config("bananas_chance")
@@ -2610,7 +2621,11 @@ sub say {
     my $chl  = shift;
     my $text = "@_";
 
-    push @{ $history{$chl} }, [ $nick, 'irc_public', $text ];
+    if ( &config("haiku_report") ) {
+        push @{ $history{$chl} }, [ $nick, 'irc_public', $text, &count_syllables($text) ];
+    } else {
+        push @{ $history{$chl} }, [ $nick, 'irc_public', $text ];
+    }
     $irc->yield( privmsg => $chl => $text );
 }
 
@@ -2618,7 +2633,11 @@ sub do {
     my $chl    = shift;
     my $action = "@_";
 
-    push @{ $history{$chl} }, [ $nick, 'irc_ctcp_action', $action ];
+    if ( &config("haiku_report") ) {
+        push @{ $history{$chl} }, [ $nick, 'irc_ctcp_action', $action, &count_syllables($action) ];
+    } else {
+        push @{ $history{$chl} }, [ $nick, 'irc_ctcp_action', $action ];
+    }
     $irc->yield( ctcp => $chl => "ACTION $action" );
 }
 
@@ -3036,7 +3055,7 @@ sub syllables {
     $modsyl++ if ( $word =~ /[^aeiou]i[rl]e$/ );
     $modsyl-- if ( $word =~ /[^cs]es$/ );
     $modsyl++ if ( $word =~ /[cs]hes$/ );
-    $modsyl++ if ( $word =~ /[^aeiou][aeiou]ing/ );
+    $modsyl++ if ( $word =~ /[^aeiou][aeiouy]ing/ );
     $modsyl-- if ( $word =~ /[aeiou][^aeiou][e]ing/ );
     $modsyl-- if ( $word =~ /(.[^adeiouyt])ed$/ );
     $modsyl-- if ( $word =~ /[agq]ued$/ );
@@ -3044,6 +3063,8 @@ sub syllables {
     $modsyl++ if ( $word =~ /[aeiou][^aeioub]le$/ );
     $modsyl++ if ( $word =~ /ier$/ );
     $modsyl-- if ( $word =~ /[cp]ally/ );
+    $modsyl-- if ( $word =~ /[^aeiou]eful/ );
+    $modsyl++ if ( $word =~ /dle$/ );
 
     # force list context, there has to be a prettier way to do this?
     $modsyl -= () = $word =~ m/eau/g;
