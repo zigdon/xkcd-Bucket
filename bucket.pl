@@ -256,27 +256,30 @@ sub irc_on_public {
 
     if ( &config("history_size") and &config("history_size") > 0 ) {
         if ( &config("haiku_report") ) {
-            push @{ $history{$chl} }, [ $who, $type, $msg, &count_syllables($msg) ];
-            if (    @{$history{$chl}} > 3
+            push @{ $history{$chl} },
+              [ $who, $type, $msg, &count_syllables($msg) ];
+            if (    @{ $history{$chl} } > 3
                 and $history{$chl}[-1][3] == 5
                 and $history{$chl}[-2][3] == 7
                 and $history{$chl}[-3][3] == 5 )
             {
                 my @haiku;
-                push @haiku, [ @{$history{$chl}[-3]}[0, 2] ];
-                push @haiku, [ @{$history{$chl}[-2]}[0, 2] ];
-                push @haiku, [ @{$history{$chl}[-1]}[0, 2] ];
+                push @haiku, [ @{ $history{$chl}[-3] }[ 0, 2 ] ];
+                push @haiku, [ @{ $history{$chl}[-2] }[ 0, 2 ] ];
+                push @haiku, [ @{ $history{$chl}[-1] }[ 0, 2 ] ];
                 Report "Haiku found in $chl:";
-                Report sprintf "<%s> %s", @{$haiku[0]};
-                Report sprintf "<%s> %s", @{$haiku[1]};
-                Report sprintf "<%s> %s", @{$haiku[2]};
+                Report sprintf "<%s> %s", @{ $haiku[0] };
+                Report sprintf "<%s> %s", @{ $haiku[1] };
+                Report sprintf "<%s> %s", @{ $haiku[2] };
                 &cached_reply( $chl, $who, "", "haiku detected" );
 
                 &sql(
                     'insert bucket_facts (fact, verb, tidbit, protected)
                              values (?, ?, ?, 1)',
-                    [ "Automatic Haiku", "<reply>", 
-                        join " / ", $haiku[0][1], $haiku[1][1], $haiku[2][1],
+                    [
+                        "Automatic Haiku", "<reply>",
+                        join " / ",        $haiku[0][1],
+                        $haiku[1][1],      $haiku[2][1],
                     ]
                 );
             }
@@ -2622,7 +2625,8 @@ sub say {
     my $text = "@_";
 
     if ( &config("haiku_report") ) {
-        push @{ $history{$chl} }, [ $nick, 'irc_public', $text, &count_syllables($text) ];
+        push @{ $history{$chl} },
+          [ $nick, 'irc_public', $text, &count_syllables($text) ];
     } else {
         push @{ $history{$chl} }, [ $nick, 'irc_public', $text ];
     }
@@ -2634,7 +2638,8 @@ sub do {
     my $action = "@_";
 
     if ( &config("haiku_report") ) {
-        push @{ $history{$chl} }, [ $nick, 'irc_ctcp_action', $action, &count_syllables($action) ];
+        push @{ $history{$chl} },
+          [ $nick, 'irc_ctcp_action', $action, &count_syllables($action) ];
     } else {
         push @{ $history{$chl} }, [ $nick, 'irc_ctcp_action', $action ];
     }
@@ -3019,7 +3024,13 @@ sub syllables {
     }
 
     if ( $word =~ /^([a-z])\1*$/ ) {    # Fixed for AAAAAAAAAAAAA and mmmmm
-        return 1;
+        if ( $word =~ /[aeiou]/ ) {
+            return 1;
+        }
+        if ( $word =~ /w/ ) {
+            return 3 * length($word);
+        }
+        return length($word);
     }
 
     # Check for non-words, just in case.  This is probably a bit too shotgun-y.
@@ -3031,7 +3042,7 @@ sub syllables {
 
     # Check for likely acronyms (all-consonant string)
     if ( $word =~ /^[bcdfghjklmnpqrstvwxz]+$/ ) {
-        return length($word);
+        return length($word) + 2 * $word =~ tr/w/w/;
     }
     $word =~ s/'//g;
 
