@@ -272,6 +272,7 @@ sub irc_on_public {
                 Report sprintf "<%s> %s", @{ $haiku[1] };
                 Report sprintf "<%s> %s", @{ $haiku[2] };
                 &cached_reply( $chl, $who, "", "haiku detected" );
+                $stats{haiku}++;
 
                 &sql(
                     'insert bucket_facts (fact, verb, tidbit, protected)
@@ -834,6 +835,9 @@ sub irc_on_public {
               sprintf "forgot %d factoid%s",
               $stats{deleted}, &s( $stats{deleted} )
               if ( $stats{deleted} );
+            push @fact_stats,
+              sprintf "found %d haikus",
+              $stats{haiku} if ( $stats{haiku} );
 
             # strip out the string 'factoids' from all but the first entry
             if ( @fact_stats > 1 ) {
@@ -3045,6 +3049,8 @@ sub syllables {
         return length($word) + 2 * $word =~ tr/w/w/;
     }
     $word =~ s/'//g;
+
+    $word =~ s/\$/ dollar /g;
 
     # Handle numbers
     if ( $word =~ /^[0-9]+$/ ) {
