@@ -254,10 +254,23 @@ sub irc_on_public {
         return;
     }
 
+    my $addressed = 0;
+    if ( $type eq 'irc_msg' or $msg =~ s/^$nick[:,]\s*|,\s+$nick\W+$//i ) {
+        $addressed = 1;
+    } else {
+        $msg =~ s/^\S+://;
+    }
+
     if ( &config("history_size") and &config("history_size") > 0 ) {
-        if ( &config("haiku_report") ) {
+        if ( &config("haiku_report")
+            and not( $addressed and $msg =~ /^how many syllables\??$/ ) )
+        {
+            (
+                $stats{haiku_debug}{$chl}{count},
+                $stats{haiku_debug}{$chl}{line}
+            ) = &count_syllables($msg);
             push @{ $history{$chl} },
-              [ $who, $type, $msg, &count_syllables($msg) ];
+              [ $who, $type, $msg, $stats{haiku_debug}{$chl}{count} ];
             if (    @{ $history{$chl} } > 3
                 and $history{$chl}[-1][3] == 5
                 and $history{$chl}[-2][3] == 7
@@ -307,13 +320,6 @@ sub irc_on_public {
         or $irc->is_channel_admin( $mainchannel, $who ) )
     {
         $operator = 1;
-    }
-
-    my $addressed = 0;
-    if ( $type eq 'irc_msg' or $msg =~ s/^$nick[:,]\s*|,\s+$nick\W+$//i ) {
-        $addressed = 1;
-    } else {
-        $msg =~ s/^\S+://;
     }
 
     # flood protection
@@ -770,6 +776,18 @@ sub irc_on_public {
             EVENT => 'db_success'
         );
 
+    } elsif ( $addressed and $msg =~ /^how many syllables\??$/ ) {
+        my $count = $stats{haiku_debug}{$chl}{count};
+        my $line  = $stats{haiku_debug}{$chl}{line};
+
+        unless ( $count and $line ) {
+            &say( $chl => "Sorry, $who, I have no idea." );
+            return;
+        }
+
+        &say(   $chl => "$who, that was '$line', with $count syllable"
+              . &s($count) );
+
     } elsif ( $addressed and $msg =~ /^what was that\??$/ ) {
         my $id = $stats{last_fact}{$chl};
         unless ($id) {
@@ -835,9 +853,8 @@ sub irc_on_public {
               sprintf "forgot %d factoid%s",
               $stats{deleted}, &s( $stats{deleted} )
               if ( $stats{deleted} );
-            push @fact_stats,
-              sprintf "found %d haikus",
-              $stats{haiku} if ( $stats{haiku} );
+            push @fact_stats, sprintf "found %d haikus", $stats{haiku}
+              if ( $stats{haiku} );
 
             # strip out the string 'factoids' from all but the first entry
             if ( @fact_stats > 1 ) {
@@ -2629,8 +2646,10 @@ sub say {
     my $text = "@_";
 
     if ( &config("haiku_report") ) {
+        ( $stats{haiku_debug}{$chl}{count}, $stats{haiku_debug}{$chl}{line} ) =
+          &count_syllables($text);
         push @{ $history{$chl} },
-          [ $nick, 'irc_public', $text, &count_syllables($text) ];
+          [ $nick, 'irc_public', $text, $stats{haiku_debug}{$chl}{count} ];
     } else {
         push @{ $history{$chl} }, [ $nick, 'irc_public', $text ];
     }
@@ -2642,8 +2661,13 @@ sub do {
     my $action = "@_";
 
     if ( &config("haiku_report") ) {
+        ( $stats{haiku_debug}{$chl}{count}, $stats{haiku_debug}{$chl}{line} ) =
+          &count_syllables($action);
         push @{ $history{$chl} },
-          [ $nick, 'irc_ctcp_action', $action, &count_syllables($action) ];
+          [
+            $nick,   'irc_ctcp_action',
+            $action, $stats{haiku_debug}{$chl}{count}
+          ];
     } else {
         push @{ $history{$chl} }, [ $nick, 'irc_ctcp_action', $action ];
     }
@@ -2996,13 +3020,18 @@ sub count_syllables {
 
     my @words = split ' ', $line;
     my $syl = 0;
+    my $debug_line;
     foreach my $word (@words) {
 
         # The main call to syllablecount.
-        $syl += &syllables($word);
+        my ( $count, $debug ) = &syllables($word);
+        #print "$word => $debug == $count; ";
+        $debug_line .= "$debug ";
+        $syl += $count;
     }
+    #print "\n$debug_line => $syl\n";
 
-    return $syl;
+    return ( $syl, $debug_line );
 }
 
 # Counts the syllables of a word passed to it.  Strips some formatting.
@@ -3011,56 +3040,56 @@ sub syllables {
 
     # Check against the cheat sheet dictionary for singular/plurals.
     if ( $config->{sylcheat}{$word} ) {
-        return $config->{sylcheat}{$word};
+        return ( $config->{sylcheat}{$word}, "$word (cheat)" );
     }
 
     if ( $word =~ /s$/ ) {
         my $singular = $word;
         $singular =~ s/'?s$//;
         if ( $config->{sylcheat}{$singular} ) {
-            return $config->{sylcheat}{$singular};
+            return ( $config->{sylcheat}{$singular},
+                "$word (cheat '$singular')" );
         }
 
         $singular =~ s/se$/s/;
         if ( $config->{sylcheat}{$singular} ) {
-            return $config->{sylcheat}{$singular};
+            return ( $config->{sylcheat}{$singular},
+                "$word (cheat '$singular')" );
         }
     }
 
     if ( $word =~ /^([a-z])\1*$/ ) {    # Fixed for AAAAAAAAAAAAA and mmmmm
         if ( $word =~ /[aeiou]/ ) {
-            return 1;
+            return ( 1, "$word (aeiou)" );
         }
         if ( $word =~ /w/ ) {
-            return 3 * length($word);
+            return ( 3 * length($word), "$word (w's)" );
         }
-        return length($word);
+        return ( length($word), "$word (single letter)" );
     }
 
     # Check for non-words, just in case.  This is probably a bit too shotgun-y.
     # Add special cases here or in the cheat sheet, but note that Some
     # punctuation is already stripped.
     if ( $word =~ /^[^a-zA-Z0-9]+$/ ) {
-        return 0;
+        return ( 0, "$word (non-word)" );
     }
 
     # Check for likely acronyms (all-consonant string)
     if ( $word =~ /^[bcdfghjklmnpqrstvwxz]+$/ ) {
-        return length($word) + 2 * $word =~ tr/w/w/;
+        return ( length($word) + 2 * $word =~ tr/w/w/, "$word (acronym)" );
     }
     $word =~ s/'//g;
 
-    $word =~ s/\$/ dollar /g;
-
     # Handle numbers
     if ( $word =~ /^[0-9]+$/ ) {
-        return &numbersyl($word);
+        return ( &numbersyl($word), "$word (number)" );
     }
 
     # Handle negative numbers as "minus <num>"
     if ( $word =~ /^-[0-9]+$/ ) {
         $word =~ s/^-//;
-        return 2 + &numbersyl($word);
+        return ( 2 + &numbersyl($word), "$word (negative number)" );
     }
 
     # These are all improvements to ths Syllable library which bring it
@@ -3082,12 +3111,14 @@ sub syllables {
     $modsyl-- if ( $word =~ /[cp]ally/ );
     $modsyl-- if ( $word =~ /[^aeiou]eful/ );
     $modsyl++ if ( $word =~ /dle$/ );
+    $modsyl += 2 if ( $word =~ s/\$//g );
 
     # force list context, there has to be a prettier way to do this?
     $modsyl -= () = $word =~ m/eau/g;
     $word =~ s/judgement/judgment/g;
 
-    return Lingua::EN::Syllable::syllable($word) + $modsyl;
+    return ( Lingua::EN::Syllable::syllable($word) + $modsyl,
+        $modsyl ? "$word (+$modsyl)" : $word );
 }
 
 # This routine pronounces numbers.
