@@ -853,7 +853,7 @@ sub irc_on_public {
               sprintf "forgot %d factoid%s",
               $stats{deleted}, &s( $stats{deleted} )
               if ( $stats{deleted} );
-            push @fact_stats, sprintf "found %d haikus", $stats{haiku}
+            push @fact_stats, sprintf "found %d haiku", $stats{haiku}
               if ( $stats{haiku} );
 
             # strip out the string 'factoids' from all but the first entry
