@@ -2704,7 +2704,7 @@ sub lookup {
         $type = "none";
     }
 
-    if ( exists $params{search} ) {
+    if ( $params{search} ) {
         $sql .= " and tidbit like \"%$params{search}%\"";
     }
 
@@ -2728,6 +2728,7 @@ sub lookup {
             op        => $params{op} || 0,
             idle      => $params{idle} || 0,
             type      => $params{type} || "irc_public",
+            search    => $params{search},
         },
         EVENT => 'db_success'
     );
