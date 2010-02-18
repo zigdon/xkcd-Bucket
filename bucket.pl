@@ -135,14 +135,6 @@ my %gender_vars = (
     },
 );
 
-# set up gender aliases
-foreach my $type ( keys %gender_vars ) {
-    foreach my $alias ( @{ $gender_vars{$type}{aliases} } ) {
-        $gender_vars{$alias} = $gender_vars{$type};
-        &Log("Setting gender alias: $alias => $type");
-    }
-}
-
 $stats{startup_time}  = time;
 $stats{modified_time} = ( stat($0) )[9];
 
@@ -150,6 +142,14 @@ if ( &config("logfile") ) {
     open( LOG, ">>",
         DEBUG ? &config("logfile") . ".debug" : &config("logfile") )
       or die "Can't write " . &config("logfile") . ": $!";
+}
+
+# set up gender aliases
+foreach my $type ( keys %gender_vars ) {
+    foreach my $alias ( @{ $gender_vars{$type}{aliases} } ) {
+        $gender_vars{$alias} = $gender_vars{$type};
+        &Log("Setting gender alias: $alias => $type");
+    }
 }
 
 $irc->plugin_add( 'NickServID',
