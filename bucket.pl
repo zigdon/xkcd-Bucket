@@ -2231,7 +2231,7 @@ sub irc_on_notice {
 
     Log("Notice from $who: $msg");
     if (    $who eq 'NickServ'
-        and $msg =~ /Password accepted|isn't registered/ )
+        and $msg =~ /Password accepted|(?:isn't|not) registered/ )
     {
         $irc->yield( mode => $nick => "+B" );
         unless ( &config("hide_hostmask") ) {
