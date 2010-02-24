@@ -135,8 +135,7 @@ my %gender_vars = (
     },
 );
 
-$stats{startup_time}  = time;
-$stats{modified_time} = ( stat($0) )[9];
+$stats{startup_time} = time;
 
 if ( &config("logfile") ) {
     open( LOG, ">>",
@@ -824,7 +823,7 @@ sub irc_on_public {
             return;
         }
         my ( $awake, $units ) = &round_time( time - $stats{startup_time} );
-        my ( $mod,   $modu )  = &round_time( time - $stats{modified_time} );
+        my ( $mod, $modu ) = &round_time( time - ( stat($0) )[9] );
 
         my $reply;
         $reply = sprintf "I've been awake since %s (about %d %s), ",
@@ -832,8 +831,13 @@ sub irc_on_public {
           $awake, $units;
 
         if ( $awake != $mod or $units ne $modu ) {
-            $reply .= sprintf "and was last changed about %d %s ago. ", $mod,
-              $modu;
+            if ( ( stat($0) )[9] <  $stats{startup_time} ) {
+                $reply .= sprintf "and was last changed about %d %s ago. ",
+                          $mod, $modu;
+            } else {
+                $reply .= sprintf "and a newer version has been available for %d %s. ",
+                          $mod, $modu;
+            }
         } else {
             $reply .= "and that was when I was last changed. ";
         }
@@ -3032,10 +3036,12 @@ sub count_syllables {
 
         # The main call to syllablecount.
         my ( $count, $debug ) = &syllables($word);
+
         #print "$word => $debug == $count; ";
         $debug_line .= "$debug ";
         $syl += $count;
     }
+
     #print "\n$debug_line => $syl\n";
 
     return ( $syl, $debug_line );
