@@ -1226,7 +1226,8 @@ sub irc_on_public {
 
     } elsif (
         $addressed
-        and $msg =~ /^(I|[-\w]+) \s (?:am|is) \s
+        and $msg =~ /^(?:(I|[-\w]+) \s (?:am|is)|
+                         I'm(?: an?)?) \s
                        (
                          male          |
                          female        |
