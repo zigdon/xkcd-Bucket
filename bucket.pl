@@ -2632,6 +2632,11 @@ sub round_time {
             if ( $dt > 24 ) {
                 $dt /= 24;    # days
                 $units = "day";
+
+                if ( $dt > 7 ) {
+                    $dt /= 7;    # weeks
+                    $units = "week";
+                }
             }
         }
     }
