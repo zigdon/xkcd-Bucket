@@ -775,6 +775,12 @@ sub irc_on_public {
             EVENT => 'db_success'
         );
 
+    } elsif ( $addressed and $msg =~ /^how many syllables in (.*)/ ) {
+        my ( $count, $debug ) = &count_syllables($1);
+        &say(
+            $chl => sprintf "%s: %d syllable%s.  %s",
+            $who, $count, &s($count), $debug
+        );
     } elsif ( $addressed and $msg =~ /^how many syllables\??$/ ) {
         my $count = $stats{haiku_debug}{$chl}{count};
         my $line  = $stats{haiku_debug}{$chl}{line};
@@ -831,12 +837,13 @@ sub irc_on_public {
           $awake, $units;
 
         if ( $awake != $mod or $units ne $modu ) {
-            if ( ( stat($0) )[9] <  $stats{startup_time} ) {
+            if ( ( stat($0) )[9] < $stats{startup_time} ) {
                 $reply .= sprintf "and was last changed about %d %s ago. ",
-                          $mod, $modu;
+                  $mod, $modu;
             } else {
-                $reply .= sprintf "and a newer version has been available for %d %s. ",
-                          $mod, $modu;
+                $reply .=
+                  sprintf "and a newer version has been available for %d %s. ",
+                  $mod, $modu;
             }
         } else {
             $reply .= "and that was when I was last changed. ";
@@ -3130,8 +3137,12 @@ sub syllables {
     $modsyl -= () = $word =~ m/eau/g;
     $word =~ s/judgement/judgment/g;
 
-    return ( Lingua::EN::Syllable::syllable($word) + $modsyl,
-        $modsyl ? "$word (+$modsyl)" : $word );
+    return (
+        Lingua::EN::Syllable::syllable($word) + $modsyl,
+        $modsyl > 0   ? "$word (+$modsyl)"
+        : $modsyl < 0 ? "$word ($modsyl)"
+        : $word
+    );
 }
 
 # This routine pronounces numbers.
