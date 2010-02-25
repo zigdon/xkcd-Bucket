@@ -262,7 +262,7 @@ sub irc_on_public {
 
     if ( &config("history_size") and &config("history_size") > 0 ) {
         if ( &config("haiku_report")
-            and not( $addressed and $msg =~ /^how many syllables\??$/ ) )
+            and not( $addressed and $msg =~ /^how many syllables\??$/i ) )
         {
             (
                 $stats{haiku_debug}{$chl}{count},
@@ -775,13 +775,13 @@ sub irc_on_public {
             EVENT => 'db_success'
         );
 
-    } elsif ( $addressed and $msg =~ /^how many syllables in (.*)/ ) {
+    } elsif ( $addressed and $msg =~ /^how many syllables in (.*)/i ) {
         my ( $count, $debug ) = &count_syllables($1);
         &say(
             $chl => sprintf "%s: %d syllable%s.  %s",
             $who, $count, &s($count), $debug
         );
-    } elsif ( $addressed and $msg =~ /^how many syllables\??$/ ) {
+    } elsif ( $addressed and $msg =~ /^how many syllables\??$/i ) {
         my $count = $stats{haiku_debug}{$chl}{count};
         my $line  = $stats{haiku_debug}{$chl}{line};
 
