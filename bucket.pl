@@ -1188,6 +1188,11 @@ sub irc_on_public {
             return;
         }
 
+        if ( lc $target eq lc $who ) {
+            &say( $chl => "$who, please don't quote yourself." );
+            return;
+        }
+
         my $match;
         foreach my $line ( reverse @{ $history{$chl} } ) {
             next unless lc $line->[0] eq lc $1;
@@ -1474,10 +1479,11 @@ sub db_success {
                 return;
             }
 
-            if ( lc $fact eq lc $bag{who} ) {
+            if ( lc $fact eq lc $bag{who} or lc $fact eq lc "$bag{who} quotes" )
+            {
                 Log "Not allowing $bag{who} to edit his own factoid";
                 &say( $bag{chl} =>
-                      "Please don't edit your own factoid, $bag{who}." );
+                      "Please don't edit your own factoids, $bag{who}." );
                 return;
             }
 
