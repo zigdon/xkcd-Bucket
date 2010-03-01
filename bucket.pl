@@ -239,6 +239,11 @@ sub irc_on_public {
     my $chl   = $_[ARG1];
     $chl = $chl->[0] if ref $chl eq 'ARRAY';
     my $msg = $_[ARG2];
+    my %bag;
+
+    $bag{who}  = $who;
+    $bag{chl}  = $chl;
+    $bag{type} = $type;
 
     if ( not $stats{tail_time} or time - $stats{tail_time} > 60 ) {
         &tail( $_[KERNEL] );
@@ -255,9 +260,10 @@ sub irc_on_public {
 
     my $addressed = 0;
     if ( $type eq 'irc_msg' or $msg =~ s/^$nick[:,]\s*|,\s+$nick\W+$//i ) {
-        $addressed = 1;
+        $bag{addressed} = $addressed = 1;
     } else {
-        $msg =~ s/^\S+://;
+        $msg =~ s/^(\S+)://;
+        $bag{to} = $1;
     }
 
     if ( &config("history_size") and &config("history_size") > 0 ) {
@@ -318,7 +324,7 @@ sub irc_on_public {
         or $irc->is_channel_owner( $mainchannel, $who )
         or $irc->is_channel_admin( $mainchannel, $who ) )
     {
-        $operator = 1;
+        $bag{op} = $operator = 1;
     }
 
     # flood protection
@@ -361,7 +367,7 @@ sub irc_on_public {
     }
 
     if ( $type eq 'irc_msg' ) {
-        $chl = $who;
+        $bag{chl} = $chl = $who;
     }
 
     if ( &config("bananas_chance")
@@ -375,6 +381,7 @@ sub irc_on_public {
       if ( $type ne 'irc_msg' and $chl ne '#bots' )
       or ( $type eq 'irc_msg' and $operator );
     Log("$type($chl): $who(o=$operator, a=$addressed, e=$editable): $msg");
+    $bag{editable} = $editable;
 
     if (
             $addressed
@@ -401,14 +408,12 @@ sub irc_on_public {
             SQL => 'select * ' . 'from bucket_facts where fact = ? order by id',
             PLACEHOLDERS => [$fact],
             BAGGAGE      => {
+                %bag,
                 cmd   => "edit",
-                who   => $who,
-                chl   => $chl,
                 fact  => $fact,
                 old   => $old,
                 'new' => $new,
                 flag  => $flag,
-                op    => $operator,
             },
             EVENT => 'db_success'
         );
@@ -429,13 +434,10 @@ sub irc_on_public {
         $msg  = $fact;
         Log "Looking up a particular factoid - '$search' in '$fact'";
         &lookup(
-            chl       => $chl,
-            msg       => $msg,
-            who       => $who,
-            addressed => $addressed,
-            editable  => 0,
-            op        => $operator,
-            search    => $search,
+            %bag,
+            msg      => $msg,
+            editable => 0,
+            search   => $search,
         );
     } elsif ( $msg =~ /^literal(?:\[([*\d]+)\])?\s+(.*)/i ) {
         my ( $page, $fact ) = ( $1 || 1, $2 );
@@ -448,12 +450,10 @@ sub irc_on_public {
                                 from bucket_facts where fact = ? order by id',
             PLACEHOLDERS => [$fact],
             BAGGAGE      => {
+                %bag,
                 cmd  => "literal",
-                who  => $who,
-                chl  => $chl,
                 page => $page,
                 fact => $fact,
-                op   => $operator,
             },
             EVENT => 'db_success'
         );
@@ -470,9 +470,8 @@ sub irc_on_public {
                 PLACEHOLDERS => [$fact],
                 EVENT        => "db_success",
                 BAGGAGE      => {
+                    %bag,
                     cmd  => "delete_id",
-                    chl  => $chl,
-                    who  => $who,
                     fact => $fact,
                 }
             );
@@ -484,9 +483,8 @@ sub irc_on_public {
                 PLACEHOLDERS => [$fact],
                 EVENT        => "db_success",
                 BAGGAGE      => {
+                    %bag,
                     cmd  => "delete",
-                    chl  => $chl,
-                    who  => $who,
                     fact => $fact,
                 }
             );
@@ -707,11 +705,10 @@ sub irc_on_public {
                     from bucket_facts where fact = ? limit 1',
             PLACEHOLDERS => [$src],
             BAGGAGE      => {
+                %bag,
                 cmd => "merge",
-                chl => $chl,
                 src => $src,
                 dst => $dst,
-                who => $who,
             },
             EVENT => 'db_success'
         );
@@ -725,11 +722,10 @@ sub irc_on_public {
                     from bucket_facts where fact = ? limit 1',
             PLACEHOLDERS => [$src],
             BAGGAGE      => {
+                %bag,
                 cmd => "alias1",
-                chl => $chl,
                 src => $src,
                 dst => $dst,
-                who => $who,
             },
             EVENT => 'db_success'
         );
@@ -740,15 +736,13 @@ sub irc_on_public {
                             where id = ? ',
             PLACEHOLDERS => [$1],
             BAGGAGE      => {
+                %bag,
                 cmd       => "fact",
-                chl       => $chl,
                 msg       => $1,
                 orig      => $1,
-                who       => $who,
                 addressed => 0,
                 editable  => 0,
                 op        => 0,
-                type      => $type,
             },
             EVENT => 'db_success'
         );
@@ -766,9 +760,8 @@ sub irc_on_public {
                             where id = ? ',
             PLACEHOLDERS => [$id],
             BAGGAGE      => {
+                %bag,
                 cmd => "forget",
-                chl => $chl,
-                who => $who,
                 msg => $msg,
                 id  => $id,
             },
@@ -807,9 +800,8 @@ sub irc_on_public {
                                 where id = ? ',
                 PLACEHOLDERS => [$id],
                 BAGGAGE      => {
+                    %bag,
                     cmd => "report",
-                    chl => $chl,
-                    who => $who,
                     msg => $msg,
                     id  => $id,
                 },
@@ -819,10 +811,7 @@ sub irc_on_public {
             &say( $chl => "$who: that was $id" );
         }
     } elsif ( $addressed and $msg eq 'something random' ) {
-        &lookup(
-            chl => $chl,
-            who => $who,
-        );
+        &lookup(%bag);
     } elsif ( $addressed and $msg eq 'stats' ) {
         unless ( $stats{stats_cached} ) {
             &say( $chl => "$who: Hold on, I'm still counting" );
@@ -998,10 +987,9 @@ sub irc_on_public {
                       order by value',
                 PLACEHOLDERS => [$var],
                 BAGGAGE      => {
+                    %bag,
                     cmd  => "dump_var",
                     name => $var,
-                    who  => $who,
-                    chl  => $chl
                 },
                 EVENT => 'db_success'
             );
@@ -1223,14 +1211,10 @@ sub irc_on_public {
                     where fact = ? and verb = "<alias>"',
             PLACEHOLDERS => ["$match->[0] quotes"],
             BAGGAGE      => {
-                chl       => $chl,
+                %bag,
                 msg       => "$match->[0] quotes <reply> $quote",
                 orig      => "$match->[0] quotes <reply> $quote",
-                who       => $who,
                 addressed => 1,
-                editable  => $editable,
-                op        => $operator,
-                type      => $type,
                 fact      => "$match->[0] quotes",
                 verb      => "<reply>",
                 tidbit    => $quote,
@@ -1316,14 +1300,9 @@ sub irc_on_public {
 
             #Log "Looking up $msg";
             &lookup(
-                chl       => $chl,
-                msg       => $msg,
-                orig      => $orig,
-                who       => $who,
-                addressed => $addressed,
-                editable  => $editable,
-                op        => $operator,
-                type      => $type,
+                %bag,
+                msg  => $msg,
+                orig => $orig,
             );
         }
     }
@@ -1394,7 +1373,7 @@ sub db_success {
             }
 
             $line{tidbit} =
-              &expand( $bag{who}, $bag{chl}, $line{tidbit}, $bag{editable} );
+              &expand( $bag{who}, $bag{chl}, $line{tidbit}, $bag{editable}, $bag{to} );
             return unless $line{tidbit};
 
             if ( $line{verb} eq '<reply>' ) {
@@ -2374,7 +2353,7 @@ sub cached_reply {
         $extra = "";
     }
 
-    $tidbit = &expand( $who, $chl, $tidbit, 0 );
+    $tidbit = &expand( $who, $chl, $tidbit, 0, undef );
     return unless $tidbit;
 
     if ( $line->{verb} eq '<action>' ) {
@@ -2741,17 +2720,14 @@ sub lookup {
         : $type eq 'single' ? [ $params{msg} ]
         : [],
         BAGGAGE => {
+            %params,
             cmd       => "fact",
-            chl       => $params{chl},
-            msg       => $params{msg},
             orig      => $params{orig} || $params{msg},
-            who       => $params{who},
             addressed => $params{addressed} || 0,
             editable  => $params{editable} || 0,
             op        => $params{op} || 0,
             idle      => $params{idle} || 0,
             type      => $params{type} || "irc_public",
-            search    => $params{search},
         },
         EVENT => 'db_success'
     );
@@ -2770,25 +2746,36 @@ sub sql {
 }
 
 sub expand {
-    my ( $who, $chl, $msg, $editable ) = @_;
+    my ( $who, $chl, $msg, $editable, $to ) = @_;
 
     my $gender = $stats{users}{genders}{ lc $who };
     my $target = $who;
-    if ( $msg =~ /\$who/ ) {
-        $msg =~ s/\$who/$who/gi;
+    if ( $msg =~ /\$who\b/i ) {
+        $msg =~ s/\$who\b/$who/gi;
         $stats{last_vars}{$chl}{who} = $who;
     }
 
-    if ( $msg =~ /\$someone/i ) {
+    if ( $msg =~ /\$someone\b/i ) {
         $stats{last_vars}{$chl}{someone} = [];
-        while ( $msg =~ /\$someone/i ) {
+        while ( $msg =~ /\$someone\b/i ) {
             my $rnick = &someone($chl);
-            $msg =~ s/\$someone/$rnick/i;
+            $msg =~ s/\$someone\b/$rnick/i;
             push @{ $stats{last_vars}{$chl}{someone} }, $rnick;
 
             $gender = $stats{users}{genders}{ lc $rnick };
             $target = $rnick;
         }
+    }
+
+    while ( $msg =~ /\$to\b/i ) {
+        unless ( defined $to ) {
+            $to = &someone($chl);
+        }
+        $msg =~ s/\$to\b/$to/i;
+        push @{ $stats{last_vars}{$chl}{to} }, $to;
+
+        $gender = $stats{users}{genders}{ lc $to };
+        $target = $to;
     }
 
     $stats{last_vars}{$chl}{item} = [];
