@@ -239,6 +239,7 @@ sub irc_on_public {
     my $chl   = $_[ARG1];
     $chl = $chl->[0] if ref $chl eq 'ARRAY';
     my $msg = $_[ARG2];
+    $msg =~ s/\s\s+/ /g;
     my %bag;
 
     $bag{who}  = $who;
