@@ -459,7 +459,23 @@ sub irc_on_public {
             },
             EVENT => 'db_success'
         );
-    } elsif ( $addressed and $operator and $msg =~ /^delete (#)?(.*)/i ) {
+    } elsif ( $addressed and $operator and $msg =~ /^delete item #?(\d+)/i ) {
+        unless ( $stats{detailed_inventory}{$who} ) {
+            &say( $chl => "$who: ask me for a detailed inventory first." );
+            return;
+        }
+
+        my $num  = $1 - 1;
+        my $item = $stats{detailed_inventory}{$who}[$num];
+        unless ( defined $item ) {
+            &say( $chl => "Sorry, $who, I can't find that!" );
+            return;
+        }
+        &say( $chl => "Okay, $who, destroying '$item'" );
+        @inventory = grep { $_ ne $item } @inventory;
+        &sql( "delete from bucket_items where `what` = ?", [$item] );
+        delete $stats{detailed_inventory}{$who};
+    } elsif ( $addressed and $operator and $msg =~ /^delete (#)?(.+)/i ) {
         my $id   = $1;
         my $fact = $2;
         $stats{deleted}++;
@@ -1149,6 +1165,32 @@ sub irc_on_public {
         $replacables{$var}{type} = $type;
         &sql( "update bucket_vars set type=? where id = ?",
             [ $type, $replacables{$var}{id} ] );
+    } elsif ( $operator
+        and $addressed
+        and $msg =~ /^(?:detailed inventory|list item details)[?.!]?$/i )
+    {
+        unless (@inventory) {
+            &say( $chl => "Sorry, $who, I'm not carrying anything!" );
+            return;
+        }
+        $stats{detailed_inventory}{$who} = [];
+        my $c = 0;
+        my $line;
+        foreach my $item ( sort @inventory ) {
+            $c++;
+            push @{ $stats{detailed_inventory}{$who} }, $item;
+            if ( length $line + length "$c. $item; " < 450 ) {
+                $line .= "$c. $item; ";
+                next;
+            }
+
+            &say( $chl => "$who: $line" );
+            $line = "$c. $item; ";
+        }
+
+        if ($line) {
+            &say( $chl => "$who: $line" );
+        }
     } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?$/i ) {
         &cached_reply( $chl, $who, "", "list items" );
     } elsif ( $addressed
@@ -1375,7 +1417,8 @@ sub db_success {
             }
 
             $line{tidbit} =
-              &expand( $bag{who}, $bag{chl}, $line{tidbit}, $bag{editable}, $bag{to} );
+              &expand( $bag{who}, $bag{chl}, $line{tidbit}, $bag{editable},
+                $bag{to} );
             return unless $line{tidbit};
 
             if ( $line{verb} eq '<reply>' ) {
