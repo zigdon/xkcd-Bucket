@@ -474,7 +474,6 @@ sub irc_on_public {
         &say( $chl => "Okay, $who, destroying '$item'" );
         @inventory = grep { $_ ne $item } @inventory;
         &sql( "delete from bucket_items where `what` = ?", [$item] );
-        delete $stats{detailed_inventory}{$who};
     } elsif ( $addressed and $operator and $msg =~ /^delete (#)?(.+)/i ) {
         my $id   = $1;
         my $fact = $2;
@@ -1179,7 +1178,7 @@ sub irc_on_public {
         foreach my $item ( sort @inventory ) {
             $c++;
             push @{ $stats{detailed_inventory}{$who} }, $item;
-            if ( length $line + length "$c. $item; " < 450 ) {
+            if ( length $line + length "$c. $item; " < 400 ) {
                 $line .= "$c. $item; ";
                 next;
             }
