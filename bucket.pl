@@ -474,6 +474,7 @@ sub irc_on_public {
         &say( $chl => "Okay, $who, destroying '$item'" );
         @inventory = grep { $_ ne $item } @inventory;
         &sql( "delete from bucket_items where `what` = ?", [$item] );
+        delete $stats{detailed_inventory}{$who}[$num];
     } elsif ( $addressed and $operator and $msg =~ /^delete (#)?(.+)/i ) {
         my $id   = $1;
         my $fact = $2;
