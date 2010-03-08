@@ -1528,6 +1528,20 @@ sub db_success {
             );
 
             return;
+        } elsif ( $bag{addressed} and $bag{orig} =~ m{^([\s0-9_xe+\-*/.()]+)$} ) {
+            Log "Mathing: $1";
+            my $res;;
+            my $exp = "\$res = 0 + $1";
+            eval $exp;
+            if (defined $res) {
+                &say( $bag{chl} => "$bag{who}: $res" );
+            } elsif ($@) {
+                $@ =~ s/ at \(.*//;
+                &say( $bag{chl} => "Sorry, $bag{who}, there was an error: $@" );
+            } else {
+                &error( $bag{chl}, $bag{who} );
+            }
+            return;
         } elsif ( $bag{addressed} ) {
             &error( $bag{chl}, $bag{who} );
             return;
