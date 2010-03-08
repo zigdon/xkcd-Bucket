@@ -1528,12 +1528,14 @@ sub db_success {
             );
 
             return;
-        } elsif ( $bag{addressed} and $bag{orig} =~ m{^([\s0-9_xe+\-*/.()]+)$} ) {
+        } elsif ( $bag{addressed}
+            and $bag{orig} =~ m{^([\s0-9a-fA-F_xe+\-*/.()]+)$} )
+        {
             Log "Mathing: $1";
-            my $res;;
+            my $res;
             my $exp = "\$res = 0 + $1";
             eval $exp;
-            if (defined $res) {
+            if ( defined $res ) {
                 &say( $bag{chl} => "$bag{who}: $res" );
             } elsif ($@) {
                 $@ =~ s/ at \(.*//;
