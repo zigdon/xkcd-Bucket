@@ -1554,9 +1554,9 @@ sub db_success {
                 if ( length $res < 400 ) {
                     &say( $bag{chl} => "$bag{who}: $res" );
                 } else {
-                    &say( $bag{chl} =>
-"Sorry, $bag{who}, I know the answer, but it's too long ("
-                          . length $res
+                    &say(   $bag{chl} => "Sorry, $bag{who}, I know the answer, "
+                          . "but it's too long ("
+                          . length($res)
                           . " characters)." );
                 }
             } elsif ($@) {
