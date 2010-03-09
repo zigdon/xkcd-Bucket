@@ -1550,14 +1550,15 @@ sub db_success {
             $exp = "package Bucket::Eval; \$res = 0 + $exp;";
             Log " -> $exp";
             eval $exp;
+            Log "-> $res";
             if ( defined $res ) {
                 if ( length $res < 400 ) {
                     &say( $bag{chl} => "$bag{who}: $res" );
                 } else {
-                    &say(   $bag{chl} => "Sorry, $bag{who}, I know the answer, "
-                          . "but it's too long ("
-                          . length($res)
-                          . " characters)." );
+                    $res->accuracy(400);
+                    &say(   $bag{chl} => "$bag{who}: "
+                          . $res->mantissa() . "e"
+                          . $res->exponent() );
                 }
             } elsif ($@) {
                 $@ =~ s/ at \(.*//;
