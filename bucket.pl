@@ -1532,6 +1532,7 @@ sub db_success {
             and $bag{orig} =~ m{^([\s0-9a-fA-F_x+\-*/.()]+)$} )
         {
             # Mathing!
+            $stats{math}++;
             my $res;
             my $exp = "package Bucket::Eval; \$res = 0 + $1;";
             eval $exp;
