@@ -1529,11 +1529,11 @@ sub db_success {
 
             return;
         } elsif ( $bag{addressed}
-            and $bag{orig} =~ m{^([\s0-9a-fA-F_xe+\-*/.()]+)$} )
+            and $bag{orig} =~ m{^([\s0-9a-fA-F_x+\-*/.()]+)$} )
         {
-            Log "Mathing: $1";
+            # Mathing!
             my $res;
-            my $exp = "\$res = 0 + $1";
+            my $exp = "package Bucket::Eval; \$res = 0 + $1;";
             eval $exp;
             if ( defined $res ) {
                 &say( $bag{chl} => "$bag{who}: $res" );
