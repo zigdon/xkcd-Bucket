@@ -34,6 +34,14 @@ use HTML::Entities;
 use URI::Escape;
 $Data::Dumper::Indent = 1;
 
+# try to load Math::BigFloat if possible
+my $math = "";
+eval { require Math::BigFloat; };
+unless ($@) {
+    $math = "Math::BigFloat";
+    &Log("$math loaded");
+}
+
 use constant { DEBUG => 0 };
 
 # work around a bug: https://rt.cpan.org/Ticket/Display.html?id=50991
@@ -1531,13 +1539,26 @@ sub db_success {
         } elsif ( $bag{addressed}
             and $bag{orig} =~ m{^([\s0-9a-fA-F_x+\-*/.()]+)$} )
         {
+
             # Mathing!
             $stats{math}++;
             my $res;
-            my $exp = "package Bucket::Eval; \$res = 0 + $1;";
+            my $exp = $1;
+            if ($math) {
+                $exp =~ s/([-\d.e]+)/new $math("$1")/g;
+            }
+            $exp = "package Bucket::Eval; \$res = 0 + $exp;";
+            Log " -> $exp";
             eval $exp;
             if ( defined $res ) {
-                &say( $bag{chl} => "$bag{who}: $res" );
+                if ( length $res < 400 ) {
+                    &say( $bag{chl} => "$bag{who}: $res" );
+                } else {
+                    &say( $bag{chl} =>
+"Sorry, $bag{who}, I know the answer, but it's too long ("
+                          . length $res
+                          . " characters)." );
+                }
             } elsif ($@) {
                 $@ =~ s/ at \(.*//;
                 &say( $bag{chl} => "Sorry, $bag{who}, there was an error: $@" );
