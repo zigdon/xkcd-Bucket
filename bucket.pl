@@ -1545,7 +1545,12 @@ sub db_success {
             my $res;
             my $exp = $1;
             if ($math) {
-                $exp =~ s/([-\d.e]+)/new $math("$1")/g;
+                my $newexp;
+                foreach my $word (split /( |-[\d_e.]+|\*\*|[+\/()*])/, $exp) {
+                    $word = "new $math(\"$word\")" if $word =~ /^[_0-9.e]+$/;
+                    $newexp .= $word;
+                }
+                $exp = $newexp;
             }
             $exp = "package Bucket::Eval; \$res = 0 + $exp;";
             Log " -> $exp";
