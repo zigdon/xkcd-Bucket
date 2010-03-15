@@ -1187,7 +1187,7 @@ sub irc_on_public {
         foreach my $item ( sort @inventory ) {
             $c++;
             push @{ $stats{detailed_inventory}{$who} }, $item;
-            if ( length $line + length "$c. $item; " < 400 ) {
+            if ( length $line + length "$c. $item; " < 350 ) {
                 $line .= "$c. $item; ";
                 next;
             }
@@ -2532,7 +2532,7 @@ sub check_idle {
         ],
         FAF => [
             "http://twitter.com/statuses/user_timeline/14062390.rss",
-            qr/^fakeanimalfacts: /, "http"
+            qr/^fakeanimalfacts: |http:.*/, "link"
         ],
         factoid => 1
     );
