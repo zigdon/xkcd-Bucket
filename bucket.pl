@@ -2839,16 +2839,16 @@ sub expand {
 
     my $gender = $stats{users}{genders}{ lc $who };
     my $target = $who;
-    if ( $msg =~ /\$who\b/i ) {
-        $msg =~ s/\$who\b/$who/gi;
+    if ( $msg =~ /\$who\b|\${who}/i ) {
+        $msg =~ s/\$who\b|\${who}/$who/gi;
         $stats{last_vars}{$chl}{who} = $who;
     }
 
-    if ( $msg =~ /\$someone\b/i ) {
+    if ( $msg =~ /\$someone\b|\${someone}/i ) {
         $stats{last_vars}{$chl}{someone} = [];
-        while ( $msg =~ /\$someone\b/i ) {
+        while ( $msg =~ /\$someone\b|\${someone}/i ) {
             my $rnick = &someone($chl);
-            $msg =~ s/\$someone\b/$rnick/i;
+            $msg =~ s/\$someone\b|\${someone}/$rnick/i;
             push @{ $stats{last_vars}{$chl}{someone} }, $rnick;
 
             $gender = $stats{users}{genders}{ lc $rnick };
@@ -2856,11 +2856,11 @@ sub expand {
         }
     }
 
-    while ( $msg =~ /\$to\b/i ) {
+    while ( $msg =~ /\$to\b|\${to}/i ) {
         unless ( defined $to ) {
             $to = &someone($chl);
         }
-        $msg =~ s/\$to\b/$to/i;
+        $msg =~ s/\$to\b|\${to}/$to/i;
         push @{ $stats{last_vars}{$chl}{to} }, $to;
 
         $gender = $stats{users}{genders}{ lc $to };
@@ -2868,15 +2868,16 @@ sub expand {
     }
 
     $stats{last_vars}{$chl}{item} = [];
-    while ( $msg =~ /\$(give)?item/i ) {
+    while ( $msg =~ /\$(give)?item|\${(give)?item}/i ) {
+        my $giveflag = $1 || $2 ? "give" : "";
         if (@inventory) {
-            my $give = $editable && $1;
+            my $give = $editable && $giveflag;
             my $item = &get_item($give);
             push @{ $stats{last_vars}{$chl}{item} },
               $give ? "$item (given)" : $item;
-            $msg =~ s/\$$1item/$item/i;
+            $msg =~ s/\$${giveflag}item|\${${giveflag}item}/$item/i;
         } else {
-            $msg =~ s/\$$1item/bananas/i;
+            $msg =~ s/\$${giveflag}item|\${${giveflag}item}/bananas/i;
             push @{ $stats{last_vars}{$chl}{item} }, "(bananas)";
         }
     }
@@ -2884,7 +2885,7 @@ sub expand {
       unless @{ $stats{last_vars}{$chl}{item} };
 
     $stats{last_vars}{$chl}{newitem} = [];
-    while ( $msg =~ /\$newitem/i ) {
+    while ( $msg =~ /\$newitem|\${newitem}/i ) {
         if ($editable) {
             my $newitem = shift @random_items || 'bananas';
             my ( $rc, @dropped ) = &put_item( $newitem, 1 );
@@ -2894,10 +2895,10 @@ sub expand {
                 return;
             }
 
-            $msg =~ s/\$newitem/$newitem/i;
+            $msg =~ s/\$newitem|\${newitem}/$newitem/i;
             push @{ $stats{last_vars}{$chl}{newitem} }, $newitem;
         } else {
-            $msg =~ s/\$newitem/bananas/ig;
+            $msg =~ s/\$newitem|\${newitem}/bananas/ig;
         }
     }
     delete $stats{last_vars}{$chl}{newitem}
@@ -2905,7 +2906,7 @@ sub expand {
 
     if ($gender) {
         foreach my $gvar ( keys %gender_vars ) {
-            next unless $msg =~ /\$$gvar\b/i;
+            next unless $msg =~ /\$$gvar\b|\${$gvar}/i;
 
             Log "Replacing gvar $gvar...";
             if ( exists $gender_vars{$gvar}{$gender} ) {
@@ -2915,16 +2916,16 @@ sub expand {
                     $g_v =~ s/%N/$target/;
                     Log " => $g_v";
                 }
-                $msg =~ s/\$$gvar\b/$g_v/gi;
+                $msg =~ s/\$$gvar\b|\${$gvar}/$g_v/gi;
                 $stats{last_vars}{$chl}{$gvar} = $g_v;
             }
         }
     }
 
     my $oldmsg = "";
-    while ( $oldmsg ne $msg and $msg =~ /\$([a-zA-Z_]\w+)/ ) {
+    while ( $oldmsg ne $msg and $msg =~ /\$([a-zA-Z_]\w+)|\${([a-zA-Z_]\w+)}/ ) {
         $oldmsg = $msg;
-        my $var = $1;
+        my $var = $1 || $2;
         Log "Found variable \$$var";
 
         # yay for special cases!
@@ -2973,7 +2974,7 @@ sub expand {
         }
 
         $stats{last_vars}{$chl}{$full} = [];
-        while ( $msg =~ /((\ban? )?\$$full\b)/i ) {
+        while ( $msg =~ /((\ban? )?\$(?:$full|{$full})\b)/i ) {
             my $replacement = &set_case( $record, $var, $conjugate );
             $replacement = A($replacement) if $2;
 
@@ -3001,7 +3002,7 @@ sub expand {
             Log "Replacing $1 with $replacement";
             last if $replacement =~ /\$/;
 
-            $msg =~ s/(?:\ban? )?\$$full\b/$replacement/i;
+            $msg =~ s/(?:\ban? )?\$(?:$full|{$full})\b/$replacement/i;
             push @{ $stats{last_vars}{$chl}{$full} }, $replacement;
         }
 
