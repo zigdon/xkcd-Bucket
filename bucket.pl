@@ -1546,7 +1546,7 @@ sub db_success {
             my $exp = $1;
             if ($math) {
                 my $newexp;
-                foreach my $word (split /( |-[\d_e.]+|\*\*|[+\/()*])/, $exp) {
+                foreach my $word ( split /( |-[\d_e.]+|\*\*|[+\/()*])/, $exp ) {
                     $word = "new $math(\"$word\")" if $word =~ /^[_0-9.e]+$/;
                     $newexp .= $word;
                 }
@@ -2172,6 +2172,7 @@ sub db_success {
                 )
               )
             {
+                my $count = @lines;
                 while ( my $fact = shift @lines ) {
                     if ( $bag{op} ) {
                         print DUMP "#$fact->{id}\t";
@@ -2181,7 +2182,8 @@ sub db_success {
                     print DUMP "\n";
                 }
                 close DUMP;
-                &say( $bag{chl} => "$bag{who}: Here's the full list: $url" );
+                &say( $bag{chl} =>
+                      "$bag{who}: Here's the full list ($count): $url" );
                 return;
             } else {
                 Log "Failed to write dump file: $!";
@@ -2923,7 +2925,8 @@ sub expand {
     }
 
     my $oldmsg = "";
-    while ( $oldmsg ne $msg and $msg =~ /\$([a-zA-Z_]\w+)|\${([a-zA-Z_]\w+)}/ ) {
+    while ( $oldmsg ne $msg and $msg =~ /\$([a-zA-Z_]\w+)|\${([a-zA-Z_]\w+)}/ )
+    {
         $oldmsg = $msg;
         my $var = $1 || $2;
         Log "Found variable \$$var";
