@@ -558,7 +558,7 @@ sub irc_on_public {
     {
         &say( $chl => "\\o/" );
         $talking{$chl} = -1;
-    } elsif ( $addressed and $operator and $msg =~ /^(join|part) (#\w+)/i ) {
+    } elsif ( $addressed and $operator and $msg =~ /^(join|part) (#[-\w]+)/i ) {
         my ( $cmd, $dst ) = ( $1, $2 );
         unless ($dst) {
             &say( $chl => "$who: $cmd what channel?" );
@@ -2319,7 +2319,7 @@ sub irc_on_notice {
 
     Log("Notice from $who: $msg");
     if (    $who eq 'NickServ'
-        and $msg =~ /Password accepted|(?:isn't|not) registered/ )
+        and $msg =~ /Password (?:accepted|incorrect)|(?:isn't|not) registered/ )
     {
         $irc->yield( mode => $nick => "+B" );
         unless ( &config("hide_hostmask") ) {
