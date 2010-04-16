@@ -2842,7 +2842,7 @@ sub expand {
     my $gender = $stats{users}{genders}{ lc $who };
     my $target = $who;
     while ( $msg =~ /(\$who\b|\${who})/i ) {
-        my $cased = &set_case($1, $who);
+        my $cased = &set_case( $1, $who );
         last unless $msg =~ s/\$who\b|\${who}/$cased/i;
         $stats{last_vars}{$chl}{who} = $who;
     }
@@ -2851,7 +2851,7 @@ sub expand {
         $stats{last_vars}{$chl}{someone} = [];
         while ( $msg =~ /(\$someone\b|\${someone})/i ) {
             my $rnick = &someone($chl);
-            my $cased = &set_case($1, $rnick);
+            my $cased = &set_case( $1, $rnick );
             last unless $msg =~ s/\$someone\b|\${someone}/$cased/i;
             push @{ $stats{last_vars}{$chl}{someone} }, $rnick;
 
@@ -2864,7 +2864,7 @@ sub expand {
         unless ( defined $to ) {
             $to = &someone($chl);
         }
-        my $cased = &set_case($1, $to);
+        my $cased = &set_case( $1, $to );
         last unless $msg =~ s/\$to\b|\${to}/$cased/i;
         push @{ $stats{last_vars}{$chl}{to} }, $to;
 
@@ -2876,12 +2876,13 @@ sub expand {
     while ( $msg =~ /(\$(give)?item|\${(give)?item})/i ) {
         my $giveflag = $2 || $3 ? "give" : "";
         if (@inventory) {
-            my $give = $editable && $giveflag;
-            my $item = &get_item($give);
-            my $cased = &set_case($1, $item);
+            my $give  = $editable && $giveflag;
+            my $item  = &get_item($give);
+            my $cased = &set_case( $1, $item );
             push @{ $stats{last_vars}{$chl}{item} },
               $give ? "$item (given)" : $item;
-            last unless $msg =~ s/\$${giveflag}item|\${${giveflag}item}/$cased/i;
+            last
+              unless $msg =~ s/\$${giveflag}item|\${${giveflag}item}/$cased/i;
         } else {
             $msg =~ s/\$${giveflag}item|\${${giveflag}item}/bananas/i;
             push @{ $stats{last_vars}{$chl}{item} }, "(bananas)";
@@ -2901,7 +2902,7 @@ sub expand {
                 return;
             }
 
-            my $cased = &set_case($1, $newitem);
+            my $cased = &set_case( $1, $newitem );
             last unless $msg =~ s/\$newitem|\${newitem}/$cased/i;
             push @{ $stats{last_vars}{$chl}{newitem} }, $newitem;
         } else {
@@ -2924,7 +2925,7 @@ sub expand {
                     Log " => $g_v";
                 }
                 while ( $msg =~ /(\$$gvar\b|\${$gvar})/i ) {
-                    my $cased = &set_case($1, $g_v);
+                    my $cased = &set_case( $1, $g_v );
                     last unless $msg =~ s/\Q$1/$cased/g;
                 }
                 $stats{last_vars}{$chl}{$gvar} = $g_v;
@@ -3025,7 +3026,7 @@ sub expand {
 }
 
 sub set_case {
-    my ($var, $value) = @_;
+    my ( $var, $value ) = @_;
 
     my $case;
     $var =~ s/\W+//g;
