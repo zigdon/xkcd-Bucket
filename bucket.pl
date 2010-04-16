@@ -2841,16 +2841,18 @@ sub expand {
 
     my $gender = $stats{users}{genders}{ lc $who };
     my $target = $who;
-    if ( $msg =~ /\$who\b|\${who}/i ) {
-        $msg =~ s/\$who\b|\${who}/$who/gi;
+    while ( $msg =~ /(\$who\b|\${who})/i ) {
+        my $cased = &set_case($1, $who);
+        last unless $msg =~ s/\$who\b|\${who}/$cased/i;
         $stats{last_vars}{$chl}{who} = $who;
     }
 
     if ( $msg =~ /\$someone\b|\${someone}/i ) {
         $stats{last_vars}{$chl}{someone} = [];
-        while ( $msg =~ /\$someone\b|\${someone}/i ) {
+        while ( $msg =~ /(\$someone\b|\${someone})/i ) {
             my $rnick = &someone($chl);
-            $msg =~ s/\$someone\b|\${someone}/$rnick/i;
+            my $cased = &set_case($1, $rnick);
+            last unless $msg =~ s/\$someone\b|\${someone}/$cased/i;
             push @{ $stats{last_vars}{$chl}{someone} }, $rnick;
 
             $gender = $stats{users}{genders}{ lc $rnick };
@@ -2858,11 +2860,12 @@ sub expand {
         }
     }
 
-    while ( $msg =~ /\$to\b|\${to}/i ) {
+    while ( $msg =~ /(\$to\b|\${to})/i ) {
         unless ( defined $to ) {
             $to = &someone($chl);
         }
-        $msg =~ s/\$to\b|\${to}/$to/i;
+        my $cased = &set_case($1, $to);
+        last unless $msg =~ s/\$to\b|\${to}/$cased/i;
         push @{ $stats{last_vars}{$chl}{to} }, $to;
 
         $gender = $stats{users}{genders}{ lc $to };
@@ -2870,14 +2873,15 @@ sub expand {
     }
 
     $stats{last_vars}{$chl}{item} = [];
-    while ( $msg =~ /\$(give)?item|\${(give)?item}/i ) {
-        my $giveflag = $1 || $2 ? "give" : "";
+    while ( $msg =~ /(\$(give)?item|\${(give)?item})/i ) {
+        my $giveflag = $2 || $3 ? "give" : "";
         if (@inventory) {
             my $give = $editable && $giveflag;
             my $item = &get_item($give);
+            my $cased = &set_case($1, $item);
             push @{ $stats{last_vars}{$chl}{item} },
               $give ? "$item (given)" : $item;
-            $msg =~ s/\$${giveflag}item|\${${giveflag}item}/$item/i;
+            last unless $msg =~ s/\$${giveflag}item|\${${giveflag}item}/$cased/i;
         } else {
             $msg =~ s/\$${giveflag}item|\${${giveflag}item}/bananas/i;
             push @{ $stats{last_vars}{$chl}{item} }, "(bananas)";
@@ -2887,7 +2891,7 @@ sub expand {
       unless @{ $stats{last_vars}{$chl}{item} };
 
     $stats{last_vars}{$chl}{newitem} = [];
-    while ( $msg =~ /\$newitem|\${newitem}/i ) {
+    while ( $msg =~ /(\$newitem|\${newitem})/i ) {
         if ($editable) {
             my $newitem = shift @random_items || 'bananas';
             my ( $rc, @dropped ) = &put_item( $newitem, 1 );
@@ -2897,7 +2901,8 @@ sub expand {
                 return;
             }
 
-            $msg =~ s/\$newitem|\${newitem}/$newitem/i;
+            my $cased = &set_case($1, $newitem);
+            last unless $msg =~ s/\$newitem|\${newitem}/$cased/i;
             push @{ $stats{last_vars}{$chl}{newitem} }, $newitem;
         } else {
             $msg =~ s/\$newitem|\${newitem}/bananas/ig;
@@ -2918,7 +2923,10 @@ sub expand {
                     $g_v =~ s/%N/$target/;
                     Log " => $g_v";
                 }
-                $msg =~ s/\$$gvar\b|\${$gvar}/$g_v/gi;
+                while ( $msg =~ /(\$$gvar\b|\${$gvar})/i ) {
+                    my $cased = &set_case($1, $g_v);
+                    last unless $msg =~ s/\Q$1/$cased/g;
+                }
                 $stats{last_vars}{$chl}{$gvar} = $g_v;
             }
         }
@@ -2935,7 +2943,7 @@ sub expand {
         my $conjugate;
         my $record = $replacables{ lc $var };
         my $full   = $var;
-        if ( not $record and $var =~ s/ed$// ) {
+        if ( not $record and $var =~ s/ed$//i ) {
             $record = $replacables{ lc $var };
             if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&past;
@@ -2946,7 +2954,7 @@ sub expand {
             }
         }
 
-        if ( not $record and $var =~ s/ing$// ) {
+        if ( not $record and $var =~ s/ing$//i ) {
             $record = $replacables{ lc $var };
             if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&gerund;
@@ -2957,7 +2965,7 @@ sub expand {
             }
         }
 
-        if ( not $record and $var =~ s/s$// ) {
+        if ( not $record and $var =~ s/s$//i ) {
             $record = $replacables{ lc $var };
             if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&s_form;
@@ -2978,7 +2986,8 @@ sub expand {
 
         $stats{last_vars}{$chl}{$full} = [];
         while ( $msg =~ /((\ban? )?\$(?:$full|{$full})\b)/i ) {
-            my $replacement = &set_case( $record, $var, $conjugate );
+            my $replacement = &get_var( $record, $var, $conjugate );
+            $replacement = &set_case( $var, $replacement );
             $replacement = A($replacement) if $2;
 
             if ( exists $record->{cache} and not @{ $record->{cache} } ) {
@@ -3016,9 +3025,10 @@ sub expand {
 }
 
 sub set_case {
-    my ( $record, $var, $conjugate ) = @_;
+    my ($var, $value) = @_;
 
     my $case;
+    $var =~ s/\W+//g;
     if ( $var =~ /^[A-Z_]+$/ ) {
         $case = "U";
     } elsif ( $var =~ /^[A-Z][a-z_]+$/ ) {
@@ -3026,6 +3036,20 @@ sub set_case {
     } else {
         $case = "l";
     }
+
+    # values that already include capitals are never modified
+    if ( $value =~ /[A-Z]/ or $case eq "l" ) {
+        return $value;
+    } elsif ( $case eq 'U' ) {
+        return uc $value;
+    } elsif ( $case eq 'u' ) {
+        return join " ", map { ucfirst } split ' ', $value;
+    }
+}
+
+sub get_var {
+    my ( $record, $var, $conjugate ) = @_;
+
     $var = lc $var;
 
     return "\$$var" unless $record->{vals} or $record->{cache};
@@ -3045,14 +3069,7 @@ sub set_case {
         Log " => $value";
     }
 
-    # values that already include capitals are never modified
-    if ( $value =~ /[A-Z]/ or $case eq "l" ) {
-        return $value;
-    } elsif ( $case eq 'U' ) {
-        return uc $value;
-    } elsif ( $case eq 'u' ) {
-        return join " ", map { ucfirst } split ' ', $value;
-    }
+    return $value;
 }
 
 sub read_rss {
