@@ -3115,7 +3115,7 @@ sub count_syllables {
     my $line = shift;
 
     # add spaces to camelCased words
-    $line =~ s/([a-z])([A-Z])/\1 \2/g;
+    $line =~ s/([a-z])([A-Z])/$1 $2/g;
 
     # then ignore case from here on
     $line = lc $line;
@@ -3123,22 +3123,22 @@ sub count_syllables {
     # Deal with dates
     # 1994 - nineteen ninty-four
     # 2008 - two thousand eight or twenty oh eight
-    $line =~ s/\b(1[89]|20)(\d\d)\b/\1 \2/g;
+    $line =~ s/\b(1[89]|20)(\d\d)\b/$1 $2/g;
 
     # deal with comma-form numbers
-    $line =~ s/,(\d\d\d)/\1/g;
+    $line =~ s/,(\d\d\d)/$1/g;
 
     # Deal with > and < when in words or numbers, i.e. "sagan>all"
-    $line =~ s/([a-zA-Z\d ])>([a-zA-Z\d ])/\1 greater than \2/g;
-    $line =~ s/([a-zA-Z\d ])<([a-zA-Z\d ])/\1 less than \2/g;
+    $line =~ s/([a-zA-Z\d ])>([a-zA-Z\d ])/$1 greater than $2/g;
+    $line =~ s/([a-zA-Z\d ])<([a-zA-Z\d ])/$1 less than $2/g;
 
     # Deal with other crap like punctuation
-    $line =~ s/\.(com|org|net|info|biz|us)/ dot \1/g;
+    $line =~ s/\.(com|org|net|info|biz|us)/ dot $1/g;
     $line =~ s/www\./double you double you double you dot /g;
     $line =~ s/[:,\/\*.!?]/ /g;
 
     # Remove hyphens except when dealing with numbers
-    $line =~ s/-(\D|$)/ \1/g;
+    $line =~ s/-(\D|$)/ $1/g;
 
     my @words = split ' ', $line;
     my $syl = 0;
