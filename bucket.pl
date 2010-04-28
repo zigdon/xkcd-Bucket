@@ -1613,7 +1613,11 @@ sub db_success {
           )
         {
             $stats{sex}++;
-            &say( $bag{chl} => $bag{orig} );
+            if ( $bag{type} eq 'irc_ctcp_action' ) {
+                &do( $bag{chl} => $bag{orig} );
+            } else {
+                &say( $bag{chl} => $bag{orig} );
+            }
         } elsif (
             $bag{orig} !~ /\?\s*$/
             and $bag{orig} =~ /^(?:
