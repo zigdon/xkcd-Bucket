@@ -3102,7 +3102,7 @@ sub read_rss {
               }
           }
       }
-    }
+    };
 
     if ($@) {
       Report "Failed when trying to read RSS from $url: $@";
