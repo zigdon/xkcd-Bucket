@@ -3080,11 +3080,12 @@ sub get_var {
 sub read_rss {
     my ( $url, $re, $tag ) = @_;
 
-    require LWP::Simple;
-    require XML::Simple;
-
-    $LWP::Simple::ua->timeout(10);
     eval {
+      require LWP::Simple;
+      import LWP::Simple qw/$ua/;
+      require XML::Simple;
+
+      $LWP::Simple::ua->timeout(10);
       my $rss = LWP::Simple::get($url);
       if ($rss) {
           Log "Retrieved RSS";
