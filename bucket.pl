@@ -125,7 +125,7 @@ my %gender_vars = (
         aliases =>
           [qw/himself herself themself itself himselfherself herselfhimself/]
     },
-    posessive => {
+    possessive => {
         male        => "his",
         female      => "hers",
         androgynous => "theirs",
