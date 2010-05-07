@@ -2589,11 +2589,24 @@ sub get_item {
 
 sub someone {
     my $channel = shift;
-    my @nicks =
-      grep { lc $_ ne $nick and not exists $config->{exclude}{ lc $_ } }
-      keys %{ $stats{users}{$channel} };
-    return 'someone' unless @nicks;
-    return $nicks[ rand(@nicks) ];
+    my @exclude = @_;
+    my %nicks = map {lc $_ => $_} keys %{ $stats{users}{$channel} };
+
+    # we're never someone
+    delete $nicks{$nick};
+
+    # ignore people who asked to be excluded
+    if (ref $config->{exclude}) {
+      delete @nicks{ map {lc} keys %{ $config->{exclude} } };
+    }
+
+    # if we were supplied additional nicks to ignore, remove them
+    foreach my $exclude (@exclude) {
+      delete $nicks{$exclude};
+    }
+      
+    return 'someone' unless keys %nicks;
+    return (values %nicks)[ rand(keys %nicks) ];
 }
 
 sub clear_cache {
@@ -2854,7 +2867,7 @@ sub expand {
     if ( $msg =~ /\$someone\b|\${someone}/i ) {
         $stats{last_vars}{$chl}{someone} = [];
         while ( $msg =~ /(\$someone\b|\${someone})/i ) {
-            my $rnick = &someone($chl);
+            my $rnick = &someone($chl, $who, defined $to ? $to : ());
             my $cased = &set_case( $1, $rnick );
             last unless $msg =~ s/\$someone\b|\${someone}/$cased/i;
             push @{ $stats{last_vars}{$chl}{someone} }, $rnick;
@@ -2866,7 +2879,7 @@ sub expand {
 
     while ( $msg =~ /(\$to\b|\${to})/i ) {
         unless ( defined $to ) {
-            $to = &someone($chl);
+            $to = &someone($chl, $who);
         }
         my $cased = &set_case( $1, $to );
         last unless $msg =~ s/\$to\b|\${to}/$cased/i;
