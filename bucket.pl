@@ -441,7 +441,6 @@ sub irc_on_public {
       )
     {
         my ( $fact, $search ) = ( $1, $3 );
-        $search =~ s{([%?"'])}{\\$1}g;
         $fact = &trim($fact);
         $msg  = $fact;
         Log "Looking up a particular factoid - '$search' in '$fact'";
@@ -2812,21 +2811,24 @@ sub lookup {
     my %params = @_;
     my $sql;
     my $type;
+    my @placeholders;
 
     if ( exists $params{msg} ) {
-        $sql  = "fact = ?";
-        $type = "single";
+        $sql          = "fact = ?";
+        $type         = "single";
+        @placeholders = ( $params{msg} );
     } elsif ( exists $params{msgs} ) {
         $sql = "fact in (" . join( ", ", map { "?" } @{ $params{msgs} } ) . ")";
-        $params{msg} = $params{msgs}[0];
-        $type = "multiple";
+        @placeholders = @{ $params{msgs} };
+        $type         = "multiple";
     } else {
         $sql  = "1";
         $type = "none";
     }
 
     if ( $params{search} ) {
-        $sql .= " and tidbit like \"%$params{search}%\"";
+        $sql .= " and tidbit like ?";
+        push @placeholders, "\%$params{search}\%";
     }
 
     POE::Kernel->post(
@@ -2835,10 +2837,8 @@ sub lookup {
 			where $sql order by rand("
           . int( rand(1e6) ) 
           . ') limit 1',
-        PLACEHOLDERS => $type eq 'multiple' ? $params{msgs}
-        : $type eq 'single' ? [ $params{msg} ]
-        : [],
-        BAGGAGE => {
+        PLACEHOLDERS => \@placeholders,
+        BAGGAGE      => {
             %params,
             cmd       => "fact",
             orig      => $params{orig} || $params{msg},
