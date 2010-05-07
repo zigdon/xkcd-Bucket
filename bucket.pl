@@ -90,6 +90,8 @@ my %config_keys = (
     item_drop_rate         => [ "i", 3 ],
     max_sub_length         => [ "i", 80 ],
     minimum_length         => [ "i", 6 ],
+    nickserv_msg           => [ "s", "" ],
+    nickserv_nick          => [ "s", "NickServ" ],
     random_item_cache_size => [ "i", 20 ],
     random_wait            => [ "i", 3 ],
     user_activity_timeout  => [ "i", 360 ],
@@ -2322,8 +2324,16 @@ sub irc_on_notice {
     my $msg = $_[ARG2];
 
     Log("Notice from $who: $msg");
-    if (    $who eq 'NickServ'
-        and $msg =~ /Password (?:accepted|incorrect)|(?:isn't|not) registered/ )
+
+    return if $stats{identified};
+    if (
+        lc $who eq lc &config("nickserv_nick")
+        and $msg =~ (
+              &config("nickserv_msg")
+            ? &config("nickserv_msg")
+            : qr/Password accepted|(?:isn't|not) registered/
+        )
+      )
     {
         $irc->yield( mode => $nick => "+B" );
         unless ( &config("hide_hostmask") ) {
@@ -2331,6 +2341,7 @@ sub irc_on_notice {
         }
 
         $irc->yield( join => $channel );
+        $stats{identified} = 1;
     }
 }
 
@@ -2590,23 +2601,23 @@ sub get_item {
 sub someone {
     my $channel = shift;
     my @exclude = @_;
-    my %nicks = map {lc $_ => $_} keys %{ $stats{users}{$channel} };
+    my %nicks   = map { lc $_ => $_ } keys %{ $stats{users}{$channel} };
 
     # we're never someone
     delete $nicks{$nick};
 
     # ignore people who asked to be excluded
-    if (ref $config->{exclude}) {
-      delete @nicks{ map {lc} keys %{ $config->{exclude} } };
+    if ( ref $config->{exclude} ) {
+        delete @nicks{ map { lc } keys %{ $config->{exclude} } };
     }
 
     # if we were supplied additional nicks to ignore, remove them
     foreach my $exclude (@exclude) {
-      delete $nicks{$exclude};
+        delete $nicks{$exclude};
     }
-      
+
     return 'someone' unless keys %nicks;
-    return (values %nicks)[ rand(keys %nicks) ];
+    return ( values %nicks )[ rand( keys %nicks ) ];
 }
 
 sub clear_cache {
@@ -2867,7 +2878,7 @@ sub expand {
     if ( $msg =~ /\$someone\b|\${someone}/i ) {
         $stats{last_vars}{$chl}{someone} = [];
         while ( $msg =~ /(\$someone\b|\${someone})/i ) {
-            my $rnick = &someone($chl, $who, defined $to ? $to : ());
+            my $rnick = &someone( $chl, $who, defined $to ? $to : () );
             my $cased = &set_case( $1, $rnick );
             last unless $msg =~ s/\$someone\b|\${someone}/$cased/i;
             push @{ $stats{last_vars}{$chl}{someone} }, $rnick;
@@ -2879,7 +2890,7 @@ sub expand {
 
     while ( $msg =~ /(\$to\b|\${to})/i ) {
         unless ( defined $to ) {
-            $to = &someone($chl, $who);
+            $to = &someone( $chl, $who );
         }
         my $cased = &set_case( $1, $to );
         last unless $msg =~ s/\$to\b|\${to}/$cased/i;
@@ -3094,33 +3105,33 @@ sub read_rss {
     my ( $url, $re, $tag ) = @_;
 
     eval {
-      require LWP::Simple;
-      import LWP::Simple qw/$ua/;
-      require XML::Simple;
+        require LWP::Simple;
+        import LWP::Simple qw/$ua/;
+        require XML::Simple;
 
-      $LWP::Simple::ua->timeout(10);
-      my $rss = LWP::Simple::get($url);
-      if ($rss) {
-          Log "Retrieved RSS";
-          my $xml = XML::Simple::XMLin($rss);
-          for ( 1 .. 5 ) {
-              if ( $xml and my $story = $xml->{channel}{item}[ rand(40) ] ) {
-                  $story->{description} =
-                    HTML::Entities::decode_entities( $story->{description} );
-                  $story->{description} =~ s/$re//isg if $re;
-                  next if $url =~ /twitter/ and $story->{description} =~ /^@/;
-                  next if length $story->{description} > 400;
-                  next if $story->{description} =~ /\[\.\.\.\]/;
+        $LWP::Simple::ua->timeout(10);
+        my $rss = LWP::Simple::get($url);
+        if ($rss) {
+            Log "Retrieved RSS";
+            my $xml = XML::Simple::XMLin($rss);
+            for ( 1 .. 5 ) {
+                if ( $xml and my $story = $xml->{channel}{item}[ rand(40) ] ) {
+                    $story->{description} =
+                      HTML::Entities::decode_entities( $story->{description} );
+                    $story->{description} =~ s/$re//isg if $re;
+                    next if $url =~ /twitter/ and $story->{description} =~ /^@/;
+                    next if length $story->{description} > 400;
+                    next if $story->{description} =~ /\[\.\.\.\]/;
 
-                  return ( $story->{description}, $story->{$tag} );
-              }
-          }
-      }
+                    return ( $story->{description}, $story->{$tag} );
+                }
+            }
+        }
     };
 
     if ($@) {
-      Report "Failed when trying to read RSS from $url: $@";
-      return ();
+        Report "Failed when trying to read RSS from $url: $@";
+        return ();
     }
 }
 
