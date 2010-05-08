@@ -82,6 +82,7 @@ my %config_keys = (
     band_var               => [ "s", 'band' ],
     ex_to_sex              => [ "p", 1 ],
     haiku_report           => [ "i", 1 ],
+    hide_hostmask          => [ "b", 0 ],
     history_size           => [ "i", 30 ],
     idle_source            => [ "s", 'factoid' ],
     increase_mute          => [ "i", 60 ],
@@ -945,6 +946,8 @@ sub irc_on_public {
         } elsif ( $config_keys{$key}[0] eq 's' ) {
             $val =~ s/^\s+|\s+$//g;
             $config->{$key} = $val;
+        } elsif ( $config_keys{$key}[0] eq 'b' and $val =~ /^(true|false)$/ ) {
+            $config->{$key} = $val eq 'true';
         } else {
             &say( $chl => "Sorry, $who, that's an invalid value for $key." );
             return;
