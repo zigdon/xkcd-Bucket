@@ -96,6 +96,7 @@ my %config_keys = (
     random_item_cache_size => [ "i", 20 ],
     random_wait            => [ "i", 3 ],
     user_activity_timeout  => [ "i", 360 ],
+    user_mode              => [ "s", "+B" ],
     value_cache_limit      => [ "i", 1000 ],
     your_mom_is            => [ "p", 5 ],
     www_root               => [ "s", "" ],
@@ -2337,7 +2338,7 @@ sub irc_on_notice {
         )
       )
     {
-        $irc->yield( mode => $nick => "+B" );
+        $irc->yield( mode => $nick => &config("user_mode") );
         unless ( &config("hide_hostmask") ) {
             $irc->yield( mode => $nick => "-x" );
         }
