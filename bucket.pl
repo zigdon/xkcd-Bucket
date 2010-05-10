@@ -1541,6 +1541,28 @@ sub db_success {
             );
 
             return;
+        } elsif (
+            $bag{addressed}
+            and $bag{orig} =~ m{ ^ \s* (how|what|who|where|why) # interrogative
+                                   \s+ does 
+                                   \s+ (\S+) # nick
+                                   \s+ (\w+) # verb
+                                   (?:.*) # more }xi
+          )
+        {
+            my ( $inter, $member, $verb, $more ) = ( $1, $2, $3, $4 );
+            if ( &is_nick( $bag{chl}, $member ) ) {
+                &lookup(
+                    %bag,
+                    editable => 0,
+                    msg      => $member,
+                    orig     => $member,
+                    verb     => &s_form($verb),
+                    starts   => $more,
+                );
+
+                return;
+            }
         } elsif ( $bag{addressed}
             and $bag{orig} =~ m{^([\s0-9a-fA-F_x+\-*/.()]+)$} )
         {
@@ -2601,6 +2623,17 @@ sub get_item {
     }
 }
 
+sub is_nick {
+    my $channel = shift;
+    my $who     = shift;
+
+    my ($pass) = grep /^\Q$who\E$/i, keys %{ $stats{users}{$channel} };
+
+    Log "Checking if $who is $channel: $pass";
+
+    return $pass ? 1 : 0;
+}
+
 sub someone {
     my $channel = shift;
     my @exclude = @_;
@@ -2830,7 +2863,15 @@ sub lookup {
         $type = "none";
     }
 
-    if ( $params{search} ) {
+    if ( exists $params{verb} ) {
+        $sql .= " and verb = ?";
+        push @placeholders, $params{verb};
+    }
+
+    if ( $params{starts} ) {
+        $sql .= " and tidbit like ?";
+        push @placeholders, "$params{starts}\%";
+    } elsif ( $params{search} ) {
         $sql .= " and tidbit like ?";
         push @placeholders, "\%$params{search}\%";
     }
