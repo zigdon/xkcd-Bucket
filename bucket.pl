@@ -1410,7 +1410,7 @@ sub db_success {
                     return;
                 }
                 $bag{aliases}{ $line{tidbit} } = 1;
-                $bag{alias_id} = $line{id} unless $bag{alias_id};
+                $bag{alias_chain} .= "'$line{fact}' => ";
 
                 Log "Following alias '$line{fact}' -> '$line{tidbit}'";
                 &lookup( %bag, msg => $line{tidbit} );
@@ -1421,7 +1421,8 @@ sub db_success {
             $bag{orig} = $line{fact} unless defined $bag{orig};
 
             $stats{last_vars}{ $bag{chl} } = {};
-            $stats{last_fact}{ $bag{chl} } = $bag{alias_id} || $line{id};
+            $stats{last_fact}{ $bag{chl} } = $line{id};
+            $stats{last_alias_chain}{ $bag{chl} } = $bag{alias_chain};
             $stats{lookup}++;
 
          # if we're just idle chatting, replace any $who reference with $someone
@@ -1542,8 +1543,7 @@ sub db_success {
 
             return;
         } elsif (
-            $bag{addressed}
-            and $bag{orig} =~ m{ ^ \s* (how|what|who|where|why) # interrogative
+            $bag{orig} =~ m{ ^ \s* (how|what|who|where|why) # interrogative
                                    \s+ does 
                                    \s+ (\S+) # nick
                                    \s+ (\w+) # verb
@@ -2167,11 +2167,15 @@ sub db_success {
                 $report =~ s/\n//g;
                 $report =~ s/\$VAR1 = //;
                 $report =~ s/  +/ /g;
-                &say(   $bag{chl} => "$bag{who}: That was '$line{fact}' "
+                &say(   $bag{chl} => "$bag{who}: That was " .
+                      ( $stats{last_alias_chain}{$bag{chl}} || "" ) .
+                      "'$line{fact}' "
                       . "(#$bag{id}): $line{verb} $line{tidbit};  "
                       . "vars used: $report." );
             } else {
-                &say( $bag{chl} => "$bag{who}: That was '$line{fact}' "
+                &say( $bag{chl} => "$bag{who}: That was " .
+                      ( $stats{last_alias_chain}{$bag{chl}} || "" ) .
+                      "'$line{fact}' "
                       . "(#$bag{id}): $line{verb} $line{tidbit}" );
             }
         } else {
