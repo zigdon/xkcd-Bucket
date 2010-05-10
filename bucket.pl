@@ -1551,8 +1551,7 @@ sub db_success {
           )
         {
             my ( $inter, $member, $verb, $more ) = ( $1, $2, $3, $4 );
-            $member = &is_nick( $bag{chl}, $member );
-            if ($member) {
+            if (DEBUG or $irc->is_channel_member( $bag{chl}, $member )) {
                 Log "Looking up $member($verb) + $more";
                 &lookup(
                     %bag,
@@ -2627,23 +2626,6 @@ sub get_item {
     } else {
         return $inventory[$item];
     }
-}
-
-sub is_nick {
-    my $channel = shift;
-    my $who     = shift;
-
-    my %users = map { lc $_ => $_ } keys %{ $stats{users}{$channel} };
-
-    Log "Checking if $who is $channel:";
-    if ( DEBUG and $channel ne $mainchannel ) {
-        Log " => Debug is on, so faking it";
-        return $who;
-    }
-
-    my $normalized = $users{ lc $who };
-    Log " => $normalized";
-    return $normalized || undef;
 }
 
 sub someone {
