@@ -77,30 +77,31 @@ my %replacables;
 my %history;
 
 my %config_keys = (
-    bananas_chance         => [ "p", 0.02 ],
-    band_name              => [ "p", 5 ],
-    band_var               => [ "s", 'band' ],
-    ex_to_sex              => [ "p", 1 ],
-    haiku_report           => [ "i", 1 ],
-    hide_hostmask          => [ "b", 0 ],
-    history_size           => [ "i", 30 ],
-    idle_source            => [ "s", 'factoid' ],
-    increase_mute          => [ "i", 60 ],
-    inventory_preload      => [ "i", 0 ],
-    inventory_size         => [ "i", 20 ],
-    item_drop_rate         => [ "i", 3 ],
-    max_sub_length         => [ "i", 80 ],
-    minimum_length         => [ "i", 6 ],
-    nickserv_msg           => [ "s", "" ],
-    nickserv_nick          => [ "s", "NickServ" ],
-    random_item_cache_size => [ "i", 20 ],
-    random_wait            => [ "i", 3 ],
-    user_activity_timeout  => [ "i", 360 ],
-    user_mode              => [ "s", "+B" ],
-    value_cache_limit      => [ "i", 1000 ],
-    your_mom_is            => [ "p", 5 ],
-    www_root               => [ "s", "" ],
-    www_url                => [ "s", "" ],
+    bananas_chance         => [ p => 0.02 ],
+    band_name              => [ p => 5 ],
+    band_var               => [ s => 'band' ],
+    ex_to_sex              => [ p => 1 ],
+    haiku_report           => [ i => 1 ],
+    hide_hostmask          => [ b => 0 ],
+    history_size           => [ i => 30 ],
+    idle_source            => [ s => 'factoid' ],
+    increase_mute          => [ i => 60 ],
+    inventory_preload      => [ i => 0 ],
+    inventory_size         => [ i => 20 ],
+    item_drop_rate         => [ i => 3 ],
+    max_sub_length         => [ i => 80 ],
+    minimum_length         => [ i => 6 ],
+    nickserv_msg           => [ s => "" ],
+    nickserv_nick          => [ s => "NickServ" ],
+    random_item_cache_size => [ i => 20 ],
+    random_wait            => [ i => 3 ],
+    repeated_queries       => [ i => 5 ],
+    user_activity_timeout  => [ i => 360 ],
+    user_mode              => [ s => "+B" ],
+    value_cache_limit      => [ i => 1000 ],
+    your_mom_is            => [ p => 5 ],
+    www_root               => [ s => "" ],
+    www_url                => [ s => "" ],
 );
 
 my %gender_vars = (
@@ -326,7 +327,9 @@ sub irc_on_public {
     }
 
     # keep track of who's active in each channel
-    $stats{users}{$chl}{$who} = time;
+    if ( $chl =~ /^#/ ) {
+        $stats{users}{$chl}{$who}{last_active} = time;
+    }
 
     unless ( exists $stats{users}{genders}{ lc $who } ) {
         &load_gender($who);
@@ -1355,6 +1358,42 @@ sub irc_on_public {
                 $msg = $nick;
             }
 
+            if ( not $operator and $type eq 'irc_public' ) {
+                unless ( $stats{users}{$chl}{$who}{last_lookup} ) {
+                    $stats{users}{$chl}{$who}{last_lookup} = [ $msg, 0 ];
+                }
+
+                if ( $stats{users}{$chl}{$who}{last_lookup}[0] eq $msg ) {
+                    if ( ++$stats{users}{$chl}{$who}{last_lookup}[1] ==
+                        &config("repeated_queries") )
+                    {
+                        Report "Volunteering a dump of '$msg' for $who in $chl";
+                        $_[KERNEL]->post(
+                            db => 'MULTIPLE',
+                            SQL =>
+                              'select id, verb, tidbit, mood, chance, protected
+                                          from bucket_facts where fact = ? order by id',
+                            PLACEHOLDERS => [$msg],
+                            BAGGAGE      => {
+                                %bag,
+                                cmd  => "literal",
+                                page => "*",
+                                fact => $msg,
+                            },
+                            EVENT => 'db_success'
+                        );
+                        return;
+                    } elsif ( $stats{users}{$chl}{$who}{last_lookup}[1] >
+                        &config("repeated_queries") )
+                    {
+                        Log "Ignoring $who who is asking '$msg' in $chl";
+                        return;
+                    }
+                } else {
+                    $stats{users}{$chl}{$who}{last_lookup} = [ $msg, 1 ];
+                }
+            }
+
             #Log "Looking up $msg";
             &lookup(
                 %bag,
@@ -1551,7 +1590,7 @@ sub db_success {
           )
         {
             my ( $inter, $member, $verb, $more ) = ( $1, $2, $3, $4 );
-            if (DEBUG or $irc->is_channel_member( $bag{chl}, $member )) {
+            if ( DEBUG or $irc->is_channel_member( $bag{chl}, $member ) ) {
                 Log "Looking up $member($verb) + $more";
                 &lookup(
                     %bag,
@@ -2190,7 +2229,7 @@ sub db_success {
             return;
         }
 
-        if ( $bag{page} > 10 ) {
+        if ( $bag{page} ne "*" and $bag{page} > 10 ) {
             $bag{page} = "*";
         }
 
@@ -2652,9 +2691,10 @@ sub someone {
 
 sub clear_cache {
     foreach my $channel ( keys %{ $stats{users} } ) {
+        next if $channel !~ /^#/;
         foreach my $user ( keys %{ $stats{users}{$channel} } ) {
             delete $stats{users}{$channel}{$user}
-              if $stats{users}{$channel}{$user} <
+              if $stats{users}{$channel}{$user}{last_active} <
                   time - &config("user_activity_timeout");
         }
     }
