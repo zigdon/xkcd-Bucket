@@ -1358,7 +1358,9 @@ sub irc_on_public {
                 $msg = $nick;
             }
 
-            if ( not $operator and $type eq 'irc_public' ) {
+            if ( not $operator and
+                 $type eq 'irc_public' and
+                 &config("repeated_queries") > 0 ) {
                 unless ( $stats{users}{$chl}{$who}{last_lookup} ) {
                     $stats{users}{$chl}{$who}{last_lookup} = [ $msg, 0 ];
                 }
