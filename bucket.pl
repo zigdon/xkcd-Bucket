@@ -1970,10 +1970,10 @@ sub db_success {
 
             if ( $fact =~ /\S/ ) {
                 $stats{edited}++;
-                Report "$bag{who} edited $line->{fact}($line->{id})"
+                Report "$bag{who} edited $line->{fact}(#$line->{id})"
                   . " in $bag{chl}: New values: $fact";
-                Log
-"$bag{who} edited $line->{fact}($line->{id}): New values: $fact";
+                Log "$bag{who} edited $line->{fact}($line->{id}): " .
+                    "New values: $fact";
                 my ( $verb, $tidbit );
                 if ( $fact =~ /^<(\w+)>\s*(.*)/ ) {
                     ( $verb, $tidbit ) = ( "<$1>", $2 );
@@ -2139,9 +2139,6 @@ sub db_success {
             delete $bag{also};
         }
 
-        Report "$bag{who} taught in $bag{chl}:"
-          . " '$bag{fact}', '$bag{verb}', '$bag{tidbit}'";
-        Log "$bag{who} taught '$bag{fact}', '$bag{verb}', '$bag{tidbit}'";
         &sql(
             'insert bucket_facts (fact, verb, tidbit, protected)
                      values (?, ?, ?, ?)',
@@ -2156,6 +2153,10 @@ sub db_success {
             ];
 
             $stats{last_fact}{ $bag{chl} } = $res->{INSERTID};
+
+            Report "$bag{who} taught in $bag{chl} (#$res->{INSERTID}):"
+              . " '$bag{fact}', '$bag{verb}', '$bag{tidbit}'";
+            Log "$bag{who} taught '$bag{fact}', '$bag{verb}', '$bag{tidbit}'";
         }
         my $ack;
         if ( $bag{also} ) {
