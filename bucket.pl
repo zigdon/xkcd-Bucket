@@ -1972,8 +1972,8 @@ sub db_success {
                 $stats{edited}++;
                 Report "$bag{who} edited $line->{fact}(#$line->{id})"
                   . " in $bag{chl}: New values: $fact";
-                Log "$bag{who} edited $line->{fact}($line->{id}): " .
-                    "New values: $fact";
+                Log "$bag{who} edited $line->{fact}($line->{id}): "
+                  . "New values: $fact";
                 my ( $verb, $tidbit );
                 if ( $fact =~ /^<(\w+)>\s*(.*)/ ) {
                     ( $verb, $tidbit ) = ( "<$1>", $2 );
