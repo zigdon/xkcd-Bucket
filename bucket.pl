@@ -981,10 +981,16 @@ sub irc_on_public {
     } elsif ( $operator and $addressed and $msg =~ /^get (\w+)/ ) {
         my ($key) = ($1);
         unless ( exists $config_keys{$key} ) {
-            &say(
-                $chl => "$who: Valid keys are: " . join ", ",
-                sort keys %config_keys
-            );
+            my @keys = sort keys %config_keys;
+            my $list = "$who: Valid keys are: ";
+            while (@keys) {
+                while ( length $list < 350 and @keys ) {
+                    $list .= shift(@keys) . "; ";
+                }
+
+                &say( $chl => $list );
+                $list = "$who: ";
+            }
             return;
         }
 
