@@ -505,24 +505,26 @@ sub irc_on_public {
         @inventory = grep { $_ ne $item } @inventory;
         &sql( "delete from bucket_items where `what` = ?", [$item] );
         delete $stats{detailed_inventory}{$who}[$num];
-    } elsif ( $addressed and $operator and $msg =~ /^delete (#)?(.+)/i ) {
-        my $id   = $1;
-        my $fact = $2;
+    } elsif ( $addressed and $operator and $msg =~ /^delete ((#)?.+)/i ) {
+        my $id   = $2;
+        my $fact = $1;
         $stats{deleted}++;
 
         if ($id) {
-            $_[KERNEL]->post(
-                db  => "SINGLE",
-                SQL => "select fact, tidbit, verb, RE, protected, mood, chance
-                                       from bucket_facts where id = ?",
-                PLACEHOLDERS => [$fact],
-                EVENT        => "db_success",
-                BAGGAGE      => {
-                    %bag,
-                    cmd  => "delete_id",
-                    fact => $fact,
-                }
-            );
+            while ($fact =~ s/#(\d+)\s*//) {
+                $_[KERNEL]->post(
+                    db  => "SINGLE",
+                    SQL => "select fact, tidbit, verb, RE, protected, mood, chance
+                                           from bucket_facts where id = ?",
+                    PLACEHOLDERS => [$1],
+                    EVENT        => "db_success",
+                    BAGGAGE      => {
+                        %bag,
+                        cmd  => "delete_id",
+                        fact => $1,
+                    }
+                );
+            };
         } else {
             $_[KERNEL]->post(
                 db  => "MULTIPLE",
