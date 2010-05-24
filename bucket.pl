@@ -468,7 +468,6 @@ sub irc_on_public {
         &lookup(
             %bag,
             msg      => $msg,
-            editable => 0,
             search   => $search,
         );
     } elsif ( $msg =~ /^literal(?:\[([*\d]+)\])?\s+(.*)/i ) {
