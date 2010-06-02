@@ -32,6 +32,7 @@ use Data::Dumper;
 use Fcntl qw/:seek/;
 use HTML::Entities;
 use URI::Escape;
+use File::Copy;
 $Data::Dumper::Indent = 1;
 
 # try to load Math::BigFloat if possible
@@ -46,8 +47,6 @@ use constant { DEBUG => 0 };
 
 # work around a bug: https://rt.cpan.org/Ticket/Display.html?id=50991
 sub s_form { return Lingua::EN::Conjugate::s_form(@_); }
-
-my $VERSION = '$Id: bucket.pl 685 2009-08-04 19:15:15Z dan $';
 
 $SIG{CHLD} = 'IGNORE';
 
@@ -156,6 +155,14 @@ if ( &config("logfile") ) {
       or die "Can't write " . &config("logfile") . ": $!";
 }
 
+# make sure the file_input file is empty, if it is defined
+# (so that we don't delete anything important by mistake)
+if ( &config("file_input") and -f &config("file_input") ) {
+    &Log("Ignoring the file_input directive since that file already exists " .
+         "at startup");
+    delete $config->{file_input};
+}
+
 # set up gender aliases
 foreach my $type ( keys %gender_vars ) {
     foreach my $alias ( @{ $gender_vars{$type}{aliases} } ) {
@@ -187,7 +194,7 @@ POE::Session->create(
         irc_chan_sync    => \&irc_on_chan_sync,
         db_success       => \&db_success,
         delayed_post     => \&delayed_post,
-        check_idle       => \&check_idle,
+        heartbeat        => \&heartbeat,
     },
 );
 
@@ -467,8 +474,8 @@ sub irc_on_public {
         Log "Looking up a particular factoid - '$search' in '$fact'";
         &lookup(
             %bag,
-            msg      => $msg,
-            search   => $search,
+            msg    => $msg,
+            search => $search,
         );
     } elsif ( $msg =~ /^literal(?:\[([*\d]+)\])?\s+(.*)/i ) {
         my ( $page, $fact ) = ( $1 || 1, $2 );
@@ -510,10 +517,11 @@ sub irc_on_public {
         $stats{deleted}++;
 
         if ($id) {
-            while ($fact =~ s/#(\d+)\s*//) {
+            while ( $fact =~ s/#(\d+)\s*// ) {
                 $_[KERNEL]->post(
-                    db  => "SINGLE",
-                    SQL => "select fact, tidbit, verb, RE, protected, mood, chance
+                    db => "SINGLE",
+                    SQL =>
+                      "select fact, tidbit, verb, RE, protected, mood, chance
                                            from bucket_facts where id = ?",
                     PLACEHOLDERS => [$1],
                     EVENT        => "db_success",
@@ -523,7 +531,7 @@ sub irc_on_public {
                         fact => $1,
                     }
                 );
-            };
+            }
         } else {
             $_[KERNEL]->post(
                 db  => "MULTIPLE",
@@ -581,13 +589,16 @@ sub irc_on_public {
     {
         &say( $chl => "\\o/" );
         $talking{$chl} = -1;
-    } elsif ( $addressed and $operator and $msg =~ /^(join|part) (#[-\w]+)/i ) {
-        my ( $cmd, $dst ) = ( $1, $2 );
+    } elsif ( $addressed
+        and $operator
+        and $msg =~ /^(join|part) (#[-\w]+)(?: (.*))?/i )
+    {
+        my ( $cmd, $dst, $msg ) = ( $1, $2, $3 );
         unless ($dst) {
             &say( $chl => "$who: $cmd what channel?" );
             return;
         }
-        $irc->yield( $cmd => $dst );
+        $irc->yield( $cmd => $dst, $msg );
         &say( $chl => "$who: ${cmd}ing $dst" );
         Report "${cmd}ing $dst at ${who}'s request";
     } elsif ( $addressed and $operator and lc $msg eq 'list ignored' ) {
@@ -1440,7 +1451,7 @@ sub db_success {
         {
             print "RESULT: ", scalar @{ $res->{RESULT} }, "\n";
         } else {
-            print "$_:\n", Dumper $res->{$_};
+            print "$_:\n", Dumper $res->{$_} if /BAGGAGE|PLACEHOLDERS|RESULT/;
         }
     }
     my %bag = ref $res->{BAGGAGE} ? %{ $res->{BAGGAGE} } : ();
@@ -1449,7 +1460,7 @@ sub db_success {
         if ( $res->{ERROR} eq 'Lost connection to the database server.' ) {
             Report "DB Error: $res->{ERROR}  Restarting.";
             Log "DB Error: $res->{ERROR}";
-            &say( $channel => "Lost my database!  I'll be right back." );
+            &say( $channel => "Database lost.  Self-destruct initialized." );
             $irc->yield( quit => "Eep, the house is on fire!" );
             return;
         }
@@ -2408,7 +2419,7 @@ sub irc_start {
         }
     );
 
-    $_[KERNEL]->delay( check_idle => 60 );
+    $_[KERNEL]->delay( heartbeat => 60 );
 
     if ( &config("bucketlog") and -f &config("bucketlog") and open BLOG,
         &config("bucketlog") )
@@ -2620,8 +2631,33 @@ sub tail {
     seek BLOG, 0, SEEK_CUR;
 }
 
-sub check_idle {
-    $_[KERNEL]->delay( check_idle => 60 );
+sub heartbeat {
+    $_[KERNEL]->delay( heartbeat => 60 );
+
+    if ( my $file_input = &config("file_input") ) {
+        move $file_input, "$file_input.processing";
+        if ( open FI, "$file_input.processing" ) {
+            while (<FI>) {
+                chomp;
+                my ( $output, $who, $msg ) = split ' ', $_, 3;
+                $msg =~ s/\s\s+/ /g;
+                $msg =~ s/^\s+|\s+$//g;
+                $msg = &trim($msg);
+
+                Log "file input: $output, $who: $msg";
+                &lookup(
+                    editable  => 0,
+                    addressed => 1,
+                    chl       => $output,
+                    who       => $who,
+                    msg       => $msg,
+                );
+            }
+
+            close FI;
+        }
+        unlink "$file_input.processing";
+    }
 
     my $chl = DEBUG ? $channel : $mainchannel;
     $last_activity{$chl} ||= time;
@@ -2868,6 +2904,17 @@ sub say {
     my $chl  = shift;
     my $text = "@_";
 
+    if ( $chl =~ m#^/# ) {
+        Log "Writing to '$chl'";
+        if ( open FO, ">>", $chl ) {
+            print FO "S $text\n";
+            close FO;
+        } else {
+            Log "Failed to write to $chl: $!";
+        }
+        return;
+    }
+
     if ( &config("haiku_report") ) {
         ( $stats{haiku_debug}{$chl}{count}, $stats{haiku_debug}{$chl}{line} ) =
           &count_syllables($text);
@@ -2882,6 +2929,16 @@ sub say {
 sub do {
     my $chl    = shift;
     my $action = "@_";
+
+    if ( $chl =~ m#^/# ) {
+        if ( open FO, ">>", $chl ) {
+            print FO "D $action\n";
+            close FO;
+        } else {
+            Log "Failed to write to $chl: $!";
+        }
+        return;
+    }
 
     if ( &config("haiku_report") ) {
         ( $stats{haiku_debug}{$chl}{count}, $stats{haiku_debug}{$chl}{line} ) =
@@ -2956,7 +3013,6 @@ sub lookup {
             addressed => $params{addressed} || 0,
             editable  => $params{editable} || 0,
             op        => $params{op} || 0,
-            idle      => $params{idle} || 0,
             type      => $params{type} || "irc_public",
         },
         EVENT => 'db_success'
