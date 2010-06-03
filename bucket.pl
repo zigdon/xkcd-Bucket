@@ -79,6 +79,7 @@ my %config_keys = (
     band_name              => [ p => 5 ],
     band_var               => [ s => 'band' ],
     ex_to_sex              => [ p => 1 ],
+    file_input             => [ f => "" ],
     haiku_report           => [ i => 1 ],
     hide_hostmask          => [ b => 0 ],
     history_size           => [ i => 30 ],
@@ -97,9 +98,9 @@ my %config_keys = (
     user_activity_timeout  => [ i => 360 ],
     user_mode              => [ s => "+B" ],
     value_cache_limit      => [ i => 1000 ],
-    your_mom_is            => [ p => 5 ],
     www_root               => [ s => "" ],
     www_url                => [ s => "" ],
+    your_mom_is            => [ p => 5 ],
 );
 
 my %gender_vars = (
@@ -979,6 +980,13 @@ sub irc_on_public {
             $config->{$key} = $val;
         } elsif ( $config_keys{$key}[0] eq 'b' and $val =~ /^(true|false)$/ ) {
             $config->{$key} = $val eq 'true';
+        } elsif ( $config_keys{$key}[0] eq 'f' and length $val) {
+            if ( -f $val ) {
+                &say( $chl => "Sorry, $who, $val already exists." );
+                return;
+            } else {
+                $config->{$key} = $val;
+            }
         } else {
             &say( $chl => "Sorry, $who, that's an invalid value for $key." );
             return;
