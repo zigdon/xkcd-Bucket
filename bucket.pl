@@ -32,7 +32,6 @@ use Data::Dumper;
 use Fcntl qw/:seek/;
 use HTML::Entities;
 use URI::Escape;
-use File::Copy;
 $Data::Dumper::Indent = 1;
 
 # try to load Math::BigFloat if possible
@@ -2419,13 +2418,14 @@ sub irc_start {
         }
     );
 
-    $_[KERNEL]->delay( heartbeat => 60 );
-
     if ( &config("bucketlog") and -f &config("bucketlog") and open BLOG,
         &config("bucketlog") )
     {
         seek BLOG, 0, SEEK_END;
     }
+
+    $_[KERNEL]->delay( heartbeat => 10 );
+
 }
 
 sub irc_on_notice {
@@ -2635,7 +2635,7 @@ sub heartbeat {
     $_[KERNEL]->delay( heartbeat => 60 );
 
     if ( my $file_input = &config("file_input") ) {
-        move $file_input, "$file_input.processing";
+        rename $file_input, "$file_input.processing";
         if ( open FI, "$file_input.processing" ) {
             while (<FI>) {
                 chomp;
@@ -2645,13 +2645,23 @@ sub heartbeat {
                 $msg = &trim($msg);
 
                 Log "file input: $output, $who: $msg";
-                &lookup(
-                    editable  => 0,
-                    addressed => 1,
-                    chl       => $output,
-                    who       => $who,
-                    msg       => $msg,
-                );
+
+                if ($msg eq 'something random') {
+                  &lookup(
+                      editable  => 0,
+                      addressed => 1,
+                      chl       => $output,
+                      who       => &someone($channel),
+                  );
+                } else {
+                  &lookup(
+                      editable  => 0,
+                      addressed => 1,
+                      chl       => $output,
+                      who       => $who,
+                      msg       => $msg,
+                  );
+                }
             }
 
             close FI;
