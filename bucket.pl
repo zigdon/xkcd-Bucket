@@ -1364,7 +1364,7 @@ sub irc_on_public {
         }
 
         Log "$who set ${target}'s gender to $gender";
-        $stats{users}{genders}{ lc $target } = $gender;
+        $stats{users}{genders}{ lc $target } = lc $gender;
         &sql( "replace genders (nick, gender, stamp) values (?, ?, ?)",
             [ $target, $gender, undef ] );
         &say( $chl => "Okay, $who" );
@@ -1821,7 +1821,7 @@ sub db_success {
         }
     } elsif ( $bag{cmd} eq 'load_gender' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
-        $stats{users}{genders}{ lc $bag{nick} } = $line{gender}
+        $stats{users}{genders}{ lc $bag{nick} } = lc $line{gender}
           || "androgynous";
     } elsif ( $bag{cmd} eq 'load_vars' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
@@ -3142,6 +3142,8 @@ sub expand {
                     last unless $msg =~ s/\Q$1/$cased/g;
                 }
                 $stats{last_vars}{$chl}{$gvar} = $g_v;
+            } else {
+              Log "Can't find gvar for $gvar->$gender!";
             }
         }
     }
