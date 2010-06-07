@@ -158,8 +158,8 @@ if ( &config("logfile") ) {
 # make sure the file_input file is empty, if it is defined
 # (so that we don't delete anything important by mistake)
 if ( &config("file_input") and -f &config("file_input") ) {
-    &Log("Ignoring the file_input directive since that file already exists " .
-         "at startup");
+    &Log(   "Ignoring the file_input directive since that file already exists "
+          . "at startup" );
     delete $config->{file_input};
 }
 
@@ -980,7 +980,7 @@ sub irc_on_public {
             $config->{$key} = $val;
         } elsif ( $config_keys{$key}[0] eq 'b' and $val =~ /^(true|false)$/ ) {
             $config->{$key} = $val eq 'true';
-        } elsif ( $config_keys{$key}[0] eq 'f' and length $val) {
+        } elsif ( $config_keys{$key}[0] eq 'f' and length $val ) {
             if ( -f $val ) {
                 &say( $chl => "Sorry, $who, $val already exists." );
                 return;
@@ -1236,7 +1236,7 @@ sub irc_on_public {
         foreach my $item ( sort @inventory ) {
             $c++;
             push @{ $stats{detailed_inventory}{$who} }, $item;
-            if ( length $line + length "$c. $item; " < 350 ) {
+            if ( length($line) + length("$c. $item; ") < 350 ) {
                 $line .= "$c. $item; ";
                 next;
             }
@@ -2654,21 +2654,21 @@ sub heartbeat {
 
                 Log "file input: $output, $who: $msg";
 
-                if ($msg eq 'something random') {
-                  &lookup(
-                      editable  => 0,
-                      addressed => 1,
-                      chl       => $output,
-                      who       => &someone($channel),
-                  );
+                if ( $msg eq 'something random' ) {
+                    &lookup(
+                        editable  => 0,
+                        addressed => 1,
+                        chl       => $output,
+                        who       => &someone($channel),
+                    );
                 } else {
-                  &lookup(
-                      editable  => 0,
-                      addressed => 1,
-                      chl       => $output,
-                      who       => $who,
-                      msg       => $msg,
-                  );
+                    &lookup(
+                        editable  => 0,
+                        addressed => 1,
+                        chl       => $output,
+                        who       => $who,
+                        msg       => $msg,
+                    );
                 }
             }
 
@@ -3143,7 +3143,7 @@ sub expand {
                 }
                 $stats{last_vars}{$chl}{$gvar} = $g_v;
             } else {
-              Log "Can't find gvar for $gvar->$gender!";
+                Log "Can't find gvar for $gvar->$gender!";
             }
         }
     }
