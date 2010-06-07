@@ -2159,6 +2159,11 @@ sub db_success {
             }
         }
 
+        if ( lc $bag{verb} eq '<alias>' ) {
+            &say( $bag{chl} => "$bag{who}, please use the 'alias' command." );
+            return;
+        }
+
         # we said 'is also' but we didn't get any existing results
         if ( $bag{also} and $res->{RESULT} ) {
             delete $bag{also};
