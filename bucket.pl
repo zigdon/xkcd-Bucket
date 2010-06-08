@@ -358,8 +358,8 @@ sub irc_on_public {
             and time - $stats{last_talk}{$chl}{$who}{when} <
             &config("user_activity_timeout") )
         {
-            Report "Ignoring $who who is flooding in $chl.";
             if ( $stats{last_talk}{$chl}{$who}{count} == 21 ) {
+                Report "Ignoring $who who is flooding in $chl.";
                 &say( $chl =>
                       "$who, I'm a bit busy now, try again in 5 minutes?" );
             }
