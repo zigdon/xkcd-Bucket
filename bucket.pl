@@ -3154,6 +3154,7 @@ sub expand {
     }
 
     my $oldmsg = "";
+    $stats{last_vars}{$chl} = {};
     while ( $oldmsg ne $msg and $msg =~ /\$([a-zA-Z_]\w+)|\${([a-zA-Z_]\w+)}/ )
     {
         $oldmsg = $msg;
@@ -3205,8 +3206,9 @@ sub expand {
             last;
         }
 
-        $stats{last_vars}{$chl}{$full} = [];
-        while ( $msg =~ /((\ban? )?\$(?:$full|{$full})\b)/i ) {
+        $stats{last_vars}{$chl}{$full} = [] unless exists $stats{last_vars}{$chl}{$full};
+        Log "full = $full, msg = $msg";
+        while ( $msg =~ /((\ban? )?\$(?:$full|{$full})(?:\b|$))/i ) {
             my $replacement = &get_var( $record, $var, $conjugate );
             $replacement = &set_case( $var, $replacement );
             $replacement = A($replacement) if $2;
@@ -3235,7 +3237,7 @@ sub expand {
             Log "Replacing $1 with $replacement";
             last if $replacement =~ /\$/;
 
-            $msg =~ s/(?:\ban? )?\$(?:$full|{$full})\b/$replacement/i;
+            $msg =~ s/(?:\ban? )?\$(?:$full|{$full})(?:\b|$)/$replacement/i;
             push @{ $stats{last_vars}{$chl}{$full} }, $replacement;
         }
 
