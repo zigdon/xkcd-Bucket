@@ -2427,6 +2427,7 @@ sub irc_start {
             Username => &config("username") || "bucket",
             Ircname  => &config("irc_name") || "YABI",
             Server   => &config("server") || "irc.foonetic.net",
+            Port     => &config("port") || "6667",
             Flood    => 0,
         }
     );
