@@ -558,7 +558,7 @@ sub irc_on_public {
         if ($operator) {
             my $target = 0;
             unless ( $num or $word ) {
-                $num = 4 * 60 * 60;    # by default, shut up for 4 hours
+                $num = 60 * 60;    # by default, shut up for one hour
             }
             if ($num) {
                 $target += $num if not $unit or $unit eq 's';
@@ -846,7 +846,7 @@ sub irc_on_public {
         &say(   $chl => "$who, that was '$line', with $count syllable"
               . &s($count) );
 
-    } elsif ( $addressed and $msg =~ /^what was that\??$/ ) {
+    } elsif ( $addressed and $msg =~ /^what was that\??$/i ) {
         my $id = $stats{last_fact}{$chl};
         unless ($id) {
             &say( $chl => "Sorry, $who, I have no idea." );
