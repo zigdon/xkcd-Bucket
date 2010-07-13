@@ -311,7 +311,10 @@ sub irc_on_public {
                 Report sprintf "<%s> %s", @{ $haiku[0] };
                 Report sprintf "<%s> %s", @{ $haiku[1] };
                 Report sprintf "<%s> %s", @{ $haiku[2] };
-                &cached_reply( $chl, $who, "", "haiku detected" );
+
+                if ( $talking{$chl} == -1 ) {
+                    &cached_reply( $chl, $who, "", "haiku detected" );
+                }
                 $stats{haiku}++;
 
                 &sql(
