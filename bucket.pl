@@ -1371,7 +1371,9 @@ sub irc_on_public {
         &sql( "replace genders (nick, gender, stamp) values (?, ?, ?)",
             [ $target, $gender, undef ] );
         &say( $chl => "Okay, $who" );
-    } elsif ( $addressed and $msg =~ /^what is my gender\??$/i ) {
+    } elsif ( $addressed
+        and $msg =~ /^what is my gender\??$|^what gender am I\??/i )
+    {
         if ( exists $stats{users}{genders}{ lc $who } ) {
             &say(
                 $chl => "$who: Grammatically, I refer to you as",
@@ -3210,7 +3212,8 @@ sub expand {
             last;
         }
 
-        $stats{last_vars}{$chl}{$full} = [] unless exists $stats{last_vars}{$chl}{$full};
+        $stats{last_vars}{$chl}{$full} = []
+          unless exists $stats{last_vars}{$chl}{$full};
         Log "full = $full, msg = $msg";
         while ( $msg =~ /((\ban? )?\$(?:$full|{$full})(?:\b|$))/i ) {
             my $replacement = &get_var( $record, $var, $conjugate );
