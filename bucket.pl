@@ -1269,7 +1269,7 @@ sub irc_on_public {
         &save;
     } elsif ( $addressed
         and ref $history{$chl}
-        and $msg =~ /^remember (\S+) ([^<>]+)$/ )
+        and $msg =~ /^remember (\S+) ([^<>]+)$/i )
     {
         my ( $target, $re ) = ( $1, $2 );
         if ( exists $config->{protected_quotes}
