@@ -963,7 +963,7 @@ sub irc_on_public {
         Log "Restarting at ${who}'s request";
         &say( $chl => "Okay, $who, I'll be right back." );
         $irc->yield( quit => "OHSHI--" );
-    } elsif ( $operator and $addressed and $msg =~ /^set(?: (\w+) (.*))?/ ) {
+    } elsif ( $operator and $addressed and $msg =~ /^set(?: (\w+) (.*)|$)/ ) {
         my ( $key, $val ) = ( $1, $2 );
 
         unless ( $key and exists $config_keys{$key} ) {
