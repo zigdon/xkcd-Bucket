@@ -1000,7 +1000,7 @@ sub irc_on_public {
 
         &save;
         return;
-    } elsif ( $operator and $addressed and $msg =~ /^get (\w+)/ ) {
+    } elsif ( $operator and $addressed and $msg =~ /^get (\w+)\s*$/ ) {
         my ($key) = ($1);
         unless ( exists $config_keys{$key} ) {
             my @keys = sort keys %config_keys;
