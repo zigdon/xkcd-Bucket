@@ -95,6 +95,7 @@ my %config_keys = (
     random_item_cache_size => [ i => 20 ],
     random_wait            => [ i => 3 ],
     repeated_queries       => [ i => 5 ],
+    uses_reply             => [ i => 5 ],
     user_activity_timeout  => [ i => 360 ],
     user_mode              => [ s => "+B" ],
     value_cache_limit      => [ i => 1000 ],
@@ -1393,6 +1394,10 @@ sub irc_on_public {
             &load_gender($1);
             &say( $chl => "$who: I don't know how to refer to $1!" );
         }
+    } elsif ( $msg =~ /^uses(?: \S+){1,5}$/i 
+              and &config("uses_reply") 
+              and rand(100) < &config("uses_reply") ) {
+        &cached_reply( $chl, $who, undef, "uses reply" );
     } else {
         my $orig = $msg;
         $msg = &trim($msg);
@@ -2415,14 +2420,11 @@ sub irc_start {
         EVENT   => 'db_success'
     );
 
-    &cache( $_[KERNEL], "Don't know" );
-    &cache( $_[KERNEL], "takes item" );
-    &cache( $_[KERNEL], "drops item" );
-    &cache( $_[KERNEL], "pickup full" );
-    &cache( $_[KERNEL], "list items" );
-    &cache( $_[KERNEL], "duplicate item" );
-    &cache( $_[KERNEL], "band name reply" );
-    &cache( $_[KERNEL], "haiku detected" );
+    foreach my $reply ("Don't know", "takes item", "drops item", "pickup full",
+                       "list items", "duplicate item", "band name reply",
+                       "haiku detected", "uses reply") {
+      &cache( $_[KERNEL], $reply );
+    }
     &random_item_cache( $_[KERNEL] );
     $stats{preloaded_items} = &config("inventory_preload");
 
