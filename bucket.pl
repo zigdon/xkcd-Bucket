@@ -3383,7 +3383,7 @@ sub count_syllables {
     # break up at&t to a t & t.  find&replace => find & replace.
     while ($line =~ /(?:\b|^)(\w+)&(\w+)(?:\b|$)/) {
       my ($first, $last) = ($1, $2);
-      if (length $first + length $last < 6) {
+      if (length($first) + length($last) < 6) {
         my ($newfirst, $newlast) = ($first, $last);
         $newfirst = join " ", split //, $newfirst;
         $newlast  = join " ", split //, $newlast;
