@@ -3379,16 +3379,17 @@ sub count_syllables {
     $line =~ s/\.(com|org|net|info|biz|us)/ dot $1/g;
     $line =~ s/www\./double you double you double you dot /g;
     $line =~ s/[:,\/\*.!?]/ /g;
-    while ($line =~ /\b(\w+)&(\w+)\b/) {
-      Log "Replacing $1&$2...";
+
+    # break up at&t to a t & t.  find&replace => find & replace.
+    while ($line =~ /(?:\b|^)(\w+)&(\w+)(?:\b|$)/) {
       my ($first, $last) = ($1, $2);
       if (length $first + length $last < 6) {
         my ($newfirst, $newlast) = ($first, $last);
-        $newfirst =~ s// /g;
-        $newlast  =~ s// /g;
-        $line =~ s/\b$first&$last\b/$newfirst and $newlast/g;
+        $newfirst = join " ", split //, $newfirst;
+        $newlast  = join " ", split //, $newlast;
+        $line =~ s/(?:^|\b)$first&$last(?:\b|$)/$newfirst and $newlast/g;
       } else {
-        $line =~ s/$first&$last/$first and $last/g;
+        $line =~ s/(?:^|\b)$first&$last(?:\b|$)/$first and $last/g;
       }
     }
     $line =~ s/&/ and /g;
