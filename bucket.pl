@@ -2718,6 +2718,10 @@ sub heartbeat {
             "http://twitter.com/statuses/user_timeline/14062390.rss",
             qr/^fakeanimalfacts: |http:.*/, "link"
         ],
+        Batman => [
+            "http://twitter.com/statuses/user_timeline/126881128.rss",
+            qr/^God_Damn_Batman: |http:.*/, "link"
+        ]
         factoid => 1
     );
     my $source = &config("idle_source");
