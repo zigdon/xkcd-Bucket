@@ -3375,6 +3375,19 @@ sub count_syllables {
     $line =~ s/\.(com|org|net|info|biz|us)/ dot $1/g;
     $line =~ s/www\./double you double you double you dot /g;
     $line =~ s/[:,\/\*.!?]/ /g;
+    while ($line =~ /\b(\w+)&(\w+)\b/) {
+      Log "Replacing $1&$2...";
+      my ($first, $last) = ($1, $2);
+      if (length $first + length $last < 6) {
+        my ($newfirst, $newlast) = ($first, $last);
+        $newfirst =~ s// /g;
+        $newlast  =~ s// /g;
+        $line =~ s/\b$first&$last\b/$newfirst and $newlast/g;
+      } else {
+        $line =~ s/$first&$last/$first and $last/g;
+      }
+    }
+    $line =~ s/&/ and /g;
 
     # Remove hyphens except when dealing with numbers
     $line =~ s/-(\D|$)/ $1/g;
