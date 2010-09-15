@@ -1056,22 +1056,28 @@ sub irc_on_public {
             or ref $replacables{$var}{vals} eq 'ARRAY'
             and @{ $replacables{$var}{vals} } > 30 )
         {
-            $_[KERNEL]->post(
-                db  => 'MULTIPLE',
-                SQL => 'select value 
-                      from bucket_vars vars 
-                           left join bucket_values vals 
-                           on vars.id = vals.var_id  
-                      where name = ?
-                      order by value',
-                PLACEHOLDERS => [$var],
-                BAGGAGE      => {
-                    %bag,
-                    cmd  => "dump_var",
-                    name => $var,
-                },
-                EVENT => 'db_success'
-            );
+            if ( &config("www_root") ) {
+                $_[KERNEL]->post(
+                    db  => 'MULTIPLE',
+                    SQL => 'select value 
+                        from bucket_vars vars 
+                             left join bucket_values vals 
+                             on vars.id = vals.var_id  
+                        where name = ?
+                        order by value',
+                    PLACEHOLDERS => [$var],
+                    BAGGAGE      => {
+                        %bag,
+                        cmd  => "dump_var",
+                        name => $var,
+                    },
+                    EVENT => 'db_success'
+                );
+            } else {
+                &say( $chl =>
+                        "Sorry, $who, I can't print $replacables{$var}{vals}"
+                      . "values to the channel." );
+            }
             return;
         }
 
@@ -1394,9 +1400,10 @@ sub irc_on_public {
             &load_gender($1);
             &say( $chl => "$who: I don't know how to refer to $1!" );
         }
-    } elsif ( $msg =~ /^uses(?: \S+){1,5}$/i 
-              and &config("uses_reply") 
-              and rand(100) < &config("uses_reply") ) {
+    } elsif ( $msg =~ /^uses(?: \S+){1,5}$/i
+        and &config("uses_reply")
+        and rand(100) < &config("uses_reply") )
+    {
         &cached_reply( $chl, $who, undef, "uses reply" );
     } else {
         my $orig = $msg;
@@ -2420,10 +2427,19 @@ sub irc_start {
         EVENT   => 'db_success'
     );
 
-    foreach my $reply ("Don't know", "takes item", "drops item", "pickup full",
-                       "list items", "duplicate item", "band name reply",
-                       "haiku detected", "uses reply") {
-      &cache( $_[KERNEL], $reply );
+    foreach my $reply (
+        "Don't know",
+        "takes item",
+        "drops item",
+        "pickup full",
+        "list items",
+        "duplicate item",
+        "band name reply",
+        "haiku detected",
+        "uses reply"
+      )
+    {
+        &cache( $_[KERNEL], $reply );
     }
     &random_item_cache( $_[KERNEL] );
     $stats{preloaded_items} = &config("inventory_preload");
@@ -3381,16 +3397,16 @@ sub count_syllables {
     $line =~ s/[:,\/\*.!?]/ /g;
 
     # break up at&t to a t & t.  find&replace => find & replace.
-    while ($line =~ /(?:\b|^)(\w+)&(\w+)(?:\b|$)/) {
-      my ($first, $last) = ($1, $2);
-      if (length($first) + length($last) < 6) {
-        my ($newfirst, $newlast) = ($first, $last);
-        $newfirst = join " ", split //, $newfirst;
-        $newlast  = join " ", split //, $newlast;
-        $line =~ s/(?:^|\b)$first&$last(?:\b|$)/$newfirst and $newlast/g;
-      } else {
-        $line =~ s/(?:^|\b)$first&$last(?:\b|$)/$first and $last/g;
-      }
+    while ( $line =~ /(?:\b|^)(\w+)&(\w+)(?:\b|$)/ ) {
+        my ( $first, $last ) = ( $1, $2 );
+        if ( length($first) + length($last) < 6 ) {
+            my ( $newfirst, $newlast ) = ( $first, $last );
+            $newfirst = join " ", split //, $newfirst;
+            $newlast  = join " ", split //, $newlast;
+            $line =~ s/(?:^|\b)$first&$last(?:\b|$)/$newfirst and $newlast/g;
+        } else {
+            $line =~ s/(?:^|\b)$first&$last(?:\b|$)/$first and $last/g;
+        }
     }
     $line =~ s/&/ and /g;
 
