@@ -42,7 +42,7 @@ unless ($@) {
     &Log("$math loaded");
 }
 
-use constant { DEBUG => 0 };
+use constant { DEBUG => 1 };
 
 # work around a bug: https://rt.cpan.org/Ticket/Display.html?id=50991
 sub s_form { return Lingua::EN::Conjugate::s_form(@_); }
@@ -1672,7 +1672,7 @@ sub db_success {
             $stats{math}++;
             my $res;
             my $exp = $1;
-            if ($math) {
+            if ($exp !~ /\*\*/ and $math) {
                 my $newexp;
                 foreach my $word ( split /( |-[\d_e.]+|\*\*|[+\/()*])/, $exp ) {
                     $word = "new $math(\"$word\")" if $word =~ /^[_0-9.e]+$/;
@@ -1732,9 +1732,7 @@ sub db_success {
         } elsif (
             &config("max_sub_length")
             and length( $bag{orig} ) < &config("max_sub_length")
-            and
-
-            $bag{orig} !~ /extra|except/
+            and $bag{orig} !~ /extra|except/
             and rand(100) < &config("ex_to_sex")
             and (  $bag{orig} =~ s/\ban ex/a sex/
                 or $bag{orig} =~ s/\bex/sex/ )
