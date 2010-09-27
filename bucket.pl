@@ -1625,6 +1625,8 @@ sub db_success {
                 return;
             }
 
+            $fact =~ s/\s*,\s*/ /g;
+            $fact =~ s/\s\s+/ /g;
             Log "Learning '$fact' '$verb' '$tidbit'";
             $_[KERNEL]->post(
                 db  => 'SINGLE',
@@ -3025,10 +3027,12 @@ sub lookup {
     if ( exists $params{msg} ) {
         $sql          = "fact = ?";
         $type         = "single";
+        $params{msg}  =~ s/\s*,\s*/ /g;
+        $params{msg}  =~ s/\s\s+/ /g;
         @placeholders = ( $params{msg} );
     } elsif ( exists $params{msgs} ) {
         $sql = "fact in (" . join( ", ", map { "?" } @{ $params{msgs} } ) . ")";
-        @placeholders = @{ $params{msgs} };
+        @placeholders = map {s/\s*,\s*/ /g; s/\s\s+/ /g; $_} @{$params{msgs}};
         $type         = "multiple";
     } else {
         $sql  = "1";
