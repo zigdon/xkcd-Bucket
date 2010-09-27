@@ -485,6 +485,7 @@ sub irc_on_public {
         my ( $page, $fact ) = ( $1 || 1, $2 );
         $stats{literal}++;
         $fact = &trim($fact);
+        $fact = &decommify($fact);
         Log "Literal[$page] $fact";
         $_[KERNEL]->post(
             db  => 'MULTIPLE',
@@ -1625,8 +1626,7 @@ sub db_success {
                 return;
             }
 
-            $fact =~ s/\s*,\s*/ /g;
-            $fact =~ s/\s\s+/ /g;
+            $fact = &decommify($fact);
             Log "Learning '$fact' '$verb' '$tidbit'";
             $_[KERNEL]->post(
                 db  => 'SINGLE',
@@ -2921,6 +2921,15 @@ sub commify {
     return $num;
 }
 
+sub decommify {
+    my $string = shift
+
+    $string =~ s/\s*,\s*/ /g;
+    $string =~ s/\s\s+/ /g;
+
+    return $string;
+}
+
 sub round_time {
     my $dt    = shift;
     my $units = "second";
@@ -3027,12 +3036,11 @@ sub lookup {
     if ( exists $params{msg} ) {
         $sql          = "fact = ?";
         $type         = "single";
-        $params{msg}  =~ s/\s*,\s*/ /g;
-        $params{msg}  =~ s/\s\s+/ /g;
+        $params{msg}  = &decommify($params{msg});
         @placeholders = ( $params{msg} );
     } elsif ( exists $params{msgs} ) {
         $sql = "fact in (" . join( ", ", map { "?" } @{ $params{msgs} } ) . ")";
-        @placeholders = map {s/\s*,\s*/ /g; s/\s\s+/ /g; $_} @{$params{msgs}};
+        @placeholders = map { &decommify($_) } @{$params{msgs}};
         $type         = "multiple";
     } else {
         $sql  = "1";
