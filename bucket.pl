@@ -42,7 +42,7 @@ unless ($@) {
     &Log("$math loaded");
 }
 
-use constant { DEBUG => 0 };
+use constant { DEBUG => 1 };
 
 # work around a bug: https://rt.cpan.org/Ticket/Display.html?id=50991
 sub s_form { return Lingua::EN::Conjugate::s_form(@_); }
@@ -2922,7 +2922,7 @@ sub commify {
 }
 
 sub decommify {
-    my $string = shift
+    my $string = shift;
 
     $string =~ s/\s*,\s*/ /g;
     $string =~ s/\s\s+/ /g;
