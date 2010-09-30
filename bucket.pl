@@ -1749,15 +1749,15 @@ sub db_success {
         } elsif (
             $bag{orig} !~ /\?\s*$/
             and $bag{orig} =~ /^(?:
-                               puts \s (.+) \s in \s (the \s)? $nick\b
-                             | (?:gives|hands) \s $nick \s (.+)
-                             | (?:gives|hands) \s (.+) \s to $nick\b
+                               puts \s (\S.+) \s in \s (the \s)? $nick\b
+                             | (?:gives|hands) \s $nick \s (\S.+)
+                             | (?:gives|hands) \s (\S.+) \s to $nick\b
                             )/ix
             or (
                     $bag{addressed}
                 and $bag{orig} =~ /^(?:
-                                 take \s this \s (.+)
-                               | have \s (an? \s .+)
+                                 take \s this \s (\S.+)
+                               | have \s (an? \s \S.+)
                               )/x
             )
           )
