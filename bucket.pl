@@ -1675,6 +1675,14 @@ sub db_success {
             $stats{math}++;
             my $res;
             my $exp = $1;
+            
+            # if there's hex in here, but not prefixed with 0x, just throw an error
+            foreach my $num ($exp =~ /([x0-9a-fA-F.]+)/g) {
+                next if $num =~ /^0x|^[0-9.]+$|^[0-9.]+[eE][0-9]+$/;
+                &error( $bag{chl}, $bag{who} );
+                return;
+            }
+
             if ($exp !~ /\*\*/ and $math) {
                 my $newexp;
                 foreach my $word ( split /( |-[\d_e.]+|\*\*|[+\/()*])/, $exp ) {
