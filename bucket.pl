@@ -1667,6 +1667,7 @@ sub db_success {
                 return;
             }
         } elsif ( $bag{addressed}
+            and $bag{orig} =~ m{[+\-*/]} )
             and $bag{orig} =~ m{^([\s0-9a-fA-F_x+\-*/.()]+)$} )
         {
 
