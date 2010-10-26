@@ -95,6 +95,8 @@ my %config_keys = (
     random_item_cache_size => [ i => 20 ],
     random_wait            => [ i => 3 ],
     repeated_queries       => [ i => 5 ],
+    squirrel_shock         => [ i => 60 ],
+    timeout                => [ i => 60 ],
     uses_reply             => [ i => 5 ],
     user_activity_timeout  => [ i => 360 ],
     user_mode              => [ s => "+B" ],
@@ -1717,7 +1719,19 @@ sub db_success {
         }
 
         #Log "extra work on $bag{msg}";
-        if ( $bag{orig} =~ /^say (.*)/i ) {
+        if ( $bag{orig} =~ /\bsquirrel\b/i and &config("squirrel_shock") and
+             $talking{$bag{chl}} == -1 ) {
+            &say( $bag{chl} => "SQUIRREL!" );
+            &say( $bag{chl} => "O_O" );
+            POE::Kernel->delay_add(
+                delayed_post => &config("squirrel_shock") / 2 =>
+                $bag{chl} => "    O_O" );
+            POE::Kernel->delay_add(
+                delayed_post => &config("squirrel_shock") =>
+                $bag{chl} => "  O_O" );
+            # and shut up for the shock time
+            $talking{$bag{chl}} = time + &config("squirrel_shock");
+        } elsif ( $bag{orig} =~ /^say (.*)/i ) {
             my $msg = $1;
             $stats{say}++;
             $msg =~ s/\W+$//;
