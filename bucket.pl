@@ -95,6 +95,7 @@ my %config_keys = (
     random_item_cache_size => [ i => 20 ],
     random_wait            => [ i => 3 ],
     repeated_queries       => [ i => 5 ],
+    squirrel_chance        => [ i => 20 ],
     squirrel_shock         => [ i => 60 ],
     timeout                => [ i => 60 ],
     uses_reply             => [ i => 5 ],
@@ -1669,7 +1670,7 @@ sub db_success {
                 return;
             }
         } elsif ( $bag{addressed}
-            and $bag{orig} =~ m{[+\-*/]} 
+            and $bag{orig} =~ m{[+\-*/]}
             and $bag{orig} =~ m{^([\s0-9a-fA-F_x+\-*/.()]+)$} )
         {
 
@@ -1677,15 +1678,15 @@ sub db_success {
             $stats{math}++;
             my $res;
             my $exp = $1;
-            
-            # if there's hex in here, but not prefixed with 0x, just throw an error
-            foreach my $num ($exp =~ /([x0-9a-fA-F.]+)/g) {
+
+         # if there's hex in here, but not prefixed with 0x, just throw an error
+            foreach my $num ( $exp =~ /([x0-9a-fA-F.]+)/g ) {
                 next if $num =~ /^0x|^[0-9.]+$|^[0-9.]+[eE][0-9]+$/;
                 &error( $bag{chl}, $bag{who} );
                 return;
             }
 
-            if ($exp !~ /\*\*/ and $math) {
+            if ( $exp !~ /\*\*/ and $math ) {
                 my $newexp;
                 foreach my $word ( split /( |-[\d_e.]+|\*\*|[+\/()*])/, $exp ) {
                     $word = "new $math(\"$word\")" if $word =~ /^[_0-9.e]+$/;
@@ -1719,18 +1720,22 @@ sub db_success {
         }
 
         #Log "extra work on $bag{msg}";
-        if ( $bag{orig} =~ /\bsquirrel\b/i and &config("squirrel_shock") and
-             $talking{$bag{chl}} == -1 ) {
+        if (    $bag{orig} =~ /\bsquirrel\b/i
+            and &config("squirrel_shock")
+            and rand(100) < &config("squirrel_chance")
+            and $talking{ $bag{chl} } == -1 )
+        {
             &say( $bag{chl} => "SQUIRREL!" );
             &say( $bag{chl} => "O_O" );
             POE::Kernel->delay_add(
-                delayed_post => &config("squirrel_shock") / 2 =>
-                $bag{chl} => "    O_O" );
+                delayed_post => &config("squirrel_shock") / 2 => $bag{chl} =>
+                  "    O_O" );
             POE::Kernel->delay_add(
-                delayed_post => &config("squirrel_shock") =>
-                $bag{chl} => "  O_O" );
+                delayed_post => &config("squirrel_shock") => $bag{chl} =>
+                  "  O_O" );
+
             # and shut up for the shock time
-            $talking{$bag{chl}} = time + &config("squirrel_shock");
+            $talking{ $bag{chl} } = time + &config("squirrel_shock");
         } elsif ( $bag{orig} =~ /^say (.*)/i ) {
             my $msg = $1;
             $stats{say}++;
@@ -3059,12 +3064,12 @@ sub lookup {
     if ( exists $params{msg} ) {
         $sql          = "fact = ?";
         $type         = "single";
-        $params{msg}  = &decommify($params{msg});
+        $params{msg}  = &decommify( $params{msg} );
         @placeholders = ( $params{msg} );
     } elsif ( exists $params{msgs} ) {
         $sql = "fact in (" . join( ", ", map { "?" } @{ $params{msgs} } ) . ")";
-        @placeholders = map { &decommify($_) } @{$params{msgs}};
-        $type         = "multiple";
+        @placeholders = map { &decommify($_) } @{ $params{msgs} };
+        $type = "multiple";
     } else {
         $sql  = "1";
         $type = "none";
