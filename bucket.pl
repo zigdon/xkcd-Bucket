@@ -2330,6 +2330,25 @@ sub db_success {
             $bag{page} = "*";
         }
 
+        if ( $lines[0]->{verb} eq "<alias>" ) {
+            my $new_fact = $lines[0]->{tidbit};
+            $_[KERNEL]->post(
+                db  => 'MULTIPLE',
+                SQL => 'select id, verb, tidbit, mood, chance, protected
+					from bucket_facts where fact = ? order by id',
+                PLACEHOLDERS => [$new_fact],
+                BAGGAGE      => {
+                    %bag,
+                    cmd      => "literal",
+                    alias_to => $new_fact
+                },
+                EVENT => 'db_success'
+            );
+            Report "Asked for the 'literal' of an alias,"
+              . " being smart and redirecting to '$new_fact'";
+            return;
+        }
+
         if (    $bag{page} eq '*'
             and &config("www_url")
             and &config("www_root")
@@ -2344,6 +2363,9 @@ sub db_success {
                 )
               )
             {
+                if ( defined $bag{alias_to} ) {
+                    print DUMP "Alias to $bag{alias_to}\n";
+                }
                 my $count = @lines;
                 while ( my $fact = shift @lines ) {
                     if ( $bag{op} ) {
@@ -2367,8 +2389,10 @@ sub db_success {
         $bag{page} = 1 if $bag{page} eq '*';
 
         my $prefix = "$bag{fact}";
-        if ( $lines[0]->{protected} ) {
+        if ( $lines[0]->{protected} and not defined $bag{alias_to} ) {
             $prefix .= " (protected)";
+        } elsif ( defined $bag{alias_to} ) {
+            $prefix .= " (=> $bag{alias_to})";
         }
 
         my $answer;
