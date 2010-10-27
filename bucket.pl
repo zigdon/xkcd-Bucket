@@ -1319,6 +1319,7 @@ sub irc_on_public {
         } else {
             $quote = "<$match->[0]> $match->[2]";
         }
+        $quote =~ s/\$/\\\$/g;
         Log "Remembering '$match->[0] quotes' '<reply>' '$quote'";
         $_[KERNEL]->post(
             db  => 'SINGLE',
