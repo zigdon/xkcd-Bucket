@@ -88,6 +88,7 @@ my %config_keys = (
     inventory_preload      => [ i => 0 ],
     inventory_size         => [ i => 20 ],
     item_drop_rate         => [ i => 3 ],
+    lookup_tla             => [ i => 10 ],
     max_sub_length         => [ i => 80 ],
     minimum_length         => [ i => 6 ],
     nickserv_msg           => [ s => "" ],
@@ -835,7 +836,6 @@ sub irc_on_public {
             },
             EVENT => 'db_success'
         );
-
     } elsif ( $addressed and $msg =~ /^how many syllables in (.*)/i ) {
         my ( $count, $debug ) = &count_syllables($1);
         &say(
@@ -853,7 +853,6 @@ sub irc_on_public {
 
         &say(   $chl => "$who, that was '$line', with $count syllable"
               . &s($count) );
-
     } elsif ( $addressed and $msg =~ /^what was that\??$/i ) {
         my $id = $stats{last_fact}{$chl};
         unless ($id) {
@@ -1339,7 +1338,6 @@ sub irc_on_public {
             },
             EVENT => 'db_success'
         );
-
     } elsif (
         $addressed
         and $msg =~ /^(?:(I|[-\w]+) \s (?:am|is)|
@@ -1410,6 +1408,23 @@ sub irc_on_public {
         and rand(100) < &config("uses_reply") )
     {
         &cached_reply( $chl, $who, undef, "uses reply" );
+    } elsif ( &config("lookup_tla") > 0
+        and rand(100) < &config("lookup_tla")
+        and $msg =~ /^([A-Z])([A-Z])([A-Z])\??$/ )
+    {
+        my $pattern = "$1% $2% $3%";
+        $_[KERNEL]->post(
+            db  => 'SINGLE',
+            SQL => 'select value
+               from bucket_values 
+               where var_id = (select id from bucket_vars where name = ? limit 1)
+                     and value like ?
+               order by rand()
+               limit 1',
+            PLACEHOLDERS => [ &config("band_var"), $pattern ],
+            BAGGAGE => { %bag, cmd => "tla", },
+            EVENT   => 'db_success'
+        );
     } else {
         my $orig = $msg;
         $msg = &trim($msg);
@@ -2451,6 +2466,12 @@ sub db_success {
 
             &random_item_cache( $_[KERNEL] );
         }
+    } elsif ( $bag{cmd} eq 'tla' ) {
+        &say(
+            $bag{chl} => "$bag{who}: " . join " ",
+            map { ucfirst }
+            split ' ', $res->{RESULT}{value}
+        );
     }
 }
 
