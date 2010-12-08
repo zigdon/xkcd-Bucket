@@ -1417,8 +1417,9 @@ sub irc_on_public {
             db  => 'SINGLE',
             SQL => 'select value
                from bucket_values 
-               where var_id = (select id from bucket_vars where name = ? limit 1)
-                     and value like ?
+               left join bucket_vars 
+                    on var_id = bucket_vars.id
+               where name = ?  and value like ?
                order by rand()
                limit 1',
             PLACEHOLDERS => [ &config("band_var"), $pattern ],
