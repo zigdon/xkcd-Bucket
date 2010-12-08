@@ -1422,7 +1422,7 @@ sub irc_on_public {
                order by rand()
                limit 1',
             PLACEHOLDERS => [ &config("band_var"), $pattern ],
-            BAGGAGE => { %bag, cmd => "tla", },
+            BAGGAGE => { %bag, cmd => "tla", tla => $msg },
             EVENT   => 'db_success'
         );
     } else {
@@ -2467,11 +2467,15 @@ sub db_success {
             &random_item_cache( $_[KERNEL] );
         }
     } elsif ( $bag{cmd} eq 'tla' ) {
-        &say(
-            $bag{chl} => "$bag{who}: " . join " ",
-            map { ucfirst }
-            split ' ', $res->{RESULT}{value}
-        );
+        if ($res->{RESULT}{value}) {
+            $bag{tla} =~ s/\W//g;
+            $stats{last_fact}{$bag{chl}} = "a possible meaning of $bag{tla}.";
+            &say(
+                $bag{chl} => "$bag{who}: " . join " ",
+                map { ucfirst }
+                split ' ', $res->{RESULT}{value}
+            );
+        }
     }
 }
 
