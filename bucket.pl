@@ -2469,6 +2469,7 @@ sub db_success {
         }
     } elsif ( $bag{cmd} eq 'tla' ) {
         if ($res->{RESULT}{value}) {
+            $stats{lookup_tla}++;
             $bag{tla} =~ s/\W//g;
             $stats{last_fact}{$bag{chl}} = "a possible meaning of $bag{tla}.";
             &say(
