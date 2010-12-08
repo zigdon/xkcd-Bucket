@@ -1742,6 +1742,7 @@ sub db_success {
             and rand(100) < &config("squirrel_chance")
             and $talking{ $bag{chl} } == -1 )
         {
+            $stats{squirrels}++;
             &say( $bag{chl} => "SQUIRREL!" );
             &say( $bag{chl} => "O_O" );
             POE::Kernel->delay_add(
