@@ -2558,7 +2558,7 @@ sub irc_on_notice {
         and $msg =~ (
               &config("nickserv_msg")
             ? &config("nickserv_msg")
-            : qr/Password accepted|(?:isn't|not) registered/
+            : qr/Password accepted|(?:isn't|not) registered|You are now identified/
         )
       )
     {
