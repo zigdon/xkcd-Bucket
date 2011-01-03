@@ -32,6 +32,7 @@ use Data::Dumper;
 use Fcntl qw/:seek/;
 use HTML::Entities;
 use URI::Escape;
+use DBI;
 $Data::Dumper::Indent = 1;
 
 # try to load Math::BigFloat if possible
@@ -73,6 +74,7 @@ my @inventory;
 my @random_items;
 my %replacables;
 my %history;
+my %handles;
 
 my %config_keys = (
     bananas_chance         => [ p => 0.02 ],
@@ -1993,34 +1995,7 @@ sub db_success {
     } elsif ( $bag{cmd} eq 'band_name' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         unless ( $line{value} ) {
-            my @words = sort { length $b <=> length $a } @{ $bag{words} };
-            $_[KERNEL]->post(
-                db  => 'SINGLE',
-                SQL => 'select id from `mainlog` where 
-                            instr( msg, ? ) >0 and 
-                            instr( msg, ? ) >0 and 
-                            instr( msg, ? ) >0
-                            limit 1',
-                PLACEHOLDERS => \@words,
-                BAGGAGE      => { %bag, cmd => "band_name2", },
-                EVENT        => 'db_success'
-            );
-        }
-    } elsif ( $bag{cmd} eq 'band_name2' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
-        unless ( $line{id} ) {
-            &sql(
-                'insert into bucket_values (var_id, value) 
-                 values ( (select id from bucket_vars where name = ? limit 1), ?);',
-                [ &config("band_var"), $bag{stripped_name} ],
-                { %bag, cmd => "new band name" }
-            );
-
-            $bag{name} =~ s/(^| )(\w)/$1\u$2/g;
-            Report
-              "Learned a new band name from $bag{who} in $bag{chl}: $bag{name}";
-            &cached_reply( $bag{chl}, $bag{who}, $bag{name},
-                "band name reply" );
+            &check_band_name(\%bag);
         }
     } elsif ( $bag{cmd} eq 'edit' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
@@ -3451,6 +3426,125 @@ sub read_rss {
         Report "Failed when trying to read RSS from $url: $@";
         return ();
     }
+}
+
+sub get_band_name_handles {
+    if (exists $handles{dbh}) {
+        return \%handles;
+    }
+
+    Log "Creating band name database/query handles";
+    unless ($handles{dbh}) {
+        $handles{dbh} = DBI->connect(&config("db_dsn"),
+                                     &config("db_username"),
+                                     &config("db_password"))
+          or Report "Failed to create dbh!" and return undef; 
+    }
+
+
+    $handles{lookup} = $handles{dbh}
+                       ->prepare("select id, word, `lines` 
+                                  from word2id 
+                                  where word in (?, ?, ?) 
+                                  order by `lines`");
+
+    return \%handles;
+}
+
+sub check_band_name {
+    my $bag = shift;
+
+    my $handles = &get_band_name_handles();
+    return unless $handles;
+
+    return unless ref $bag->{words} eq 'ARRAY' and @{$bag->{words}} == 3;
+    Log "Executing band name word count";
+    $handles->{lookup}->execute(map {s/[^0-9a-zA-Z'\-]//g; $_} @{$bag->{words}});
+    my @words;
+    my $delayed;
+    my $found = 0;
+    while (my $line = $handles->{lookup}->fetchrow_hashref) {
+        my $entry = { word  => $line->{word},
+                      id    => $line->{id},
+                      count => $line->{lines},
+                      start => time };
+
+        if (@words < 2) {
+            Log "processing $entry->{word} ($entry->{count})\n";
+            $entry->{sth} = $handles->{dbh}->prepare("select line 
+                                                      from word2line 
+                                                      where word = ? 
+                                                      order by line");
+            $entry->{sth}->execute($entry->{id});
+            $entry->{cur} = $entry->{sth}->fetchrow_hashref;
+            unless ($entry->{cur}) {
+                Log "Not all words found, new band declared";
+                &add_new_band($bag);
+                return;
+            }
+            $entry->{next_id} = $entry->{cur}{line};
+            $entry->{elapsed} = time - $entry->{start};
+            push @words, $entry;
+        } else {
+            Log "delaying processing $entry->{word} ($entry->{count})\n";
+            $delayed = $entry;
+        }
+    }
+
+    @words = sort {$a->{next_id} <=> $b->{next_id}} @words;
+
+    my @union;
+    Log "Finding union";;
+    while (1) {
+        if ($words[0]->{next_id} == $words[1]->{next_id}) {
+            push @union, $words[0]->{next_id};
+        }
+    
+        unless ($words[0]->{next_id} < $words[1]->{next_id}) {
+            ($words[1], $words[0]) = ($words[0], $words[1]);
+        }
+    
+        unless ($words[0]->{cur} = $words[0]->{sth}->fetchrow_hashref) {
+            last;
+        }
+        $words[0]->{next_id} = $words[0]->{cur}{line};
+    }
+  
+    if (@union > 0) {
+        Log "Union ids: " . @union;
+        my $sth = $handles->{dbh}->prepare("select line 
+                                            from word2line 
+                                            where word = ? 
+                                              and line in (?" . 
+                                                (",?" x (@union - 1)) . ") 
+                                            limit 1");
+        
+        my $res = $sth->execute($delayed->{id}, @union);
+        $found = $res > 0;
+    } else {
+        $found = 1;
+    }
+
+    Log "Found = $found";
+    unless ($found) {
+        &add_new_band($bag);
+        return;
+    }
+}
+
+sub add_new_band {
+    my $bag = shift;
+    &sql(
+        'insert into bucket_values (var_id, value) 
+         values ( (select id from bucket_vars where name = ? limit 1), ?);',
+        [ &config("band_var"), $bag->{stripped_name} ],
+        { %$bag, cmd => "new band name" }
+    );
+
+    $bag->{name} =~ s/(^| )(\w)/$1\u$2/g;
+    Report
+      "Learned a new band name from $bag->{who} in $bag->{chl}: $bag->{name}";
+    &cached_reply( $bag->{chl}, $bag->{who}, $bag->{name}, "band name reply" );
 }
 
 sub config {
