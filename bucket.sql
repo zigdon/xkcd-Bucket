@@ -106,3 +106,28 @@ CREATE TABLE IF NOT EXISTS `genders` (
   PRIMARY KEY  (`id`),
   UNIQUE KEY `nick` (`nick`)
 ) ENGINE=MyISAM  DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `word2id`
+--
+
+DROP TABLE IF EXISTS `word2id`;
+CREATE TABLE IF NOT EXISTS `word2id` (
+  `id` int(10) unsigned NOT NULL auto_increment,
+  `word` varchar(32) NOT NULL,
+  `lines` int(10) unsigned NOT NULL,
+  PRIMARY KEY  (`id`),
+  UNIQUE KEY `word` (`word`)
+) ENGINE=MyISAM  DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `word2line`
+--
+
+DROP TABLE IF EXISTS `word2line`;
+CREATE TABLE IF NOT EXISTS `word2line` (
+  `word` int(10) unsigned NOT NULL,
+  `line` int(10) unsigned NOT NULL,
+  KEY `word` (`word`,`line`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+

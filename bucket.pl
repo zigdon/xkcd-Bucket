@@ -3458,8 +3458,15 @@ sub check_band_name {
     return unless $handles;
 
     return unless ref $bag->{words} eq 'ARRAY' and @{$bag->{words}} == 3;
-    Log "Executing band name word count";
-    $handles->{lookup}->execute(map {s/[^0-9a-zA-Z'\-]//g; $_} @{$bag->{words}});
+    my @trimmed_words = map {s/[^0-9a-zA-Z'\-]//g; lc $_} @{$bag->{words}};
+    if ($trimmed_words[0] eq $trimmed_words[1] or
+        $trimmed_words[0] eq $trimmed_words[2] or
+        $trimmed_words[1] eq $trimmed_words[2]) {
+        return;
+    }
+
+    Log "Executing band name word count (@trimmed_words)";
+    $handles->{lookup}->execute(@trimmed_words);
     my @words;
     my $delayed;
     my $found = 0;
