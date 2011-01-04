@@ -1995,7 +1995,7 @@ sub db_success {
     } elsif ( $bag{cmd} eq 'band_name' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
         unless ( $line{value} ) {
-            &check_band_name(\%bag);
+            &check_band_name( \%bag );
         }
     } elsif ( $bag{cmd} eq 'edit' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
@@ -2444,14 +2444,14 @@ sub db_success {
             &random_item_cache( $_[KERNEL] );
         }
     } elsif ( $bag{cmd} eq 'tla' ) {
-        if ($res->{RESULT}{value}) {
+        if ( $res->{RESULT}{value} ) {
             $stats{lookup_tla}++;
             $bag{tla} =~ s/\W//g;
-            $stats{last_fact}{$bag{chl}} = "a possible meaning of $bag{tla}.";
+            $stats{last_fact}{ $bag{chl} } = "a possible meaning of $bag{tla}.";
             &say(
                 $bag{chl} => "$bag{who}: " . join " ",
                 map { ucfirst }
-                split ' ', $res->{RESULT}{value}
+                  split ' ', $res->{RESULT}{value}
             );
         }
     }
@@ -3429,24 +3429,24 @@ sub read_rss {
 }
 
 sub get_band_name_handles {
-    if (exists $handles{dbh}) {
+    if ( exists $handles{dbh} ) {
         return \%handles;
     }
 
     Log "Creating band name database/query handles";
-    unless ($handles{dbh}) {
-        $handles{dbh} = DBI->connect(&config("db_dsn"),
-                                     &config("db_username"),
-                                     &config("db_password"))
-          or Report "Failed to create dbh!" and return undef; 
+    unless ( $handles{dbh} ) {
+        $handles{dbh} =
+          DBI->connect( &config("db_dsn"), &config("db_username"),
+            &config("db_password") )
+          or Report "Failed to create dbh!" and return undef;
     }
 
-
-    $handles{lookup} = $handles{dbh}
-                       ->prepare("select id, word, `lines` 
+    $handles{lookup} = $handles{dbh}->prepare(
+        "select id, word, `lines` 
                                   from word2id 
                                   where word in (?, ?, ?) 
-                                  order by `lines`");
+                                  order by `lines`"
+    );
 
     return \%handles;
 }
@@ -3457,11 +3457,13 @@ sub check_band_name {
     my $handles = &get_band_name_handles();
     return unless $handles;
 
-    return unless ref $bag->{words} eq 'ARRAY' and @{$bag->{words}} == 3;
-    my @trimmed_words = map {s/[^0-9a-zA-Z'\-]//g; lc $_} @{$bag->{words}};
-    if ($trimmed_words[0] eq $trimmed_words[1] or
-        $trimmed_words[0] eq $trimmed_words[2] or
-        $trimmed_words[1] eq $trimmed_words[2]) {
+    return unless ref $bag->{words} eq 'ARRAY' and @{ $bag->{words} } == 3;
+    $bag->{start} = time;
+    my @trimmed_words = map { s/[^0-9a-zA-Z'\-]//g; lc $_ } @{ $bag->{words} };
+    if (   $trimmed_words[0] eq $trimmed_words[1]
+        or $trimmed_words[0] eq $trimmed_words[2]
+        or $trimmed_words[1] eq $trimmed_words[2] )
+    {
         return;
     }
 
@@ -3470,22 +3472,27 @@ sub check_band_name {
     my @words;
     my $delayed;
     my $found = 0;
-    while (my $line = $handles->{lookup}->fetchrow_hashref) {
-        my $entry = { word  => $line->{word},
-                      id    => $line->{id},
-                      count => $line->{lines},
-                      start => time };
+    while ( my $line = $handles->{lookup}->fetchrow_hashref ) {
+        my $entry = {
+            word  => $line->{word},
+            id    => $line->{id},
+            count => $line->{lines},
+            start => time
+        };
 
-        if (@words < 2) {
+        if ( @words < 2 ) {
             Log "processing $entry->{word} ($entry->{count})\n";
-            $entry->{sth} = $handles->{dbh}->prepare("select line 
+            $entry->{sth} = $handles->{dbh}->prepare(
+                "select line 
                                                       from word2line 
                                                       where word = ? 
-                                                      order by line");
-            $entry->{sth}->execute($entry->{id});
+                                                      order by line"
+            );
+            $entry->{sth}->execute( $entry->{id} );
             $entry->{cur} = $entry->{sth}->fetchrow_hashref;
-            unless ($entry->{cur}) {
+            unless ( $entry->{cur} ) {
                 Log "Not all words found, new band declared";
+                $bag->{elapsed} = time - $bag->{start};
                 &add_new_band($bag);
                 return;
             }
@@ -3498,35 +3505,37 @@ sub check_band_name {
         }
     }
 
-    @words = sort {$a->{next_id} <=> $b->{next_id}} @words;
+    @words = sort { $a->{next_id} <=> $b->{next_id} } @words;
 
     my @union;
-    Log "Finding union";;
+    Log "Finding union";
     while (1) {
-        if ($words[0]->{next_id} == $words[1]->{next_id}) {
+        if ( $words[0]->{next_id} == $words[1]->{next_id} ) {
             push @union, $words[0]->{next_id};
         }
-    
-        unless ($words[0]->{next_id} < $words[1]->{next_id}) {
-            ($words[1], $words[0]) = ($words[0], $words[1]);
+
+        unless ( $words[0]->{next_id} < $words[1]->{next_id} ) {
+            ( $words[1], $words[0] ) = ( $words[0], $words[1] );
         }
-    
-        unless ($words[0]->{cur} = $words[0]->{sth}->fetchrow_hashref) {
+
+        unless ( $words[0]->{cur} = $words[0]->{sth}->fetchrow_hashref ) {
             last;
         }
         $words[0]->{next_id} = $words[0]->{cur}{line};
     }
-  
-    if (@union > 0) {
+
+    if ( @union > 0 ) {
         Log "Union ids: " . @union;
-        my $sth = $handles->{dbh}->prepare("select line 
+        my $sth = $handles->{dbh}->prepare(
+            "select line 
                                             from word2line 
                                             where word = ? 
-                                              and line in (?" . 
-                                                (",?" x (@union - 1)) . ") 
-                                            limit 1");
-        
-        my $res = $sth->execute($delayed->{id}, @union);
+                                              and line in (?"
+              . ( ",?" x ( @union - 1 ) ) . ") 
+                                            limit 1"
+        );
+
+        my $res = $sth->execute( $delayed->{id}, @union );
         $found = $res > 0;
     } else {
         $found = 1;
@@ -3534,6 +3543,7 @@ sub check_band_name {
 
     Log "Found = $found";
     unless ($found) {
+        $bag->{elapsed} = time - $bag->{start};
         &add_new_band($bag);
         return;
     }
@@ -3549,8 +3559,9 @@ sub add_new_band {
     );
 
     $bag->{name} =~ s/(^| )(\w)/$1\u$2/g;
-    Report
-      "Learned a new band name from $bag->{who} in $bag->{chl}: $bag->{name}";
+    Report "Learned a new band name from $bag->{who} in $bag->{chl} ("
+      . &round_time( $bag->{elapsed} )
+      . "): $bag->{name}";
     &cached_reply( $bag->{chl}, $bag->{who}, $bag->{name}, "band name reply" );
 }
 
