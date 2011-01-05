@@ -3560,7 +3560,7 @@ sub add_new_band {
 
     $bag->{name} =~ s/(^| )(\w)/$1\u$2/g;
     Report "Learned a new band name from $bag->{who} in $bag->{chl} ("
-      . &round_time( $bag->{elapsed} )
+      . join( " ", &round_time( $bag->{elapsed} ) )
       . "): $bag->{name}";
     &cached_reply( $bag->{chl}, $bag->{who}, $bag->{name}, "band name reply" );
 }
