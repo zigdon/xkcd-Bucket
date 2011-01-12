@@ -2708,6 +2708,7 @@ sub get_stats {
     # check if the log file was moved, if so, reopen it
     if (&config("logfile") and not -f &config("logfile")) {
         &open_log;
+        Log "Reopened log file";
     }
 }
 
