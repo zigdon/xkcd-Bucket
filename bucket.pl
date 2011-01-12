@@ -155,12 +155,7 @@ my %gender_vars = (
 );
 
 $stats{startup_time} = time;
-
-if ( &config("logfile") ) {
-    open( LOG, ">>",
-        DEBUG ? &config("logfile") . ".debug" : &config("logfile") )
-      or die "Can't write " . &config("logfile") . ": $!";
-}
+&open_log;
 
 # make sure the file_input file is empty, if it is defined
 # (so that we don't delete anything important by mistake)
@@ -2709,6 +2704,11 @@ sub get_stats {
     );
 
     $stats{last_updated} = time;
+
+    # check if the log file was moved, if so, reopen it
+    if (&config("logfile") and not -f &config("logfile")) {
+        &open_log;
+    }
 }
 
 sub tail {
@@ -3804,4 +3804,12 @@ sub seven {
         return 0;
     }
     return 1;
+}
+
+sub open_log {
+    if ( &config("logfile") ) {
+        open( LOG, ">>",
+            DEBUG ? &config("logfile") . ".debug" : &config("logfile") )
+          or die "Can't write " . &config("logfile") . ": $!";
+    }
 }
