@@ -3704,7 +3704,7 @@ sub syllables {
     $modsyl++ if ( $word =~ /e[^aeioun]eo/ );
     $modsyl-- if ( $word =~ /e[^aeiou]eo([^s]$|u)/ );
     $modsyl++ if ( $word =~ /[^aeiou]i[rl]e$/ );
-    $modsyl-- if ( $word =~ /[^cs]es$/ );
+    $modsyl-- if ( $word =~ /[^cszaeiou]es$/ );
     $modsyl++ if ( $word =~ /[cs]hes$/ );
     $modsyl++ if ( $word =~ /[^aeiou][aeiouy]ing/ );
     $modsyl-- if ( $word =~ /[aeiou][^aeiou][e]ing/ );
