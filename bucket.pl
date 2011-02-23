@@ -604,7 +604,7 @@ sub irc_on_public {
             &say( $chl => "$who: $cmd what channel?" );
             return;
         }
-        $irc->yield( $cmd => $dst, $msg );
+        $irc->yield( $cmd => $msg ? ($dst, $msg) : $dst );
         &say( $chl => "$who: ${cmd}ing $dst" );
         Report "${cmd}ing $dst at ${who}'s request";
     } elsif ( $addressed and $operator and lc $msg eq 'list ignored' ) {
