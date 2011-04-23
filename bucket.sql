@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS `bucket_vars` (
   `id` int(10) unsigned NOT NULL auto_increment,
   `name` varchar(16) NOT NULL,
   `perms` enum('read-only','editable') NOT NULL default 'read-only',
-  `type` enum('var','varb','noun') NOT NULL default 'var',
+  `type` enum('var','verb','noun') NOT NULL default 'var',
   PRIMARY KEY  (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=MyISAM  DEFAULT CHARSET=latin1;
