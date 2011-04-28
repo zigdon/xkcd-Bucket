@@ -1393,7 +1393,7 @@ sub irc_on_public {
             &load_gender($who);
             &say( $chl => "$who: I don't know how to refer to you!" );
         }
-    } elsif ( $addressed and $msg =~ /^what gender is ([-\w]+)\??$/ ) {
+    } elsif ( $addressed and $msg =~ /^what gender is ([-\w]+)\??$/i ) {
         if ( exists $stats{users}{genders}{ lc $1 } ) {
             &say( $chl => "$who: $1 is $stats{users}{genders}{lc $1}." );
         } else {
