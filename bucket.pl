@@ -604,7 +604,7 @@ sub irc_on_public {
             &say( $chl => "$who: $cmd what channel?" );
             return;
         }
-        $irc->yield( $cmd => $msg ? ($dst, $msg) : $dst );
+        $irc->yield( $cmd => $msg ? ( $dst, $msg ) : $dst );
         &say( $chl => "$who: ${cmd}ing $dst" );
         Report "${cmd}ing $dst at ${who}'s request";
     } elsif ( $addressed and $operator and lc $msg eq 'list ignored' ) {
@@ -1881,8 +1881,8 @@ sub db_success {
         }
     } elsif ( $bag{cmd} eq 'load_gender' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
-        $stats{users}{genders}{ lc $bag{nick} } = lc $line{gender}
-          || "androgynous";
+        $stats{users}{genders}{ lc $bag{nick} } =
+          lc( $line{gender} || "androgynous" );
     } elsif ( $bag{cmd} eq 'load_vars' ) {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
         my ( @small, @large );
@@ -1965,7 +1965,7 @@ sub db_success {
         Log "Loaded vars:",
           &make_list(
             map { "$_ (" . scalar @{ $replacables{$_}{vals} } . ")" }
-              sort keys %replacables
+            sort keys %replacables
           );
     } elsif ( $bag{cmd} eq 'dump_var' ) {
         unless ( ref $res->{RESULT} ) {
@@ -2706,7 +2706,7 @@ sub get_stats {
     $stats{last_updated} = time;
 
     # check if the log file was moved, if so, reopen it
-    if (&config("logfile") and not -f &config("logfile")) {
+    if ( &config("logfile") and not -f &config("logfile") ) {
         &open_log;
         Log "Reopened log file";
     }
