@@ -2591,6 +2591,7 @@ sub irc_on_connect {
         Log("Identifying...");
         &say( nickserv => "identify $pass" );
     } else {
+        Log("Skipping identify...");
         $stats{identified} = 1;
         $irc->yield( join => $channel );
     }
@@ -3815,8 +3816,9 @@ sub seven {
 
 sub open_log {
     if ( &config("logfile") ) {
-        open( LOG, ">>",
-            DEBUG ? &config("logfile") . ".debug" : &config("logfile") )
+        my $logfile = DEBUG ? &config("logfile") . ".debug" : &config("logfile");
+        open( LOG, ">>", $logfile)
           or die "Can't write " . &config("logfile") . ": $!";
+        Log("Opened $logfile");
     }
 }
