@@ -483,7 +483,7 @@ sub irc_on_public {
             msg    => $msg,
             search => $search,
         );
-    } elsif ( $msg =~ /^literal(?:\[([*\d]+)\])?\s+(.*)/i ) {
+    } elsif ( $addressed and $msg =~ /^literal(?:\[([*\d]+)\])?\s+(.*)/i ) {
         my ( $page, $fact ) = ( $1 || 1, $2 );
         $stats{literal}++;
         $fact = &trim($fact);
