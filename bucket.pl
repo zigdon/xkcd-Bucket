@@ -283,7 +283,7 @@ sub irc_on_public {
     }
 
     if ( &config("sub_siri") ) {
-      $msg =~ s/\bsiri\b/$nick/ig;
+        $msg =~ s/\bsiri\b/$nick/ig;
     }
 
     my $addressed = 0;
@@ -2591,7 +2591,7 @@ sub irc_on_chan_sync {
 
 sub irc_on_connect {
     Log("Connected...");
-    if (&config("identify_before_autojoin")) {
+    if ( &config("identify_before_autojoin") ) {
         Log("Identifying...");
         &say( nickserv => "identify $pass" );
     } else {
@@ -3820,8 +3820,9 @@ sub seven {
 
 sub open_log {
     if ( &config("logfile") ) {
-        my $logfile = DEBUG ? &config("logfile") . ".debug" : &config("logfile");
-        open( LOG, ">>", $logfile)
+        my $logfile =
+          DEBUG ? &config("logfile") . ".debug" : &config("logfile");
+        open( LOG, ">>", $logfile )
           or die "Can't write " . &config("logfile") . ": $!";
         Log("Opened $logfile");
     }
