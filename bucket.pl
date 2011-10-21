@@ -283,7 +283,7 @@ sub irc_on_public {
     }
 
     my $addressed = 0;
-    if ( $type eq 'irc_msg' or $msg =~ s/^$nick[:,]\s*|,\s+$nick\W+$//i ) {
+    if ( $type eq 'irc_msg' or $msg =~ s/^(?:$nick|siri)[:,]\s*|,\s+$nick\W+$//i ) {
         $bag{addressed} = $addressed = 1;
         $bag{to} = $nick;
     } else {
