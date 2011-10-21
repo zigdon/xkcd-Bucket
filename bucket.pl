@@ -101,6 +101,7 @@ my %config_keys = (
     repeated_queries         => [ i => 5 ],
     squirrel_chance          => [ i => 20 ],
     squirrel_shock           => [ i => 60 ],
+    sub_siri                 => [ b => 1 ],
     timeout                  => [ i => 60 ],
     uses_reply               => [ i => 5 ],
     user_activity_timeout    => [ i => 360 ],
@@ -282,8 +283,12 @@ sub irc_on_public {
         return;
     }
 
+    if ( $config->{sub_siri} ) {
+      $msg =~ s/\bsiri\b/$nick/g;
+    }
+
     my $addressed = 0;
-    if ( $type eq 'irc_msg' or $msg =~ s/^(?:$nick|siri)[:,]\s*|,\s+$nick\W+$//i ) {
+    if ( $type eq 'irc_msg' or $msg =~ s/^$nick[:,]\s*|,\s+$nick\W+$//i ) {
         $bag{addressed} = $addressed = 1;
         $bag{to} = $nick;
     } else {
