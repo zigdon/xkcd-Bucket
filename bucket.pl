@@ -278,13 +278,12 @@ sub irc_on_public {
     $last_activity{$chl} = time;
 
     if ( exists $config->{ignore}{ lc $who } ) {
-
         Log("ignoring $who");
         return;
     }
 
-    if ( $config->{sub_siri} ) {
-      $msg =~ s/\bsiri\b/$nick/g;
+    if ( &config("sub_siri") ) {
+      $msg =~ s/\bsiri\b/$nick/ig;
     }
 
     my $addressed = 0;
