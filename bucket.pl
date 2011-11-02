@@ -838,7 +838,7 @@ sub irc_on_public {
             },
             EVENT => 'db_success'
         );
-    } elsif ( $addressed and $msg =~ /^how many syllables in (.*)/i ) {
+    } elsif ( $addressed and $msg =~ /^how many syllables (?:is|in) (.*)/i ) {
         my ( $count, $debug ) = &count_syllables($1);
         &say(
             $chl => sprintf "%s: %d syllable%s.  %s",
