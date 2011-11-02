@@ -302,7 +302,9 @@ sub irc_on_public {
             (
                 $stats{haiku_debug}{$chl}{count},
                 $stats{haiku_debug}{$chl}{line}
-            ) = &count_syllables($msg);
+              )
+              = &count_syllables(
+                $type eq 'irc_ctcp_action' ? "$who $msg" : $msg );
             push @{ $history{$chl} },
               [ $who, $type, $msg, $stats{haiku_debug}{$chl}{count} ];
             if (    @{ $history{$chl} } > 3
