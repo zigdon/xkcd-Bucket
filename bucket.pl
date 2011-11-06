@@ -43,7 +43,7 @@ unless ($@) {
     &Log("$math loaded");
 }
 
-use constant { DEBUG => 0 };
+use constant { DEBUG => 1 };
 
 # work around a bug: https://rt.cpan.org/Ticket/Display.html?id=50991
 sub s_form { return Lingua::EN::Conjugate::s_form(@_); }
@@ -57,7 +57,8 @@ my $configfile = shift || "bucket.yml";
 my $config     = LoadFile($configfile);
 my $nick       = &config("nick") || "Bucket";
 my $pass       = &config("password") || "somethingsecret";
-$nick = DEBUG ? ( &config("debug_nick") || "bucketgoat" ) : $nick;
+$config->{nick} = $nick = DEBUG ? ( &config("debug_nick") || "bucketgoat" ) : $nick;
+
 my $channel =
   DEBUG
   ? ( &config("debug_channel") || "#bucket" )
@@ -75,8 +76,10 @@ my @random_items;
 my %replacables;
 my %history;
 my %handles;
+my %plugin_signals;
 
 my %config_keys = (
+    autoload_plugins         => [ s => '' ],
     bananas_chance           => [ p => 0.02 ],
     band_name                => [ p => 5 ],
     band_var                 => [ s => 'band' ],
@@ -101,7 +104,6 @@ my %config_keys = (
     repeated_queries         => [ i => 5 ],
     squirrel_chance          => [ i => 20 ],
     squirrel_shock           => [ i => 60 ],
-    sub_siri                 => [ b => 1 ],
     timeout                  => [ i => 60 ],
     uses_reply               => [ i => 5 ],
     user_activity_timeout    => [ i => 360 ],
@@ -111,6 +113,15 @@ my %config_keys = (
     www_url                  => [ s => "" ],
     your_mom_is              => [ p => 5 ],
 );
+
+$stats{startup_time} = time;
+&open_log;
+
+if (&config("autoload_plugins")) {
+  foreach my $plugin (split /\S+/, &config("autoload_plugins")) {
+    &load_plugin($plugin);
+  }
+}
 
 my %gender_vars = (
     subjective => {
@@ -155,9 +166,6 @@ my %gender_vars = (
         aliases     => [qw/their hisher herhis/]
     },
 );
-
-$stats{startup_time} = time;
-&open_log;
 
 # make sure the file_input file is empty, if it is defined
 # (so that we don't delete anything important by mistake)
@@ -236,6 +244,8 @@ sub irc_on_topic {
     my $chl   = $_[ARG1];
     my $topic = $_[ARG2];
 
+    return if &signal_plugin("on_topic", {chl => $chl, topic => $topic});
+
     $stats{topics}{$chl}{old}     = $stats{topics}{$chl}{current};
     $stats{topics}{$chl}{current} = $topic;
 }
@@ -247,6 +257,8 @@ sub irc_on_kick {
     my $desc     = $_[ARG3];
 
     Log "$kicker kicked $kickee from $chl";
+
+    return if &signal_plugin("on_kick", {kicker => $kicker, chl => $chl, kickee => $kickee, desc => $desc});
 
     &lookup(
         msgs => [ "$kicker kicked $kickee", "$kicker kicked someone" ],
@@ -267,6 +279,7 @@ sub irc_on_public {
     my %bag;
 
     $bag{who}  = $who;
+    $bag{msg}  = $msg;
     $bag{chl}  = $chl;
     $bag{type} = $type;
 
@@ -277,36 +290,53 @@ sub irc_on_public {
 
     $last_activity{$chl} = time;
 
-    if ( exists $config->{ignore}{ lc $who } ) {
-        Log("ignoring $who");
+    if ( exists $config->{ignore}{ lc $bag{who} } ) {
+        Log("ignoring $bag{who}");
         return;
     }
 
-    if ( &config("sub_siri") ) {
-        $msg =~ s/\bsiri\b/$nick/ig;
-    }
-
     my $addressed = 0;
-    if ( $type eq 'irc_msg' or $msg =~ s/^$nick[:,]\s*|,\s+$nick\W+$//i ) {
+    if ( $type eq 'irc_msg' or $bag{msg} =~ s/^$nick[:,]\s*|,\s+$nick\W+$//i ) {
         $bag{addressed} = $addressed = 1;
         $bag{to} = $nick;
     } else {
-        $msg =~ s/^(\S+)://;
+        $bag{msg} =~ s/^(\S+)://;
         $bag{to} = $1;
+    }
+
+    my $operator = 0;
+    if (   $irc->is_channel_member( $channel, $bag{who} )
+        or $irc->is_channel_operator( $mainchannel, $bag{who} )
+        or $irc->is_channel_owner( $mainchannel, $bag{who} )
+        or $irc->is_channel_admin( $mainchannel, $bag{who} ) )
+    {
+        $bag{op} = $operator = 1;
+    }
+
+    my $editable = 0;
+    $editable = 1
+      if ( $type ne 'irc_msg' and $chl ne '#bots' )
+      or ( $type eq 'irc_msg' and $operator );
+    $bag{editable} = $editable;
+
+    if ( $type eq 'irc_msg' ) {
+      return if &signal_plugin("on_msg", \%bag);
+    } else {
+      return if &signal_plugin("on_public", \%bag);
     }
 
     if ( &config("history_size") and &config("history_size") > 0 ) {
         if ( &config("haiku_report")
-            and not( $addressed and $msg =~ /^how many syllables\??$/i ) )
+            and not( $addressed and $bag{msg} =~ /^how many syllables\??$/i ) )
         {
             (
                 $stats{haiku_debug}{$chl}{count},
                 $stats{haiku_debug}{$chl}{line}
               )
               = &count_syllables(
-                $type eq 'irc_ctcp_action' ? "$who $msg" : $msg );
+                $type eq 'irc_ctcp_action' ? "$bag{who} $bag{msg}" : $bag{msg} );
             push @{ $history{$chl} },
-              [ $who, $type, $msg, $stats{haiku_debug}{$chl}{count} ];
+              [ $bag{who}, $type, $bag{msg}, $stats{haiku_debug}{$chl}{count} ];
             if (    @{ $history{$chl} } > 3
                 and $history{$chl}[-1][3] == 5
                 and $history{$chl}[-2][3] == 7
@@ -322,7 +352,7 @@ sub irc_on_public {
                 Report sprintf "<%s> %s", @{ $haiku[2] };
 
                 if ( $talking{$chl} == -1 ) {
-                    &cached_reply( $chl, $who, "", "haiku detected" );
+                    &cached_reply( $chl, $bag{who}, "", "haiku detected" );
                 }
                 $stats{haiku}++;
 
@@ -337,7 +367,7 @@ sub irc_on_public {
                 );
             }
         } else {
-            push @{ $history{$chl} }, [ $who, $type, $msg ];
+            push @{ $history{$chl} }, [ $bag{who}, $type, $bag{msg} ];
         }
 
         while ( @{ $history{$chl} } > &config("history_size") ) {
@@ -347,39 +377,30 @@ sub irc_on_public {
 
     # keep track of who's active in each channel
     if ( $chl =~ /^#/ ) {
-        $stats{users}{$chl}{$who}{last_active} = time;
+        $stats{users}{$chl}{$bag{who}}{last_active} = time;
     }
 
-    unless ( exists $stats{users}{genders}{ lc $who } ) {
-        &load_gender($who);
-    }
-
-    my $operator = 0;
-    if (   $irc->is_channel_member( $channel, $who )
-        or $irc->is_channel_operator( $mainchannel, $who )
-        or $irc->is_channel_owner( $mainchannel, $who )
-        or $irc->is_channel_admin( $mainchannel, $who ) )
-    {
-        $bag{op} = $operator = 1;
+    unless ( exists $stats{users}{genders}{ lc $bag{who} } ) {
+        &load_gender($bag{who});
     }
 
     # flood protection
     if ( not $operator and $addressed ) {
-        $stats{last_talk}{$chl}{$who}{when} = time;
-        if ( $stats{last_talk}{$chl}{$who}{count}++ > 20
-            and time - $stats{last_talk}{$chl}{$who}{when} <
+        $stats{last_talk}{$chl}{$bag{who}}{when} = time;
+        if ( $stats{last_talk}{$chl}{$bag{who}}{count}++ > 20
+            and time - $stats{last_talk}{$chl}{$bag{who}}{when} <
             &config("user_activity_timeout") )
         {
-            if ( $stats{last_talk}{$chl}{$who}{count} == 21 ) {
-                Report "Ignoring $who who is flooding in $chl.";
+            if ( $stats{last_talk}{$chl}{$bag{who}}{count} == 21 ) {
+                Report "Ignoring $bag{who} who is flooding in $chl.";
                 &say( $chl =>
-                      "$who, I'm a bit busy now, try again in 5 minutes?" );
+                      "$bag{who}, I'm a bit busy now, try again in 5 minutes?" );
             }
             return;
         }
     }
 
-    $msg =~ s/^\s+|\s+$//g;
+    $bag{msg} =~ s/^\s+|\s+$//g;
 
     # == 0 - shut up by operator
     # == -1 - talking
@@ -403,7 +424,7 @@ sub irc_on_public {
     }
 
     if ( $type eq 'irc_msg' ) {
-        $bag{chl} = $chl = $who;
+        $bag{chl} = $chl = $bag{who};
     }
 
     if ( &config("bananas_chance")
@@ -412,17 +433,12 @@ sub irc_on_public {
         &say( $chl => "Bananas!" );
     }
 
-    my $editable = 0;
-    $editable = 1
-      if ( $type ne 'irc_msg' and $chl ne '#bots' )
-      or ( $type eq 'irc_msg' and $operator );
-    Log("$type($chl): $who(o=$operator, a=$addressed, e=$editable): $msg");
-    $bag{editable} = $editable;
+    Log("$type($chl): $bag{who}(o=$operator, a=$addressed, e=$editable): $bag{msg}");
 
     if (
             $addressed
         and $editable
-        and $msg =~ m{ (.*?)         # $1 key to edit
+        and $bag{msg} =~ m{ (.*?)    # $1 key to edit
                    \s+(?:=~|~=)\s+   # match operator
                    s(\W)             # start match ($2 delimiter)
                      (               # $3 - string to replace
@@ -437,7 +453,7 @@ sub irc_on_public {
       )
     {
         my ( $fact, $old, $new, $flag ) = ( $1, $3, $4, $5 );
-        Report "$who is editing $fact in $chl: replacing '$old' with '$new'";
+        Report "$bag{who} is editing $fact in $chl: replacing '$old' with '$new'";
         Log "Editing $fact: replacing '$old' with '$new'";
         if ( $fact =~ /^#(\d+)$/ ) {
             $_[KERNEL]->post(
@@ -470,7 +486,7 @@ sub irc_on_public {
             );
         }
     } elsif (
-        $msg =~ m{ (.*?)             # $1 key to look up
+        $bag{msg} =~ m{ (.*?)             # $1 key to look up
                    \s+(?:=~|~=)\s+   # match operator
                    (\W)              # start match (any delimiter, $2)
                      (               # $3 - string to search
@@ -482,14 +498,24 @@ sub irc_on_public {
     {
         my ( $fact, $search ) = ( $1, $3 );
         $fact = &trim($fact);
-        $msg  = $fact;
+        $bag{msg}  = $fact;
         Log "Looking up a particular factoid - '$search' in '$fact'";
         &lookup(
             %bag,
-            msg    => $msg,
             search => $search,
         );
-    } elsif ( $addressed and $msg =~ /^literal(?:\[([*\d]+)\])?\s+(.*)/i ) {
+    } elsif ( $addressed and $operator and $bag{msg} =~ /^list plugins$/i ) {
+      &say( $chl => "$bag{who}: Currently loaded plugins: " . &make_list(map {"$_($stats{loaded_plugins}{$_})"} sort keys %{$stats{loaded_plugins}}));
+    } elsif ( $addressed and $operator and $bag{msg} =~ /^load plugin (\w+)\W*$/i ) {
+      if (&load_plugin(lc $1)) {
+        &say( $chl => "Okay, $bag{who}. Plugin $1 loaded." );
+      } else {
+        &say( $chl => "Sorry, $bag{who}. Plugin $1 failed to load." );
+      }
+    } elsif ( $addressed and $operator and $bag{msg} =~ /^unload plugin (\w+)\W*$/i ) {
+      &unload_plugin(lc $1);
+      &say( $chl => "Okay, $bag{who}. Plugin $1 unloaded." );
+    } elsif ( $addressed and $bag{msg} =~ /^literal(?:\[([*\d]+)\])?\s+(.*)/i ) {
         my ( $page, $fact ) = ( $1 || 1, $2 );
         $stats{literal}++;
         $fact = &trim($fact);
@@ -508,23 +534,23 @@ sub irc_on_public {
             },
             EVENT => 'db_success'
         );
-    } elsif ( $addressed and $operator and $msg =~ /^delete item #?(\d+)/i ) {
-        unless ( $stats{detailed_inventory}{$who} ) {
-            &say( $chl => "$who: ask me for a detailed inventory first." );
+    } elsif ( $addressed and $operator and $bag{msg} =~ /^delete item #?(\d+)/i ) {
+        unless ( $stats{detailed_inventory}{$bag{who}} ) {
+            &say( $chl => "$bag{who}: ask me for a detailed inventory first." );
             return;
         }
 
         my $num  = $1 - 1;
-        my $item = $stats{detailed_inventory}{$who}[$num];
+        my $item = $stats{detailed_inventory}{$bag{who}}[$num];
         unless ( defined $item ) {
-            &say( $chl => "Sorry, $who, I can't find that!" );
+            &say( $chl => "Sorry, $bag{who}, I can't find that!" );
             return;
         }
-        &say( $chl => "Okay, $who, destroying '$item'" );
+        &say( $chl => "Okay, $bag{who}, destroying '$item'" );
         @inventory = grep { $_ ne $item } @inventory;
         &sql( "delete from bucket_items where `what` = ?", [$item] );
-        delete $stats{detailed_inventory}{$who}[$num];
-    } elsif ( $addressed and $operator and $msg =~ /^delete ((#)?.+)/i ) {
+        delete $stats{detailed_inventory}{$bag{who}}[$num];
+    } elsif ( $addressed and $operator and $bag{msg} =~ /^delete ((#)?.+)/i ) {
         my $id   = $2;
         my $fact = $1;
         $stats{deleted}++;
@@ -561,7 +587,7 @@ sub irc_on_public {
         }
     } elsif (
         $addressed
-        and $msg =~ /^(?:shut \s up | go \s away)
+        and $bag{msg} =~ /^(?:shut \s up | go \s away)
                       (?: \s for \s (\d+)([smh])?|
                           \s for \s a \s (bit|moment|while|min(?:ute)?))?[.!]?$/xi
       )
@@ -580,7 +606,7 @@ sub irc_on_public {
                 $target += $num * 60 * 60 * 24 if $unit eq 'd';
                 Report
                   "Shutting up in $chl at ${who}'s request for $target seconds";
-                &say( $chl => "Okay $who.  I'll be back later" );
+                &say( $chl => "Okay $bag{who}.  I'll be back later" );
                 $talking{$chl} = time + $target;
             } elsif ($word) {
                 $target += 60 if $word eq 'min' or $word eq 'minute';
@@ -589,69 +615,69 @@ sub irc_on_public {
                 $target += 30 * 60 + int( rand( 30 * 60 ) ) if $word eq 'while';
                 Report
                   "Shutting up in $chl at ${who}'s request for $target seconds";
-                &say( $chl => "Okay $who.  I'll be back later" );
+                &say( $chl => "Okay $bag{who}.  I'll be back later" );
                 $talking{$chl} = time + $target;
             }
         } else {
-            &say( $chl => "Okay, $who - be back in a bit!" );
+            &say( $chl => "Okay, $bag{who} - be back in a bit!" );
             $talking{$chl} = time + &config("timeout");
         }
     } elsif ( $addressed
         and $operator
-        and $msg =~ /^unshut up\W*$|^come back\W*$/i )
+        and $bag{msg} =~ /^unshut up\W*$|^come back\W*$/i )
     {
         &say( $chl => "\\o/" );
         $talking{$chl} = -1;
     } elsif ( $addressed
         and $operator
-        and $msg =~ /^(join|part) (#[-\w]+)(?: (.*))?/i )
+        and $bag{msg} =~ /^(join|part) (#[-\w]+)(?: (.*))?/i )
     {
         my ( $cmd, $dst, $msg ) = ( $1, $2, $3 );
         unless ($dst) {
-            &say( $chl => "$who: $cmd what channel?" );
+            &say( $chl => "$bag{who}: $cmd what channel?" );
             return;
         }
         $irc->yield( $cmd => $msg ? ( $dst, $msg ) : $dst );
-        &say( $chl => "$who: ${cmd}ing $dst" );
+        &say( $chl => "$bag{who}: ${cmd}ing $dst" );
         Report "${cmd}ing $dst at ${who}'s request";
-    } elsif ( $addressed and $operator and lc $msg eq 'list ignored' ) {
+    } elsif ( $addressed and $operator and lc $bag{msg} eq 'list ignored' ) {
         &say(
             $chl => "Currently ignored: ",
             join ", ", sort keys %{ $config->{ignore} }
         );
     } elsif ( $addressed
         and $operator
-        and $msg =~ /^(\w+) has (\d+) syllables?\W*$/i )
+        and $bag{msg} =~ /^(\w+) has (\d+) syllables?\W*$/i )
     {
         $config->{sylcheat}{ lc $1 } = $2;
         &save;
-        &say( $chl => "Okay, $who.  Cheat sheet updated." );
-    } elsif ( $addressed and $operator and $msg =~ /^(un)?ignore (\S+)/i ) {
-        Report "$who is $1ignoring $2";
+        &say( $chl => "Okay, $bag{who}.  Cheat sheet updated." );
+    } elsif ( $addressed and $operator and $bag{msg} =~ /^(un)?ignore (\S+)/i ) {
+        Report "$bag{who} is $1ignoring $2";
         if ($1) {
             delete $config->{ignore}{ lc $2 };
         } else {
             $config->{ignore}{ lc $2 } = 1;
         }
         &save;
-        &say( $chl => "Okay, $who.  Ignore list updated." );
-    } elsif ( $addressed and $operator and $msg =~ /^(un)?exclude (\S+)/i ) {
-        Report "$who is $1excluding $2";
+        &say( $chl => "Okay, $bag{who}.  Ignore list updated." );
+    } elsif ( $addressed and $operator and $bag{msg} =~ /^(un)?exclude (\S+)/i ) {
+        Report "$bag{who} is $1excluding $2";
         if ($1) {
             delete $config->{exclude}{ lc $2 };
         } else {
             $config->{exclude}{ lc $2 } = 1;
         }
         &save;
-        &say( $chl => "Okay, $who.  Exclude list updated." );
-    } elsif ( $addressed and $operator and $msg =~ /^(un)?protect (.+)/i ) {
+        &say( $chl => "Okay, $bag{who}.  Exclude list updated." );
+    } elsif ( $addressed and $operator and $bag{msg} =~ /^(un)?protect (.+)/i ) {
         my ( $protect, $fact ) = ( ( $1 ? 0 : 1 ), $2 );
-        Report "$who is $1protecting $fact";
+        Report "$bag{who} is $1protecting $fact";
         Log "$1protecting $fact";
 
         if ( $fact =~ s/^\$// ) {    # it's a variable!
             unless ( exists $replacables{ lc $fact } ) {
-                &say( $chl => "Sorry, $who, \$$fact isn't a valid variable." );
+                &say( $chl => "Sorry, $bag{who}, \$$fact isn't a valid variable." );
                 return;
             }
 
@@ -661,32 +687,32 @@ sub irc_on_public {
             &sql( 'update bucket_facts set protected=? where fact=?',
                 [ $protect, $fact ] );
         }
-        &say( $chl => "Okay, $who, updated the protection bit." );
-    } elsif ( $addressed and $msg =~ /^restore topic(?: (#\S+))?/ ) {
+        &say( $chl => "Okay, $bag{who}, updated the protection bit." );
+    } elsif ( $addressed and $bag{msg} =~ /^restore topic(?: (#\S+))?/ ) {
         my $tchl = $chl;
         if ($1) {
             if ($operator) {
                 $tchl = $1;
             } else {
-                &say( $chl => "Sorry, $who, "
+                &say( $chl => "Sorry, $bag{who}, "
                       . "you can't change the topic for another channel!" );
                 return;
             }
         }
         unless ( $stats{topics}{$tchl}{old} ) {
             &say( $chl =>
-                  "Sorry, $who, I don't know what was the earlier topic!" );
+                  "Sorry, $bag{who}, I don't know what was the earlier topic!" );
             return;
         }
-        Log "$who restored topic in $tchl: $stats{topics}{$tchl}{old}";
-        &say( $chl => "Okay, $who." );
+        Log "$bag{who} restored topic in $tchl: $stats{topics}{$tchl}{old}";
+        &say( $chl => "Okay, $bag{who}." );
         $irc->yield( topic => $tchl => $stats{topics}{$tchl}{old} );
-    } elsif ( $addressed and $msg =~ /^undo last(?: (#\S+))?/ ) {
-        Log "$who called undo:";
+    } elsif ( $addressed and $bag{msg} =~ /^undo last(?: (#\S+))?/ ) {
+        Log "$bag{who} called undo:";
         my $uchannel = $1 || $chl;
         my $undo = $undo{$uchannel};
-        unless ( $operator or $undo->[1] eq $who ) {
-            &say( $chl => "Sorry, $who, you can't undo that." );
+        unless ( $operator or $undo->[1] eq $bag{who} ) {
+            &say( $chl => "Sorry, $bag{who}, you can't undo that." );
             return;
         }
         Log Dumper $undo;
@@ -695,8 +721,8 @@ sub irc_on_public {
                 'delete from bucket_facts where id=? limit 1',
                 [ $undo->[2] ],
             );
-            Report "$who called undo: deleted $undo->[3].";
-            &say( $chl => "Okay, $who, deleted $undo->[3]." );
+            Report "$bag{who} called undo: deleted $undo->[3].";
+            &say( $chl => "Okay, $bag{who}, deleted $undo->[3]." );
             delete $undo{$uchannel};
         } elsif ( $undo->[0] eq 'insert' ) {
             if ( $undo->[2] and ref $undo->[2] eq 'ARRAY' ) {
@@ -711,8 +737,8 @@ sub irc_on_public {
                         [ @old{qw/fact verb tidbit protected RE mood chance/} ],
                     );
                 }
-                Report "$who called undo: undeleted $undo->[3].";
-                &say( $chl => "Okay, $who, undeleted $undo->[3]." );
+                Report "$bag{who} called undo: undeleted $undo->[3].";
+                &say( $chl => "Okay, $bag{who}, undeleted $undo->[3]." );
             } elsif ( $undo->[2] and ref $undo->[2] eq 'HASH' ) {
                 my %old = %{ $undo->[2] };
                 $old{RE}        = 0 unless $old{RE};
@@ -723,13 +749,13 @@ sub irc_on_public {
                       values(?, ?, ?, ?, ?, ?, ?, ?)',
                     [ @old{qw/id fact verb tidbit protected RE mood chance/} ],
                 );
-                Report "$who called undo:",
+                Report "$bag{who} called undo:",
                   "unforgot $old{fact} $old{verb} $old{tidbit}.";
                 &say( $chl =>
-                      "Okay, $who, unforgot $old{fact} $old{verb} $old{tidbit}."
+                      "Okay, $bag{who}, unforgot $old{fact} $old{verb} $old{tidbit}."
                 );
             } else {
-                &say( $chl => "Sorry, $who, that's an invalid undo structure."
+                &say( $chl => "Sorry, $bag{who}, that's an invalid undo structure."
                       . "  Tell Zigdon, please." );
             }
 
@@ -758,17 +784,17 @@ sub irc_on_public {
                         );
                     }
                 }
-                Report "$who called undo: undone $undo->[3].";
-                &say( $chl => "Okay, $who, undone $undo->[3]." );
+                Report "$bag{who} called undo: undone $undo->[3].";
+                &say( $chl => "Okay, $bag{who}, undone $undo->[3]." );
             } else {
-                &say( $chl => "Sorry, $who, that's an invalid undo structure."
+                &say( $chl => "Sorry, $bag{who}, that's an invalid undo structure."
                       . "  Tell Zigdon, please." );
             }
             delete $undo{$uchannel};
         } else {
-            &say( $chl => "Sorry, $who, can't undo $undo->[0] yet" );
+            &say( $chl => "Sorry, $bag{who}, can't undo $undo->[0] yet" );
         }
-    } elsif ( $addressed and $operator and $msg =~ /^merge (.*) => (.*)/ ) {
+    } elsif ( $addressed and $operator and $bag{msg} =~ /^merge (.*) => (.*)/ ) {
         my ( $src, $dst ) = ( $1, $2 );
         $stats{merge}++;
 
@@ -785,7 +811,7 @@ sub irc_on_public {
             },
             EVENT => 'db_success'
         );
-    } elsif ( $addressed and $operator and $msg =~ /^alias (.*) => (.*)/ ) {
+    } elsif ( $addressed and $operator and $bag{msg} =~ /^alias (.*) => (.*)/ ) {
         my ( $src, $dst ) = ( $1, $2 );
         $stats{alias}++;
 
@@ -802,7 +828,7 @@ sub irc_on_public {
             },
             EVENT => 'db_success'
         );
-    } elsif ( $operator and $addressed and $msg =~ /^lookup #?(\d+)$/ ) {
+    } elsif ( $operator and $addressed and $bag{msg} =~ /^lookup #?(\d+)$/ ) {
         $_[KERNEL]->post(
             db  => 'SINGLE',
             SQL => 'select id, fact, verb, tidbit from bucket_facts 
@@ -819,11 +845,11 @@ sub irc_on_public {
             },
             EVENT => 'db_success'
         );
-    } elsif ( $operator and $addressed and $msg =~ /^forget (?:that|#(\d+))$/ )
+    } elsif ( $operator and $addressed and $bag{msg} =~ /^forget (?:that|#(\d+))$/ )
     {
         my $id = $1 || $stats{last_fact}{$chl};
         unless ($id) {
-            &say( $chl => "Sorry, $who, forget what?" );
+            &say( $chl => "Sorry, $bag{who}, forget what?" );
             return;
         }
 
@@ -835,32 +861,31 @@ sub irc_on_public {
             BAGGAGE      => {
                 %bag,
                 cmd => "forget",
-                msg => $msg,
                 id  => $id,
             },
             EVENT => 'db_success'
         );
-    } elsif ( $addressed and $msg =~ /^how many syllables (?:is|in) (.*)/i ) {
+    } elsif ( $addressed and $bag{msg} =~ /^how many syllables (?:is|in) (.*)/i ) {
         my ( $count, $debug ) = &count_syllables($1);
         &say(
             $chl => sprintf "%s: %d syllable%s.  %s",
-            $who, $count, &s($count), $debug
+            $bag{who}, $count, &s($count), $debug
         );
-    } elsif ( $addressed and $msg =~ /^how many syllables\??$/i ) {
+    } elsif ( $addressed and $bag{msg} =~ /^how many syllables\??$/i ) {
         my $count = $stats{haiku_debug}{$chl}{count};
         my $line  = $stats{haiku_debug}{$chl}{line};
 
         unless ( $count and $line ) {
-            &say( $chl => "Sorry, $who, I have no idea." );
+            &say( $chl => "Sorry, $bag{who}, I have no idea." );
             return;
         }
 
-        &say(   $chl => "$who, that was '$line', with $count syllable"
+        &say(   $chl => "$bag{who}, that was '$line', with $count syllable"
               . &s($count) );
-    } elsif ( $addressed and $msg =~ /^what was that\??$/i ) {
+    } elsif ( $addressed and $bag{msg} =~ /^what was that\??$/i ) {
         my $id = $stats{last_fact}{$chl};
         unless ($id) {
-            &say( $chl => "Sorry, $who, I have no idea." );
+            &say( $chl => "Sorry, $bag{who}, I have no idea." );
             return;
         }
 
@@ -873,19 +898,18 @@ sub irc_on_public {
                 BAGGAGE      => {
                     %bag,
                     cmd => "report",
-                    msg => $msg,
                     id  => $id,
                 },
                 EVENT => 'db_success'
             );
         } else {
-            &say( $chl => "$who: that was $id" );
+            &say( $chl => "$bag{who}: that was $id" );
         }
-    } elsif ( $addressed and $msg eq 'something random' ) {
+    } elsif ( $addressed and $bag{msg} eq 'something random' ) {
         &lookup(%bag);
-    } elsif ( $addressed and $msg eq 'stats' ) {
+    } elsif ( $addressed and $bag{msg} eq 'stats' ) {
         unless ( $stats{stats_cached} ) {
-            &say( $chl => "$who: Hold on, I'm still counting" );
+            &say( $chl => "$bag{who}: Hold on, I'm still counting" );
             return;
         }
         my ( $awake, $units ) = &round_time( time - $stats{startup_time} );
@@ -931,7 +955,12 @@ sub irc_on_public {
             if ( @fact_stats > 1 ) {
                 s/ factoids?// foreach @fact_stats[ 1 .. $#fact_stats ];
             }
-            $reply .= &make_list(@fact_stats) . ". ";
+
+            if (@fact_stats) {
+              $reply .= &make_list(@fact_stats) . ". ";
+            } else {
+              $reply .= "haven't had a chance to do much!";
+            }
         }
         $reply .= sprintf "I know now a total of %s thing%s "
           . "about %s subject%s. ",
@@ -948,35 +977,35 @@ sub irc_on_public {
               &round_time( $talking{$chl} - time );
         }
         &say( $chl => $reply );
-    } elsif ( $operator and $addressed and $msg =~ /^stat (\w+)\??/ ) {
+    } elsif ( $operator and $addressed and $bag{msg} =~ /^stat (\w+)\??/ ) {
         my $key = $1;
         if ( $key eq 'keys' ) {
-            &say(   $chl => "$who: valid keys are: "
+            &say(   $chl => "$bag{who}: valid keys are: "
                   . &make_list( sort keys %stats )
                   . "." );
         } elsif ( exists $stats{$key} ) {
             if ( ref $stats{$key} ) {
                 my $dump = Dumper( $stats{$key} );
                 $dump =~ s/[\s\n]+/ /g;
-                &say( $chl => "$who: $key: $dump." );
+                &say( $chl => "$bag{who}: $key: $dump." );
                 Log $dump;
             } else {
-                &say( $chl => "$who: $key: $stats{$key}." );
+                &say( $chl => "$bag{who}: $key: $stats{$key}." );
             }
         } else {
-            &say( $chl => "Sorry, $who, I don't have statistics for '$key'." );
+            &say( $chl => "Sorry, $bag{who}, I don't have statistics for '$key'." );
         }
-    } elsif ( $operator and $addressed and $msg eq 'restart' ) {
+    } elsif ( $operator and $addressed and $bag{msg} eq 'restart' ) {
         Report "Restarting at ${who}'s request";
         Log "Restarting at ${who}'s request";
-        &say( $chl => "Okay, $who, I'll be right back." );
+        &say( $chl => "Okay, $bag{who}, I'll be right back." );
         $irc->yield( quit => "OHSHI--" );
-    } elsif ( $operator and $addressed and $msg =~ /^set(?: (\w+) (.*)|$)/ ) {
+    } elsif ( $operator and $addressed and $bag{msg} =~ /^set(?: (\w+) (.*)|$)/ ) {
         my ( $key, $val ) = ( $1, $2 );
 
         unless ( $key and exists $config_keys{$key} ) {
             &say(
-                $chl => "$who: Valid keys are: " . join ", ",
+                $chl => "$bag{who}: Valid keys are: " . join ", ",
                 sort keys %config_keys
             );
             return;
@@ -993,41 +1022,41 @@ sub irc_on_public {
             $config->{$key} = $val eq 'true';
         } elsif ( $config_keys{$key}[0] eq 'f' and length $val ) {
             if ( -f $val ) {
-                &say( $chl => "Sorry, $who, $val already exists." );
+                &say( $chl => "Sorry, $bag{who}, $val already exists." );
                 return;
             } else {
                 $config->{$key} = $val;
             }
         } else {
-            &say( $chl => "Sorry, $who, that's an invalid value for $key." );
+            &say( $chl => "Sorry, $bag{who}, that's an invalid value for $key." );
             return;
         }
 
-        &say( $chl => "Okay, $who." );
-        Report "$who set '$key' to '$val'";
+        &say( $chl => "Okay, $bag{who}." );
+        Report "$bag{who} set '$key' to '$val'";
 
         &save;
         return;
-    } elsif ( $operator and $addressed and $msg =~ /^get (\w+)\s*$/ ) {
+    } elsif ( $operator and $addressed and $bag{msg} =~ /^get (\w+)\s*$/ ) {
         my ($key) = ($1);
         unless ( exists $config_keys{$key} ) {
             my @keys = sort keys %config_keys;
-            my $list = "$who: Valid keys are: ";
+            my $list = "$bag{who}: Valid keys are: ";
             while (@keys) {
                 while ( length $list < 350 and @keys ) {
                     $list .= shift(@keys) . "; ";
                 }
 
                 &say( $chl => $list );
-                $list = "$who: ";
+                $list = "$bag{who}: ";
             }
             return;
         }
 
         &say( $chl => "$key is", &config("$key") . "." );
-    } elsif ( $addressed and $msg eq 'list vars' ) {
+    } elsif ( $addressed and $bag{msg} eq 'list vars' ) {
         unless ( keys %replacables ) {
-            &say( $chl => "Sorry, $who, there are no defined variables!" );
+            &say( $chl => "Sorry, $bag{who}, there are no defined variables!" );
             return;
         }
         &say(
@@ -1042,10 +1071,10 @@ sub irc_on_public {
               )
               . "."
         );
-    } elsif ( $addressed and $msg =~ /^list var (\w+)$/ ) {
+    } elsif ( $addressed and $bag{msg} =~ /^list var (\w+)$/ ) {
         my $var = $1;
         unless ( exists $replacables{$var} ) {
-            &say( $chl => "Sorry, $who, I don't know a variable '$var'." );
+            &say( $chl => "Sorry, $bag{who}, I don't know a variable '$var'." );
             return;
         }
 
@@ -1055,7 +1084,7 @@ sub irc_on_public {
                 and @{ $replacables{$var}{vals} } )
           )
         {
-            &say( $chl => "$who: \$$var has no values defined!" );
+            &say( $chl => "$bag{who}: \$$var has no values defined!" );
             return;
         }
 
@@ -1082,7 +1111,7 @@ sub irc_on_public {
                 );
             } else {
                 &say( $chl =>
-                        "Sorry, $who, I can't print $replacables{$var}{vals}"
+                        "Sorry, $bag{who}, I can't print $replacables{$var}{vals}"
                       . "values to the channel." );
             }
             return;
@@ -1090,16 +1119,16 @@ sub irc_on_public {
 
         my @vals = @{ $replacables{$var}{vals} };
         &say( $chl => "$var:", &make_list( sort @vals ) );
-    } elsif ( $addressed and $msg =~ /^remove value (\w+) (.+)$/ ) {
+    } elsif ( $addressed and $bag{msg} =~ /^remove value (\w+) (.+)$/ ) {
         my ( $var, $value ) = ( lc $1, lc $2 );
         unless ( exists $replacables{$var} ) {
-            &say( $chl => "Sorry, $who, I don't know of a variable '$var'." );
+            &say( $chl => "Sorry, $bag{who}, I don't know of a variable '$var'." );
             return;
         }
 
         if ( $replacables{$var}{perms} ne "editable" and not $operator ) {
             &say( $chl =>
-                  "Sorry, $who, you don't have permissions to edit '$var'." );
+                  "Sorry, $bag{who}, you don't have permissions to edit '$var'." );
             return;
         }
 
@@ -1111,8 +1140,8 @@ sub irc_on_public {
                 "delete from bucket_values where var_id=? and value=? limit 1",
                 [ $replacables{$var}{id}, $value ]
             );
-            &say( $chl => "Okay, $who." );
-            Report "$who removed a value from \$$var in $chl: $value";
+            &say( $chl => "Okay, $bag{who}." );
+            Report "$bag{who} removed a value from \$$var in $chl: $value";
         }
 
         foreach my $i ( 0 .. @{ $replacables{$var}{$key} } - 1 ) {
@@ -1123,8 +1152,8 @@ sub irc_on_public {
 
             return if ( $key eq 'cache' );
 
-            &say( $chl => "Okay, $who." );
-            Report "$who removed a value from \$$var in $chl: $value";
+            &say( $chl => "Okay, $bag{who}." );
+            Report "$bag{who} removed a value from \$$var in $chl: $value";
             &sql(
                 "delete from bucket_values where var_id=? and value=? limit 1",
                 [ $replacables{$var}{id}, $value ]
@@ -1135,29 +1164,29 @@ sub irc_on_public {
 
         return if $key eq 'cache';
 
-        &say( $chl => "$who, '$value' isn't a valid value for \$$var!" );
-    } elsif ( $addressed and $msg =~ /^add value (\w+) (.+)$/ ) {
+        &say( $chl => "$bag{who}, '$value' isn't a valid value for \$$var!" );
+    } elsif ( $addressed and $bag{msg} =~ /^add value (\w+) (.+)$/ ) {
         my ( $var, $value ) = ( lc $1, $2 );
         unless ( exists $replacables{$var} ) {
-            &say( $chl => "Sorry, $who, I don't know of a variable '$var'." );
+            &say( $chl => "Sorry, $bag{who}, I don't know of a variable '$var'." );
             return;
         }
 
         if ( $replacables{$var}{perms} ne "editable" and not $operator ) {
             &say( $chl =>
-                  "Sorry, $who, you don't have permissions to edit '$var'." );
+                  "Sorry, $bag{who}, you don't have permissions to edit '$var'." );
             return;
         }
 
         if ( $value =~ /\$/ ) {
-            &say( $chl => "Sorry, $who, no nested values please." );
+            &say( $chl => "Sorry, $bag{who}, no nested values please." );
             return;
         }
 
         foreach my $v ( @{ $replacables{$var}{vals} } ) {
             next unless lc $v eq lc $value;
 
-            &say( $chl => "$who, I had it that way!" );
+            &say( $chl => "$bag{who}, I had it that way!" );
             return;
         }
 
@@ -1166,41 +1195,41 @@ sub irc_on_public {
         } else {
             push @{ $replacables{$var}{cache} }, $value;
         }
-        &say( $chl => "Okay, $who." );
-        Report "$who added a value to \$$var in $chl: $value";
+        &say( $chl => "Okay, $bag{who}." );
+        Report "$bag{who} added a value to \$$var in $chl: $value";
 
         &sql( "insert into bucket_values (var_id, value) values (?, ?)",
             [ $replacables{$var}{id}, $value ] );
-    } elsif ( $operator and $addressed and $msg =~ /^create var (\w+)$/ ) {
+    } elsif ( $operator and $addressed and $bag{msg} =~ /^create var (\w+)$/ ) {
         my $var = $1;
         if ( exists $replacables{$var} ) {
             &say( $chl =>
-                  "Sorry, $who, there already exists a variable '$var'." );
+                  "Sorry, $bag{who}, there already exists a variable '$var'." );
             return;
         }
 
         $replacables{$var} =
           { vals => [], perms => "read-only", type => "var" };
-        Log "$who created a new variable '$var' in $chl";
-        Report "$who created a new variable '$var' in $chl";
-        $undo{$chl} = [ 'newvar', $who, $var, "new variable '$var'." ];
-        &say( $chl => "Okay, $who." );
+        Log "$bag{who} created a new variable '$var' in $chl";
+        Report "$bag{who} created a new variable '$var' in $chl";
+        $undo{$chl} = [ 'newvar', $bag{who}, $var, "new variable '$var'." ];
+        &say( $chl => "Okay, $bag{who}." );
 
         &sql( 'insert into bucket_vars (name, perms) values (?, "read-only")',
             [$var], { cmd => "create_var", var => $var } );
     } elsif ( $operator
         and $addressed
-        and $msg =~ /^remove var (\w+)\s*(!+)?$/ )
+        and $bag{msg} =~ /^remove var (\w+)\s*(!+)?$/ )
     {
         my $var = $1;
         unless ( exists $replacables{$var} ) {
-            &say( $chl => "Sorry, $who, there isn't a variable '$var'!" );
+            &say( $chl => "Sorry, $bag{who}, there isn't a variable '$var'!" );
             return;
         }
 
         if ( exists $replacables{$var}{cache} and not $2 ) {
             &say( $chl =>
-                  "$who, this action cannot be undone.  If you want to proceed "
+                  "$bag{who}, this action cannot be undone.  If you want to proceed "
                   . "append a '!'" );
 
             return;
@@ -1208,15 +1237,15 @@ sub irc_on_public {
 
         if ( exists $replacables{$var}{vals} ) {
             $undo{$chl} = [
-                'delvar', $who, $var, $replacables{$var},
+                'delvar', $bag{who}, $var, $replacables{$var},
                 "deletion of variable '$var'."
             ];
             &say(
-                $chl => "Okay, $who, removed variable \$$var with",
+                $chl => "Okay, $bag{who}, removed variable \$$var with",
                 scalar @{ $replacables{$var}{vals} }, "values."
             );
         } else {
-            &say( $chl => "Okay, $who, removed variable \$$var." );
+            &say( $chl => "Okay, $bag{who}, removed variable \$$var." );
         }
 
         &sql( "delete from bucket_values where var_id = ?",
@@ -1226,50 +1255,50 @@ sub irc_on_public {
         delete $replacables{$var};
     } elsif ( $operator
         and $addressed
-        and $msg =~ /^var (\w+) type (var|verb|noun)$/ )
+        and $bag{msg} =~ /^var (\w+) type (var|verb|noun)$/ )
     {
         my ( $var, $type ) = ( $1, $2 );
         unless ( exists $replacables{$var} ) {
-            &say( $chl => "Sorry, $who, there isn't a variable '$var'!" );
+            &say( $chl => "Sorry, $bag{who}, there isn't a variable '$var'!" );
             return;
         }
 
-        Log "$who set var $var type to $type";
-        &say( $chl => "Okay, $who" );
+        Log "$bag{who} set var $var type to $type";
+        &say( $chl => "Okay, $bag{who}" );
         $replacables{$var}{type} = $type;
         &sql( "update bucket_vars set type=? where id = ?",
             [ $type, $replacables{$var}{id} ] );
     } elsif ( $operator
         and $addressed
-        and $msg =~ /^(?:detailed inventory|list item details)[?.!]?$/i )
+        and $bag{msg} =~ /^(?:detailed inventory|list item details)[?.!]?$/i )
     {
         unless (@inventory) {
-            &say( $chl => "Sorry, $who, I'm not carrying anything!" );
+            &say( $chl => "Sorry, $bag{who}, I'm not carrying anything!" );
             return;
         }
-        $stats{detailed_inventory}{$who} = [];
+        $stats{detailed_inventory}{$bag{who}} = [];
         my $c = 0;
         my $line;
         foreach my $item ( sort @inventory ) {
             $c++;
-            push @{ $stats{detailed_inventory}{$who} }, $item;
+            push @{ $stats{detailed_inventory}{$bag{who}} }, $item;
             if ( length($line) + length("$c. $item; ") < 350 ) {
                 $line .= "$c. $item; ";
                 next;
             }
 
-            &say( $chl => "$who: $line" );
+            &say( $chl => "$bag{who}: $line" );
             $line = "$c. $item; ";
         }
 
         if ($line) {
-            &say( $chl => "$who: $line" );
+            &say( $chl => "$bag{who}: $line" );
         }
-    } elsif ( $addressed and $msg =~ /^(?:inventory|list items)[?.!]?$/i ) {
-        &cached_reply( $chl, $who, "", "list items" );
+    } elsif ( $addressed and $bag{msg} =~ /^(?:inventory|list items)[?.!]?$/i ) {
+        &cached_reply( $chl, $bag{who}, "", "list items" );
     } elsif ( $addressed
         and $operator
-        and $msg =~ /^do(n't)? quote ([\w\-]+)\W*$/ )
+        and $bag{msg} =~ /^do(n't)? quote ([\w\-]+)\W*$/ )
     {
         my ( $bit, $target ) = ( $1, $2 );
         if ($bit) {
@@ -1277,25 +1306,25 @@ sub irc_on_public {
         } else {
             delete $config->{protected_quotes}{ lc $target };
         }
-        &say( $chl => "Okay, $who." );
-        Report "$who asked to", ( $bit ? "protect" : "unprotect" ),
+        &say( $chl => "Okay, $bag{who}." );
+        Report "$bag{who} asked to", ( $bit ? "protect" : "unprotect" ),
           "the '$target quotes' factoid.";
         &save;
     } elsif ( $addressed
         and ref $history{$chl}
-        and $msg =~ /^remember (\S+) ([^<>]+)$/i )
+        and $bag{msg} =~ /^remember (\S+) ([^<>]+)$/i )
     {
         my ( $target, $re ) = ( $1, $2 );
         if ( exists $config->{protected_quotes}
             and $config->{protected_quotes}{ lc $target } )
         {
             &say( $chl =>
-                  "Sorry, $who, you can't use remember for $target quotes." );
+                  "Sorry, $bag{who}, you can't use remember for $target quotes." );
             return;
         }
 
-        if ( lc $target eq lc $who ) {
-            &say( $chl => "$who, please don't quote yourself." );
+        if ( lc $target eq lc $bag{who} ) {
+            &say( $chl => "$bag{who}, please don't quote yourself." );
             return;
         }
 
@@ -1310,7 +1339,7 @@ sub irc_on_public {
 
         unless ($match) {
             &say( $chl =>
-                  "Sorry, $who, I don't remember what $target said about '$re'."
+                  "Sorry, $bag{who}, I don't remember what $target said about '$re'."
             );
             return;
         }
@@ -1338,13 +1367,13 @@ sub irc_on_public {
                 verb      => "<reply>",
                 tidbit    => $quote,
                 cmd       => "unalias",
-                ack       => "Okay, $who, remembering \"$match->[2]\".",
+                ack       => "Okay, $bag{who}, remembering \"$match->[2]\".",
             },
             EVENT => 'db_success'
         );
     } elsif (
         $addressed
-        and $msg =~ /^(?:(I|[-\w]+) \s (?:am|is)|
+        and $bag{msg} =~ /^(?:(I|[-\w]+) \s (?:am|is)|
                          I'm(?: an?)?) \s
                        (
                          male          |
@@ -1354,19 +1383,19 @@ sub irc_on_public {
                          full \s name  |
                          random gender
                        )\.?$/ix
-        or $msg =~ / ^(I|[-\w]+) \s (am|is) \s an? \s
+        or $bag{msg} =~ / ^(I|[-\w]+) \s (am|is) \s an? \s
                        ( he | she | him | her | it )\.?$
                      /ix
       )
     {
         my ( $target, $gender, $pronoun ) = ( $1, $2, $3 );
-        if ( uc $target ne "I" and lc $target ne lc $who and not $operator ) {
+        if ( uc $target ne "I" and lc $target ne lc $bag{who} and not $operator ) {
             &say(
-                $chl => "$who, you should let $target set their own gender." );
+                $chl => "$bag{who}, you should let $target set their own gender." );
             return;
         }
 
-        $target = $who if $target eq 'I';
+        $target = $bag{who} if $target eq 'I';
 
         if ($pronoun) {
             $gender = undef;
@@ -1375,46 +1404,46 @@ sub irc_on_public {
             $gender = "inanimate" if $pronoun eq 'it';
 
             unless ($gender) {
-                &say( $chl => "Sorry, $who, I didn't understand that." );
+                &say( $chl => "Sorry, $bag{who}, I didn't understand that." );
                 return;
             }
         }
 
-        Log "$who set ${target}'s gender to $gender";
+        Log "$bag{who} set ${target}'s gender to $gender";
         $stats{users}{genders}{ lc $target } = lc $gender;
         &sql( "replace genders (nick, gender, stamp) values (?, ?, ?)",
             [ $target, $gender, undef ] );
-        &say( $chl => "Okay, $who" );
+        &say( $chl => "Okay, $bag{who}" );
     } elsif ( $addressed
-        and $msg =~ /^what is my gender\??$|^what gender am I\??/i )
+        and $bag{msg} =~ /^what is my gender\??$|^what gender am I\??/i )
     {
-        if ( exists $stats{users}{genders}{ lc $who } ) {
+        if ( exists $stats{users}{genders}{ lc $bag{who} } ) {
             &say(
-                $chl => "$who: Grammatically, I refer to you as",
-                $stats{users}{genders}{ lc $who } . ".  See",
+                $chl => "$bag{who}: Grammatically, I refer to you as",
+                $stats{users}{genders}{ lc $bag{who} } . ".  See",
                 "http://wiki.xkcd.com/irc/Bucket#Docs for information on",
                 "setting this."
             );
 
         } else {
-            &load_gender($who);
-            &say( $chl => "$who: I don't know how to refer to you!" );
+            &load_gender($bag{who});
+            &say( $chl => "$bag{who}: I don't know how to refer to you!" );
         }
-    } elsif ( $addressed and $msg =~ /^what gender is ([-\w]+)\??$/i ) {
+    } elsif ( $addressed and $bag{msg} =~ /^what gender is ([-\w]+)\??$/i ) {
         if ( exists $stats{users}{genders}{ lc $1 } ) {
-            &say( $chl => "$who: $1 is $stats{users}{genders}{lc $1}." );
+            &say( $chl => "$bag{who}: $1 is $stats{users}{genders}{lc $1}." );
         } else {
             &load_gender($1);
-            &say( $chl => "$who: I don't know how to refer to $1!" );
+            &say( $chl => "$bag{who}: I don't know how to refer to $1!" );
         }
-    } elsif ( $msg =~ /^uses(?: \S+){1,5}$/i
+    } elsif ( $bag{msg} =~ /^uses(?: \S+){1,5}$/i
         and &config("uses_reply")
         and rand(100) < &config("uses_reply") )
     {
-        &cached_reply( $chl, $who, undef, "uses reply" );
+        &cached_reply( $chl, $bag{who}, undef, "uses reply" );
     } elsif ( &config("lookup_tla") > 0
         and rand(100) < &config("lookup_tla")
-        and $msg =~ /^([A-Z])([A-Z])([A-Z])\??$/ )
+        and $bag{msg} =~ /^([A-Z])([A-Z])([A-Z])\??$/ )
     {
         my $pattern = "$1% $2% $3%";
         $_[KERNEL]->post(
@@ -1427,63 +1456,61 @@ sub irc_on_public {
                order by rand()
                limit 1',
             PLACEHOLDERS => [ &config("band_var"), $pattern ],
-            BAGGAGE => { %bag, cmd => "tla", tla => $msg },
+            BAGGAGE => { %bag, cmd => "tla", tla => $bag{msg} },
             EVENT   => 'db_success'
         );
     } else {
-        my $orig = $msg;
-        $msg = &trim($msg);
+        my $orig = $bag{msg};
+        $bag{msg} = &trim($bag{msg});
         if (   $addressed
-            or length $msg >= &config("minimum_length")
-            or $msg eq '...' )
+            or length $bag{msg} >= &config("minimum_length")
+            or $bag{msg} eq '...' )
         {
-            if ( $addressed and length $msg == 0 ) {
-                $msg = $nick;
+            if ( $addressed and length $bag{msg} == 0 ) {
+                $bag{msg} = $nick;
             }
 
             if (    not $operator
                 and $type eq 'irc_public'
                 and &config("repeated_queries") > 0 )
             {
-                unless ( $stats{users}{$chl}{$who}{last_lookup} ) {
-                    $stats{users}{$chl}{$who}{last_lookup} = [ $msg, 0 ];
+                unless ( $stats{users}{$chl}{$bag{who}}{last_lookup} ) {
+                    $stats{users}{$chl}{$bag{who}}{last_lookup} = [ $bag{msg}, 0 ];
                 }
 
-                if ( $stats{users}{$chl}{$who}{last_lookup}[0] eq $msg ) {
-                    if ( ++$stats{users}{$chl}{$who}{last_lookup}[1] ==
+                if ( $stats{users}{$chl}{$bag{who}}{last_lookup}[0] eq $bag{msg} ) {
+                    if ( ++$stats{users}{$chl}{$bag{who}}{last_lookup}[1] ==
                         &config("repeated_queries") )
                     {
-                        Report "Volunteering a dump of '$msg' for $who in $chl";
+                        Report "Volunteering a dump of '$bag{msg}' for $bag{who} in $chl";
                         $_[KERNEL]->post(
                             db => 'MULTIPLE',
                             SQL =>
                               'select id, verb, tidbit, mood, chance, protected
                                           from bucket_facts where fact = ? order by id',
-                            PLACEHOLDERS => [$msg],
+                            PLACEHOLDERS => [$bag{msg}],
                             BAGGAGE      => {
                                 %bag,
                                 cmd  => "literal",
                                 page => "*",
-                                fact => $msg,
+                                fact => $bag{msg},
                             },
                             EVENT => 'db_success'
                         );
                         return;
-                    } elsif ( $stats{users}{$chl}{$who}{last_lookup}[1] >
+                    } elsif ( $stats{users}{$chl}{$bag{who}}{last_lookup}[1] >
                         &config("repeated_queries") )
                     {
-                        Log "Ignoring $who who is asking '$msg' in $chl";
+                        Log "Ignoring $bag{who} who is asking '$bag{msg}' in $chl";
                         return;
                     }
                 } else {
-                    $stats{users}{$chl}{$who}{last_lookup} = [ $msg, 1 ];
+                    $stats{users}{$chl}{$bag{who}}{last_lookup} = [ $bag{msg}, 1 ];
                 }
             }
 
-            #Log "Looking up $msg";
             &lookup(
                 %bag,
-                msg  => $msg,
                 orig => $orig,
             );
         }
@@ -1520,6 +1547,8 @@ sub db_success {
     }
 
     return unless $bag{cmd};
+
+    return if &signal_plugin("db_success", \%bag);
 
     if ( $bag{cmd} eq 'fact' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
@@ -2520,7 +2549,8 @@ sub irc_start {
     }
 
     $_[KERNEL]->delay( heartbeat => 10 );
-
+    
+    return if &signal_plugin("start", {});
 }
 
 sub irc_on_notice {
@@ -2528,6 +2558,8 @@ sub irc_on_notice {
     my $msg = $_[ARG2];
 
     Log("Notice from $who: $msg");
+
+    return if &signal_plugin("on_notice", {who => $who, msg => $msg});
 
     return if $stats{identified};
     if (
@@ -2553,6 +2585,8 @@ sub irc_on_nick {
     my ($who) = split /!/, $_[ARG0];
     my $newnick = $_[ARG1];
 
+    return if &signal_plugin("on_nick", {who => $who, newnick => $newnick});
+
     return unless exists $stats{users}{genders}{ lc $who };
     $stats{users}{genders}{ lc $newnick } =
       delete $stats{users}{genders}{ lc $who };
@@ -2565,12 +2599,16 @@ sub irc_on_jointopic {
     my ( $chl, $topic ) = @{ $_[ARG2] }[ 0, 1 ];
     $topic =~ s/ ARRAY\(0x\w+\)$//;
 
+    return if &signal_plugin("jointopic", {topic => $topic});
+
     Log "Topic in $chl: '$topic'";
     $stats{topics}{$chl}{old} = $topic;
 }
 
 sub irc_on_join {
     my ($who) = split /!/, $_[ARG0];
+
+    return if &signal_plugin("on_join", {who => $who});
 
     return if exists $stats{users}{genders}{ lc $who };
 
@@ -2580,6 +2618,8 @@ sub irc_on_join {
 sub irc_on_chan_sync {
     my $chl = $_[ARG0];
     Log "Sync done for $chl";
+
+    return if &signal_plugin("on_chan_sync", {chl => $chl});
 
     if ( not DEBUG and $chl eq $channel ) {
         Log("Autojoining channels");
@@ -2593,6 +2633,9 @@ sub irc_on_chan_sync {
 
 sub irc_on_connect {
     Log("Connected...");
+
+    return if &signal_plugin("on_connect", {});
+
     if ( &config("identify_before_autojoin") ) {
         Log("Identifying...");
         &say( nickserv => "identify $pass" );
@@ -2606,6 +2649,9 @@ sub irc_on_connect {
 
 sub irc_on_disconnect {
     Log("Disconnected...");
+
+    return if &signal_plugin("on_disconnect", {});
+
     close LOG;
     $irc->call( unregister => 'all' );
     exit;
@@ -2740,6 +2786,8 @@ sub tail {
 
 sub heartbeat {
     $_[KERNEL]->delay( heartbeat => 60 );
+
+    return if &signal_plugin("heartbeat", {});
 
     if ( my $file_input = &config("file_input") ) {
         rename $file_input, "$file_input.processing";
@@ -2974,7 +3022,7 @@ sub put_item {
 sub make_list {
     my @list = @_;
 
-    return "" unless @list;
+    return "[none]" unless @list;
     return $list[0] if @list == 1;
     return join " and ", @list if @list == 2;
     my $last = $list[-1];
@@ -3034,6 +3082,8 @@ sub say {
     my $chl  = shift;
     my $text = "@_";
 
+    return if &signal_plugin("say", {chl => $chl, text => $text});
+
     if ( $chl =~ m#^/# ) {
         Log "Writing to '$chl'";
         if ( open FO, ">>", $chl ) {
@@ -3059,6 +3109,8 @@ sub say {
 sub do {
     my $chl    = shift;
     my $action = "@_";
+
+    return if &signal_plugin("do", {chl =>  $chl, action => $action});
 
     if ( $chl =~ m#^/# ) {
         if ( open FO, ">>", $chl ) {
@@ -3102,6 +3154,8 @@ sub lookup {
     my $sql;
     my $type;
     my @placeholders;
+
+    return if &signal_plugin("lookup", \%params);
 
     if ( exists $params{msg} ) {
         $sql          = "fact = ?";
@@ -3416,6 +3470,7 @@ sub read_rss {
         import LWP::Simple qw/$ua/;
         require XML::Simple;
 
+        $LWP::Simple::ua->agent("Bucket/$nick");
         $LWP::Simple::ua->timeout(10);
         my $rss = LWP::Simple::get($url);
         if ($rss) {
@@ -3828,4 +3883,156 @@ sub open_log {
           or die "Can't write " . &config("logfile") . ": $!";
         Log("Opened $logfile");
     }
+}
+
+sub load_plugin {
+  my $name = shift;
+
+  unless (&config("plugin_dir")) {
+    Log("Plugin directory not defined, can't load plugins.");
+    return 0;
+  }
+
+  # make sure there's no funny business in the plugin name (like .., etc)
+  $name =~ s/\W+//g;
+
+  Log("Loading plugin: $name");
+  if (exists $stats{loaded_plugins}{$name}) {
+    &unload_plugin($name);
+  }
+
+  unless (open PLUGIN, "<", &config("plugin_dir") . "/plugin.$name.pl") {
+    Log("Can't find plugin.$name.pl in " . &config("plugin_dir"));
+    return 0;
+  }
+
+  # enable slurp mode
+  local $/;
+  my $code = <PLUGIN>;
+  close PLUGIN;
+
+  unless ($code =~ /^# BUCKET PLUGIN/) {
+    Log("Invalid plugin format.");
+    return 0;
+  }
+
+  my $package = "Bucket::Plugin::$name";
+  eval join ";", "{",
+                 "package $package",
+                 'use lib "' . &config("plugin_dir") . '"',
+                 $code,
+                 "}";
+  if ($@) {
+    Log("Error loading plugin: $@");
+    return 0;
+  }
+
+  my @signals;
+  eval { @signals = "$package"->signals(); };
+  if ($@) {
+    Log("Error loading plugin: $@");
+    return 0;
+  }
+
+  Log("Registering signals: @signals");
+  foreach my $signal (@signals) {
+    &register($name, $signal);
+  }
+
+  return if &signal_plugin("onload", {name => $name});
+
+  $stats{loaded_plugins}{$name} = "@signals";
+
+  return 1;
+}
+
+sub unload_plugin {
+  my $name = shift;
+
+  Log("Unloading plugin: $name");
+  &unregister($name, "*");
+
+  delete $stats{loaded_plugins}{$name};
+}
+
+sub signal_plugin {
+  my ($sig_name, $data) = @_;
+  my $rc = 0;
+
+  # call each registered plugin, in the order they were registered. First the
+  # plugins that ask for specific signals, then the ones that want all signals.
+
+  # The return value from the plugin can control future processing. A true
+  # value (positive or negative) means no further processing will be done in
+  # the core. If the return value is negative, no further plugins will be
+  # called.
+
+  if (exists $plugin_signals{$sig_name}) {
+    foreach my $plugin (@{$plugin_signals{$sig_name}}) {
+      eval {
+        $rc = "Bucket::Plugin::$plugin"->route($sig_name, $data, $config);
+      };
+      $data->{rc}{plugin} = $rc;
+
+      if ($@) {
+        Log("Error when signalling $sig_name to $plugin: $@");
+      }
+
+      last if $rc < 0;
+    }
+  }
+
+  return $rc if $rc < 0;
+
+  if (exists $plugin_signals{"*"}) {
+    foreach my $plugin (@{$plugin_signals{"*"}}) {
+      eval {
+        $rc = "Bucket::Plugin::$plugin"->route($sig_name, $data, $config);
+      };
+      $data->{rc}{plugin} = $rc;
+
+      if ($@) {
+        Log("Error when signalling $sig_name to $plugin: $@");
+      }
+
+      last if $rc < 0;
+    }
+  }
+
+  return $rc;
+}
+
+sub register {
+  my ($name, $signal) = @_;
+
+  Log("Registering plugin $name for $signal signals");
+  unless (exists $plugin_signals{$signal}) {
+    $plugin_signals{$signal} = [];
+  }
+
+  if (grep {$_ eq $name} @{$plugin_signals{$signal}}) {
+    Log("Already registered!");
+  } else {
+    push @{$plugin_signals{$signal}}, $name;
+  }
+}
+
+sub unregister {
+  my ($name, $signal) = @_;
+
+  Log("Unregistering plugin $name from $signal signals");
+  unless (exists $plugin_signals{$signal}) {
+    $plugin_signals{$signal} = [];
+  }
+
+  my @signals = ($signal);
+  if ($signal eq "*") {
+    @signals = keys %plugin_signals;
+  }
+
+  foreach my $sig (@signals) {
+    if (grep {$_ eq $name} @{$plugin_signals{$sig}}) {
+      $plugin_signals{$sig} = [ grep {$_ ne $name} @{$plugin_signals{$sig}} ];
+    }
+  }
 }
