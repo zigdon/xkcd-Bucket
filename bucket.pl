@@ -63,7 +63,7 @@ my $channel =
   DEBUG
   ? ( &config("debug_channel") || "#bucket" )
   : ( &config("control_channel") || "#billygoat" );
-my ($irc) = POE::Component::IRC::State->spawn();
+our ($irc) = POE::Component::IRC::State->spawn();
 my %channels = ( $channel => 1 );
 my $mainchannel = &config("main_channel") || "#xkcd";
 my %talking;
@@ -77,6 +77,7 @@ my %replacables;
 my %history;
 my %handles;
 my %plugin_signals;
+my @registered_commands;
 
 my %config_keys = (
     autoload_plugins         => [ s => '' ],
@@ -118,7 +119,7 @@ $stats{startup_time} = time;
 &open_log;
 
 if (&config("autoload_plugins")) {
-  foreach my $plugin (split /\S+/, &config("autoload_plugins")) {
+  foreach my $plugin (split ' ', &config("autoload_plugins")) {
     &load_plugin($plugin);
   }
 }
@@ -245,9 +246,6 @@ sub irc_on_topic {
     my $topic = $_[ARG2];
 
     return if &signal_plugin("on_topic", {chl => $chl, topic => $topic});
-
-    $stats{topics}{$chl}{old}     = $stats{topics}{$chl}{current};
-    $stats{topics}{$chl}{current} = $topic;
 }
 
 sub irc_on_kick {
@@ -434,6 +432,19 @@ sub irc_on_public {
     }
 
     Log("$type($chl): $bag{who}(o=$operator, a=$addressed, e=$editable): $bag{msg}");
+
+    # check all registered commands
+    foreach my $cmd (@registered_commands) {
+        Log("Checking cmd $cmd->{label} ($cmd->{operator})");
+        if ($addressed >= $cmd->{addressed} and
+            $operator  >= $cmd->{operator} and
+            $editable  >= $cmd->{editable} and
+            $bag{msg}  =~ $cmd->{re}) {
+            Log("Match!");
+            $cmd->{callback}->(\%bag);
+            return;
+        }
+    }
 
     if (
             $addressed
@@ -688,25 +699,6 @@ sub irc_on_public {
                 [ $protect, $fact ] );
         }
         &say( $chl => "Okay, $bag{who}, updated the protection bit." );
-    } elsif ( $addressed and $bag{msg} =~ /^restore topic(?: (#\S+))?/ ) {
-        my $tchl = $chl;
-        if ($1) {
-            if ($operator) {
-                $tchl = $1;
-            } else {
-                &say( $chl => "Sorry, $bag{who}, "
-                      . "you can't change the topic for another channel!" );
-                return;
-            }
-        }
-        unless ( $stats{topics}{$tchl}{old} ) {
-            &say( $chl =>
-                  "Sorry, $bag{who}, I don't know what was the earlier topic!" );
-            return;
-        }
-        Log "$bag{who} restored topic in $tchl: $stats{topics}{$tchl}{old}";
-        &say( $chl => "Okay, $bag{who}." );
-        $irc->yield( topic => $tchl => $stats{topics}{$tchl}{old} );
     } elsif ( $addressed and $bag{msg} =~ /^undo last(?: (#\S+))?/ ) {
         Log "$bag{who} called undo:";
         my $uchannel = $1 || $chl;
@@ -2599,10 +2591,7 @@ sub irc_on_jointopic {
     my ( $chl, $topic ) = @{ $_[ARG2] }[ 0, 1 ];
     $topic =~ s/ ARRAY\(0x\w+\)$//;
 
-    return if &signal_plugin("jointopic", {topic => $topic});
-
-    Log "Topic in $chl: '$topic'";
-    $stats{topics}{$chl}{old} = $topic;
+    return if &signal_plugin("jointopic", {chl => $chl, topic => $topic});
 }
 
 sub irc_on_join {
@@ -3930,16 +3919,27 @@ sub load_plugin {
   my @signals;
   eval { @signals = "$package"->signals(); };
   if ($@) {
-    Log("Error loading plugin: $@");
-    return 0;
+    Log("Error loading plugin signals: $@");
+  } elsif (@signals) {
+    Log("Registering signals: @signals");
+    foreach my $signal (@signals) {
+      &register($name, $signal);
+    }
   }
 
-  Log("Registering signals: @signals");
-  foreach my $signal (@signals) {
-    &register($name, $signal);
+  my @commands;
+  eval { @commands = "$package"->commands(); };
+  if ($@) {
+    Log("Error loading plugin commands: $@");
+  } elsif (@commands) {
+    Log("Registering commands: ", &make_list(map {$_->{label}} @commands));
+    foreach my $command (@commands) {
+      $command->{plugin} = $name;
+      push @registered_commands, $command;
+    }
   }
 
-  return if &signal_plugin("onload", {name => $name});
+  &signal_plugin("onload", {name => $name});
 
   $stats{loaded_plugins}{$name} = "@signals";
 
@@ -3951,6 +3951,8 @@ sub unload_plugin {
 
   Log("Unloading plugin: $name");
   &unregister($name, "*");
+
+  @registered_commands = grep {$_->{plugin} ne $name} @registered_commands;
 
   delete $stats{loaded_plugins}{$name};
 }
@@ -3970,7 +3972,7 @@ sub signal_plugin {
   if (exists $plugin_signals{$sig_name}) {
     foreach my $plugin (@{$plugin_signals{$sig_name}}) {
       eval {
-        $rc = "Bucket::Plugin::$plugin"->route($sig_name, $data, $config);
+        $rc = "Bucket::Plugin::$plugin"->route($sig_name, $data);
       };
       $data->{rc}{plugin} = $rc;
 
@@ -3987,7 +3989,7 @@ sub signal_plugin {
   if (exists $plugin_signals{"*"}) {
     foreach my $plugin (@{$plugin_signals{"*"}}) {
       eval {
-        $rc = "Bucket::Plugin::$plugin"->route($sig_name, $data, $config);
+        $rc = "Bucket::Plugin::$plugin"->route($sig_name, $data);
       };
       $data->{rc}{plugin} = $rc;
 

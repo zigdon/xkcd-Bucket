@@ -1,6 +1,6 @@
 # BUCKET PLUGIN
 
-use BucketBase qw/Log/;
+use BucketBase qw/Log config/;
 use Data::Dumper;
 $Data::Dumper::indent = 1;
 
@@ -9,19 +9,20 @@ sub signals {
 }
 
 sub route {
-  my ($package, $sig, $data, $config) = @_;
+  my ($package, $sig, $data) = @_;
 
   # anything that comes here should be processed the same way
-  &sub_siri($data, $config);
+  &sub_siri($data);
 
   return 0;
 }
 
 
 sub sub_siri {
-  my ($data, $config) = @_;
+  my ($data) = @_;
 
   return if $data->{msg} =~ /^(?:un)?load plugin siri$/;
-  $data->{msg} =~ s/\bsiri\b/$config->{nick}/ig;
+  my $nick = &config("nick");
+  $data->{msg} =~ s/\bsiri\b/$nick/ig;
 }
 

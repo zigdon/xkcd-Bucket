@@ -1,6 +1,6 @@
 # BUCKET PLUGIN
 
-use BucketBase qw/route say do Log/;
+use BucketBase qw/say do Log/;
 use Data::Dumper;
 $Data::Dumper::indent = 1;
 
@@ -9,7 +9,7 @@ sub signals {
 }
 
 sub route {
-  my ($package, $sig, $data, $config) = @_;
+  my ($package, $sig, $data) = @_;
 
   &Log("route($sig): ", Dumper($data));
 
