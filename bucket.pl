@@ -435,12 +435,11 @@ sub irc_on_public {
 
     # check all registered commands
     foreach my $cmd (@registered_commands) {
-        Log("Checking cmd $cmd->{label} ($cmd->{operator})");
         if ($addressed >= $cmd->{addressed} and
             $operator  >= $cmd->{operator} and
             $editable  >= $cmd->{editable} and
             $bag{msg}  =~ $cmd->{re}) {
-            Log("Match!");
+            Log("Matched cmd $cmd->{label}");
             $cmd->{callback}->(\%bag);
             return;
         }

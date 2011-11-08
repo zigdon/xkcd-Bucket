@@ -6,30 +6,31 @@ require Exporter;
 
 # utility functions exposed from the main bucket code
 @EXPORT_OK = qw(Log Report say do config yield);
+
 # plugin definition methods
 push @EXPORT_OK, qw(signals commands route);
 
 # make the following subs available for plugins
 foreach my $subname (qw/Log Report say do config/) {
-  eval "sub $subname { ::$subname(\@_); }";
+    eval "sub $subname { ::$subname(\@_); }";
 }
 
 sub yield {
-  $::irc->yield(@_);
+    $::irc->yield(@_);
 }
 
 sub signals {
-  return ();
+    return ();
 }
 
 sub commands {
-  return ();
+    return ();
 }
 
 sub route {
-  my ($package, $sig, $data, $config) = @_;
+    my ( $package, $sig, $data, $config ) = @_;
 
-  ::Log("Route not implemented in ". (caller)[1]);
+    ::Log( "Route not implemented in " . (caller)[1] );
 }
 
 1;
