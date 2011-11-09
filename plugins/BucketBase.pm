@@ -5,18 +5,22 @@ require Exporter;
 @ISA = qw(Exporter);
 
 # utility functions exposed from the main bucket code
-@EXPORT_OK = qw(Log Report say do config yield);
+@EXPORT_OK = qw(Log Report say do config save yield post);
 
 # plugin definition methods
 push @EXPORT_OK, qw(signals commands route);
 
 # make the following subs available for plugins
-foreach my $subname (qw/Log Report say do config/) {
+foreach my $subname (qw/Log Report say do config save/) {
     eval "sub $subname { ::$subname(\@_); }";
 }
 
 sub yield {
-    $::irc->yield(@_);
+    POE::Kernel->yield(@_);
+}
+
+sub post {
+    POE::Kernel->post(@_);
 }
 
 sub signals {
