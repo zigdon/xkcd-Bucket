@@ -5,13 +5,15 @@ require Exporter;
 @ISA = qw(Exporter);
 
 # utility functions exposed from the main bucket code
-@EXPORT_OK = qw(Log Report say do config save yield post);
+my @repeated = qw/Log Report say do config save talking cached_reply sql s/;
+push @EXPORT_OK, @repeated;
+@EXPORT_OK = qw(yield post);
 
 # plugin definition methods
 push @EXPORT_OK, qw(signals commands route);
 
 # make the following subs available for plugins
-foreach my $subname (qw/Log Report say do config save/) {
+foreach my $subname (@repeated) {
     eval "sub $subname { ::$subname(\@_); }";
 }
 
