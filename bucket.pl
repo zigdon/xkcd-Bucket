@@ -82,7 +82,6 @@ my @registered_commands;
 
 my %config_keys = (
     autoload_plugins         => [ s => '' ],
-    bananas_chance           => [ p => 0.02 ],
     band_name                => [ p => 5 ],
     band_var                 => [ s => 'band' ],
     ex_to_sex                => [ p => 1 ],
@@ -378,12 +377,6 @@ sub irc_on_public {
 
     if ( $type eq 'irc_msg' ) {
         $bag{chl} = $chl = $bag{who};
-    }
-
-    if ( &config("bananas_chance")
-        and rand(100) < &config("bananas_chance") )
-    {
-        &say( $chl => "Bananas!" );
     }
 
     Log(
@@ -3615,6 +3608,7 @@ sub load_plugin {
     if ($@) {
         Log("Error loading plugin settings: $@");
     } elsif (%plugin_settings) {
+        Log( "Defined settings: ", &make_list(sort keys %plugin_settings) );
         while ( my ( $key, $value ) = each %plugin_settings ) {
             next if &config($key);
             $config_keys{$key} = $value;
