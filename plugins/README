@@ -1,0 +1,71 @@
+Bucket plugins:
+
+- Each plugin needs to contain the line '# BUCKET PLUGIN'
+
+- Each plugin can define any of the following routines:
+  - signals - list of signals the plugin wants to be called on to handle
+  - commands - list of commands the plugin defines
+  - route - incoming sub to all called signals
+  - settings - settings the plugin uses
+
+- Known signals:
+  - "db_success", \%bag                      - called after database lookups
+  - "do", { chl, action }                    - on OUR action
+  - "heartbeat", {}                          - called on a regular interval
+  - "jointopic", { chl, topic }              - topic upon joining a channel
+  - "lookup", \%params                       - when looking up a factoid
+  - "on_chan_sync", { chl }                  - after joining a channel
+  - "on_connect", {}                         - when connecting to IRC server (shortly after startup)
+  - "on_disconnect", {}                      - when disconnecting (just before quitting)
+  - "on_join", { who }                       - when joinin a channel
+  - "on_kick", { kicker, chl, kickee, desc } - someone was kicked
+  - "onload", { name }                       - when ANY plugin is loaded
+  - "on_msg", \%bag                          - when PMed
+  - "on_nick", { who, newnick }              - when someone changes nick
+  - "on_notice", { who, msg }                - when seeing a notice
+  - "on_public", \%bag                       - on public messages
+  - "on_topic": { chl, topic }               - when topic is changed
+  - "say", { chl, text }                     - when WE say anything
+  - "start", {}                              - called on boot
+
+  Any sub that is handling a signal should return -1, 0 or 1:
+  - -1 - no further processing should be done, no other plugins called.
+  - 1  - process other plugins, but shouldn't continue with the core functions.
+  - 0  - process other plugins and core functions.
+
+- Commands:
+  The commands subroutine should return a list of hashrefs:
+    {
+        label     => text, # descriptive name
+        addressed => bool, # must the bot be addressed for this command to fire?
+        operator  => bool, # must the caller be an operator?
+        editable  => bool, # must this be called in an editable context? (public, non #bots)
+        re        => RE,   # regular expression to match against (qr/.../)
+        callback  => \&ref # subref to call when the above conditions are met
+    },
+
+- Route:
+  The routing subroutine is called whenever a register signals is triggered. It
+  should accept ( $package, $sig_name, $data ), and call the internal handlers
+  as needed.
+
+        sub route {
+            my ( $package, $sig, $data ) = @_;
+
+            if ( $sig eq 'on_public' ) {
+                &save_history($data);
+            } elsif ( $sig eq 'say' or $sig eq 'do' ) {
+                &save_self_history( $data, $sig );
+            }
+
+            return 0; # continue processing
+        }
+
+- Settings:
+  Returns a hash of setting definitions:
+
+        return ( history_size => [ i => 30 ], );
+
+  The key is the setting name. The value is an array ref, with the first
+  element the setting type (first letter of: int, string, file path, percent,
+  bool); The second element is the default value.
