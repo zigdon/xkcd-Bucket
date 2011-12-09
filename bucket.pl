@@ -881,7 +881,7 @@ sub irc_on_public {
         }
 
         if ( $stats{learn} + $stats{edited} + $stats{deleted} ) {
-            $reply .= "In that time, I ";
+            $reply .= "Since waking up, I've ";
             my @fact_stats;
             push @fact_stats,
               sprintf "learned %d new factoid%s",
