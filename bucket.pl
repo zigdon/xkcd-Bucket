@@ -929,7 +929,7 @@ sub irc_on_public {
     } elsif ( $operator and $addressed and $bag{msg} =~ /^stat (\w+)\??/ ) {
         my $key = $1;
         if ( $key eq 'keys' ) {
-            &say(   $chl => "$bag{who}: valid keys are: "
+            &say_long( $chl => "$bag{who}: valid keys are: "
                   . &make_list( sort keys %stats )
                   . "." );
         } elsif ( exists $stats{$key} ) {
@@ -957,10 +957,8 @@ sub irc_on_public {
         my ( $key, $val ) = ( $1, $2 );
 
         unless ( $key and exists $config_keys{$key} ) {
-            &say(
-                $chl => "$bag{who}: Valid keys are: " . join ", ",
-                sort keys %config_keys
-            );
+            &say_long( $chl => "$bag{who}: Valid keys are: "
+                  . &make_list( sort keys %config_keys ) );
             return;
         }
 
@@ -994,16 +992,8 @@ sub irc_on_public {
     } elsif ( $operator and $addressed and $bag{msg} =~ /^get (\w+)\s*$/ ) {
         my ($key) = ($1);
         unless ( exists $config_keys{$key} ) {
-            my @keys = sort keys %config_keys;
-            my $list = "$bag{who}: Valid keys are: ";
-            while (@keys) {
-                while ( length $list < 350 and @keys ) {
-                    $list .= shift(@keys) . "; ";
-                }
-
-                &say( $chl => $list );
-                $list = "$bag{who}: ";
-            }
+            &say_long( $chl => "$bag{who}: Valid keys are: "
+                  . &make_list( sort keys %config_keys ) );
             return;
         }
 
@@ -1235,23 +1225,13 @@ sub irc_on_public {
             return;
         }
         $stats{detailed_inventory}{ $bag{who} } = [];
-        my $c = 0;
         my $line;
-        foreach my $item ( sort @inventory ) {
-            $c++;
-            push @{ $stats{detailed_inventory}{ $bag{who} } }, $item;
-            if ( length($line) + length("$c. $item; ") < 350 ) {
-                $line .= "$c. $item; ";
-                next;
-            }
-
-            &say( $chl => "$bag{who}: $line" );
-            $line = "$c. $item; ";
-        }
-
-        if ($line) {
-            &say( $chl => "$bag{who}: $line" );
-        }
+        push @{ $stats{detailed_inventory}{ $bag{who} } }, sort @inventory;
+        my $c = 1;
+        &say_long(
+            $chl => "$bag{who}: " . join "; ",
+            map { $c++ . ": $_" } @{ $stats{detailed_inventory}{ $bag{who} } }
+        );
     } elsif ( $addressed and $bag{msg} =~ /^(?:inventory|list items)[?.!]?$/i )
     {
         &cached_reply( $chl, $bag{who}, "", "list items" );
@@ -2968,6 +2948,16 @@ sub say {
     $irc->yield( privmsg => $chl => $text );
 }
 
+sub say_long {
+    my $chl  = shift;
+    my $text = "@_";
+
+    while ( length($text) > 300 and $text =~ s/(.{0,300})\s+(.*)/\2/ ) {
+        &say( $chl, $1 );
+    }
+    &say( $chl, $text ) if $text =~ /\S/;
+}
+
 sub do {
     my $chl    = shift;
     my $action = "@_";
@@ -3582,10 +3572,10 @@ sub load_plugin {
     if ($@) {
         Log("Error loading plugin settings: $@");
     } elsif (%plugin_settings) {
-        Log( "Defined settings: ", &make_list(sort keys %plugin_settings) );
+        Log( "Defined settings: ", &make_list( sort keys %plugin_settings ) );
         while ( my ( $key, $value ) = each %plugin_settings ) {
             next if &config($key);
-            Log ("Installing new key: $key ( @$value )" );
+            Log("Installing new key: $key ( @$value )");
             $config_keys{$key} = $value;
         }
     }
