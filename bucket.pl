@@ -300,35 +300,38 @@ sub irc_on_public {
         return;
     }
 
-    my $addressed = 0;
+    $bag{addressed} = 0;
     if ( $type eq 'irc_msg' or $bag{msg} =~ s/^$nick[:,]\s*|,\s+$nick\W+$//i ) {
-        $bag{addressed} = $addressed = 1;
-        $bag{to} = $nick;
+        $bag{addressed} = 1;
+        $bag{to}        = $nick;
     } else {
-        $bag{msg} =~ s/^(\S+)://;
+        $bag{msg} =~ s/^(\S+):\s*//;
         $bag{to} = $1;
     }
 
-    my $operator = 0;
+    $bag{op} = 0;
     if (   $irc->is_channel_member( $channel, $bag{who} )
         or $irc->is_channel_operator( $mainchannel, $bag{who} )
         or $irc->is_channel_owner( $mainchannel, $bag{who} )
         or $irc->is_channel_admin( $mainchannel, $bag{who} ) )
     {
-        $bag{op} = $operator = 1;
+        $bag{op} = 1;
     }
 
-    my $editable = 0;
-    $editable = 1
+    $bag{editable} = 1
       if ( $type ne 'irc_msg' and $chl ne '#bots' )
-      or ( $type eq 'irc_msg' and $operator );
-    $bag{editable} = $editable;
+      or ( $type eq 'irc_msg' and $bag{op} );
 
     if ( $type eq 'irc_msg' ) {
         return if &signal_plugin( "on_msg", \%bag );
     } else {
         return if &signal_plugin( "on_public", \%bag );
     }
+
+    my $editable  = $bag{editable};
+    my $addressed = $bag{addressed};
+    my $operator  = $bag{op};
+    $msg = $bag{msg};
 
     # keep track of who's active in each channel
     if ( $chl =~ /^#/ ) {

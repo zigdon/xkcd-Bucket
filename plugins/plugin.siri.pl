@@ -23,5 +23,13 @@ sub sub_siri {
     return if $data->{msg} =~ /^(?:un)?load plugin siri$/;
     my $nick = &config("nick");
     $data->{msg} =~ s/\bsiri\b/$nick/ig;
+    if ( lc $data->{to} eq 'siri' ) {
+        $data->{addressed} = 1;
+        $data->{to}        = $nick;
+    }
+
+    if ( $data->{msg} =~ s/^siri[:,]\s*|,\s+siri\W+$//i ) {
+        $data->{addressed} = 1;
+    }
 }
 
