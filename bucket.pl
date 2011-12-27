@@ -43,7 +43,9 @@ unless ($@) {
     &Log("$math loaded");
 }
 
-use constant { DEBUG => 0 };
+sub DEBUG {
+    return &config('debug');
+}
 
 # work around a bug: https://rt.cpan.org/Ticket/Display.html?id=50991
 sub s_form { return Lingua::EN::Conjugate::s_form(@_); }
@@ -58,10 +60,10 @@ my $config     = LoadFile($configfile);
 my $nick       = &config("nick") || "Bucket";
 my $pass       = &config("password") || "somethingsecret";
 $config->{nick} = $nick =
-  DEBUG ? ( &config("debug_nick") || "bucketgoat" ) : $nick;
+  &DEBUG ? ( &config("debug_nick") || "bucketgoat" ) : $nick;
 
 my $channel =
-  DEBUG
+  &DEBUG
   ? ( &config("debug_channel") || "#bucket" )
   : ( &config("control_channel") || "#billygoat" );
 our ($irc) = POE::Component::IRC::State->spawn();
@@ -219,8 +221,8 @@ sub Log {
 
 sub Report {
     my $delay = shift if $_[0] =~ /^\d+$/;
-    my $logchannel = DEBUG ? $channel : &config("logchannel");
-    unshift @_, "REPORT:" if DEBUG;
+    my $logchannel = &DEBUG ? $channel : &config("logchannel");
+    unshift @_, "REPORT:" if &DEBUG;
 
     if ( $logchannel and $irc ) {
         if ($delay) {
@@ -1594,7 +1596,7 @@ sub db_success {
           )
         {
             my ( $inter, $member, $verb, $more ) = ( $1, $2, $3, $4 );
-            if ( DEBUG or $irc->is_channel_member( $bag{chl}, $member ) ) {
+            if ( &DEBUG or $irc->is_channel_member( $bag{chl}, $member ) ) {
                 Log "Looking up $member($verb) + $more";
                 &lookup(
                     %bag,
@@ -2489,7 +2491,7 @@ sub irc_on_chan_sync {
 
     return if &signal_plugin( "on_chan_sync", { chl => $chl } );
 
-    if ( not DEBUG and $chl eq $channel ) {
+    if ( not &DEBUG and $chl eq $channel ) {
         Log("Autojoining channels");
         foreach my $chl ( &config("logchannel"), keys %{ $config->{autojoin} } )
         {
@@ -2692,7 +2694,7 @@ sub heartbeat {
         unlink "$file_input.processing";
     }
 
-    my $chl = DEBUG ? $channel : $mainchannel;
+    my $chl = &DEBUG ? $channel : $mainchannel;
     $last_activity{$chl} ||= time;
 
     return
@@ -2982,15 +2984,6 @@ sub do {
         return;
     }
 
-    if ( &config("haiku_report") ) {
-        ( $stats{haiku_debug}{$chl}{count}, $stats{haiku_debug}{$chl}{line} ) =
-          &count_syllables($action);
-        push @{ $haiku_history{$chl} },
-          [
-            $nick,   'irc_ctcp_action',
-            $action, $stats{haiku_debug}{$chl}{count}
-          ];
-    }
     $irc->yield( ctcp => $chl => "ACTION $action" );
 }
 
@@ -3511,7 +3504,7 @@ sub config {
 sub open_log {
     if ( &config("logfile") ) {
         my $logfile =
-          DEBUG ? &config("logfile") . ".debug" : &config("logfile");
+          &DEBUG ? &config("logfile") . ".debug" : &config("logfile");
         open( LOG, ">>", $logfile )
           or die "Can't write " . &config("logfile") . ": $!";
         Log("Opened $logfile");
@@ -3592,6 +3585,7 @@ sub load_plugin {
         Log( "Defined settings: ", &make_list(sort keys %plugin_settings) );
         while ( my ( $key, $value ) = each %plugin_settings ) {
             next if &config($key);
+            Log ("Installing new key: $key ( @$value )" );
             $config_keys{$key} = $value;
         }
     }
