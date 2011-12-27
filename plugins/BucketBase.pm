@@ -5,7 +5,7 @@ require Exporter;
 @ISA = qw(Exporter);
 
 # utility functions exposed from the main bucket code
-my @repeated = qw/Log Report say do config save talking cached_reply sql s/;
+my @repeated = qw/Log Report say do config save talking cached_reply sql s commify/;
 push @EXPORT_OK, @repeated;
 
 # convenience methods
