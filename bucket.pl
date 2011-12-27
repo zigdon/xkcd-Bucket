@@ -3574,8 +3574,6 @@ sub load_plugin {
     } elsif (%plugin_settings) {
         Log( "Defined settings: ", &make_list( sort keys %plugin_settings ) );
         while ( my ( $key, $value ) = each %plugin_settings ) {
-            next if &config($key);
-            Log("Installing new key: $key ( @$value )");
             $config_keys{$key} = $value;
         }
     }
