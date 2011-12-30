@@ -1,6 +1,6 @@
 ---
 autoload_plugins: quote topic
-plugins: plugins
+plugin_dir: plugins
 autojoin:
   '#bucket': 1
   '#xkcd': 1
