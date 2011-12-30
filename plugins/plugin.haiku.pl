@@ -29,10 +29,6 @@ sub commands {
     );
 }
 
-sub settings {
-    return ( haiku_report => [ i => 1 ] );
-}
-
 sub route {
     my ( $package, $sig, $data ) = @_;
 
