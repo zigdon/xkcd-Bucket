@@ -3521,7 +3521,7 @@ sub load_plugin {
     }
 
     unless ( open PLUGIN, "<", &config("plugin_dir") . "/plugin.$name.pl" ) {
-        Log( "Can't find plugin.$name.pl in " . &config("plugin_dir") );
+        Log( "Can't find plugin.$name.pl in " . &config("plugin_dir") . ": $!" );
         return 0;
     }
 
