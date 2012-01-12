@@ -1452,9 +1452,9 @@ sub db_success {
             $stats{last_alias_chain}{ $bag{chl} } = $bag{alias_chain};
             $stats{lookup}++;
 
-         # if we're just idle chatting, replace any $who reference with $someone
+            # if we're just idle chatting, replace any $who reference with $someone
             if ( $bag{idle} ) {
-                $line{tidbit} =~ s/\$who/\$someone/gi;
+                $bag{who} = &someone($bag{chl});
             }
 
             $line{tidbit} =
