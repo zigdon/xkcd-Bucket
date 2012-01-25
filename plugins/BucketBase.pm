@@ -21,7 +21,7 @@ foreach my $subname (@repeated) {
 }
 
 sub yield {
-    POE::Kernel->yield(@_);
+    $::irc->yield(@_);
 }
 
 sub post {

@@ -49,24 +49,24 @@ sub update_topic {
 sub restore_nonop {
     my ($bag) = @_;
 
-    return &restore_topic( $bag, $bag->{chl} );
+    return &restore_topic( $bag, $bag->{chl}, $bag->{chl} );
 }
 
 sub restore_op {
     my ($bag) = @_;
 
-    return &restore_topic( $bag, $1 );
+    return &restore_topic( $bag, $bag->{chl}, $1 );
 }
 
 sub restore_topic {
-    my ( $bag, $chl ) = @_;
+    my ( $bag, $chl, $target ) = @_;
 
-    unless ( $topics{$chl} ) {
+    unless ( $topics{$target} ) {
         &say( $chl =>
               "Sorry, $bag->{who}, I don't know what was the earlier topic!" );
         return;
     }
-    Log "$bag->{who} restored topic in $chl: $topics{$chl}{old}";
+    Log "$bag->{who} restored topic in $target: $topics{$target}{old}";
     &say( $chl => "Okay, $bag->{who}." );
-    &yield( topic => $chl => $topics{$chl}{old} );
+    &yield( topic => $target => $topics{$target}{old} );
 }
