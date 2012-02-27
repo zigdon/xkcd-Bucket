@@ -108,6 +108,7 @@ my %config_keys = (
     user_activity_timeout    => [ i => 360 ],
     user_mode                => [ s => "+B" ],
     value_cache_limit        => [ i => 1000 ],
+    var_limit                => [ i => 3 ],
     www_root                 => [ s => "" ],
     www_url                  => [ s => "" ],
     your_mom_is              => [ p => 5 ],
@@ -1452,9 +1453,9 @@ sub db_success {
             $stats{last_alias_chain}{ $bag{chl} } = $bag{alias_chain};
             $stats{lookup}++;
 
-            # if we're just idle chatting, replace any $who reference with $someone
+         # if we're just idle chatting, replace any $who reference with $someone
             if ( $bag{idle} ) {
-                $bag{who} = &someone($bag{chl});
+                $bag{who} = &someone( $bag{chl} );
             }
 
             $line{tidbit} =
@@ -1919,17 +1920,33 @@ sub db_success {
             }
 
             if ( $fact =~ /\S/ ) {
-                $stats{edited}++;
-                Report "$bag{who} edited $line->{fact}(#$line->{id})"
-                  . " in $bag{chl}: New values: $fact";
-                Log "$bag{who} edited $line->{fact}($line->{id}): "
-                  . "New values: $fact";
                 my ( $verb, $tidbit );
                 if ( $fact =~ /^<(\w+)>\s*(.*)/ ) {
                     ( $verb, $tidbit ) = ( "<$1>", $2 );
                 } else {
                     ( $verb, $tidbit ) = split ' ', $fact, 2;
                 }
+
+                unless (
+                    &validate_factoid(
+                        {
+                            %bag,
+                            fact   => $fact,
+                            verb   => $verb,
+                            tidbit => $tidbit
+                        }
+                    )
+                  )
+                {
+                    next;
+                }
+
+                $stats{edited}++;
+                Report "$bag{who} edited $line->{fact}(#$line->{id})"
+                  . " in $bag{chl}: New values: $fact";
+                Log "$bag{who} edited $line->{fact}($line->{id}): "
+                  . "New values: $fact";
+
                 &sql(
                     'update bucket_facts set verb=?, tidbit=?
                        where id=? limit 1',
@@ -2082,6 +2099,11 @@ sub db_success {
                       "Sorry, $bag{who}, that factoid is protected" );
                 return;
             }
+        }
+
+        unless ( &validate_factoid( \%bag ) ) {
+            &say( $bag{chl} => "Sorry, $bag{who}, I can't do that." );
+            return;
         }
 
         if ( lc $bag{verb} eq '<alias>' ) {
@@ -3521,7 +3543,8 @@ sub load_plugin {
     }
 
     unless ( open PLUGIN, "<", &config("plugin_dir") . "/plugin.$name.pl" ) {
-        Log( "Can't find plugin.$name.pl in " . &config("plugin_dir") . ": $!" );
+        Log(
+            "Can't find plugin.$name.pl in " . &config("plugin_dir") . ": $!" );
         return 0;
     }
 
@@ -3692,4 +3715,20 @@ sub talking {
         $talking{$chl} = -1 if ( $talking{$chl} > 0 and $talking{$chl} < time );
         return $talking{$chl};
     }
+}
+
+sub validate_factoid {
+    my $bag = shift;
+
+    return 1 if $bag->{op};
+
+    if ( &config("var_limit") > 0 ) {
+        my $l = &config("var_limit");
+        if ( $bag->{tidbit} =~ /(?:(?<!\\)\$.+){$l}/ ) {
+            Report("Too many variables in $bag->{tidbit}");
+            return 0;
+        }
+    }
+
+    return 1;
 }
