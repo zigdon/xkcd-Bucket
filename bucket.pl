@@ -865,8 +865,22 @@ sub irc_on_public {
             &say( $chl => "$bag{who}: Hold on, I'm still counting" );
             return;
         }
+
+        # get the last modified time for any bit of the code
+        my $mtime = ( stat($0) )[9];
+        my $dir   = &config("plugin_dir");
+        if ( $dir and opendir( PLUGINS, $dir ) ) {
+            foreach my $file ( readdir(PLUGINS) ) {
+                next unless $file =~ /^plugin\.\w+\.pl$/;
+                if ( $mtime < ( stat("$dir/$file") )[9] ) {
+                    $mtime = ( stat(_) )[9];
+                }
+            }
+            closedir PLUGINS;
+        }
+
+        my ( $mod,   $modu )  = &round_time( time - $mtime );
         my ( $awake, $units ) = &round_time( time - $stats{startup_time} );
-        my ( $mod, $modu ) = &round_time( time - ( stat($0) )[9] );
 
         my $reply;
         $reply = sprintf "I've been awake since %s (about %d %s), ",
