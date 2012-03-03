@@ -3467,7 +3467,9 @@ sub check_band_name {
             ( $words[1], $words[0] ) = ( $words[0], $words[1] );
         }
 
-        unless ( $words[0]->{cur} = $words[0]->{sth}->fetchrow_hashref ) {
+        unless ($words[0]->{sth}
+            and $words[0]->{cur} = $words[0]->{sth}->fetchrow_hashref )
+        {
             last;
         }
         $words[0]->{next_id} = $words[0]->{cur}{line};
