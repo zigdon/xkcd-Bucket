@@ -104,6 +104,7 @@ my %config_keys = (
     random_wait              => [ i => 3 ],
     repeated_queries         => [ i => 5 ],
     timeout                  => [ i => 60 ],
+    tumblr_name              => [ p => 50 ],
     uses_reply               => [ i => 5 ],
     user_activity_timeout    => [ i => 360 ],
     user_mode                => [ s => "+B" ],
@@ -2414,6 +2415,7 @@ sub irc_start {
         "list items",
         "duplicate item",
         "band name reply",
+        "tumblr name reply",
         "haiku detected",
         "uses reply"
       )
@@ -2569,6 +2571,14 @@ sub cached_reply {
     my $tidbit = $line->{tidbit};
 
     if ( $type eq 'band name reply' ) {
+        if ( $tidbit =~ /\$band/i ) {
+            $tidbit =~ s/\$band/$extra/ig;
+        }
+
+        $extra = "";
+    } elsif ( $type eq 'tumblr name reply' ) {
+        $extra =~ s/ //g;
+        $extra = lc $extra;
         if ( $tidbit =~ /\$band/i ) {
             $tidbit =~ s/\$band/$extra/ig;
         }
@@ -2991,7 +3001,7 @@ sub say_long {
     my $chl  = shift;
     my $text = "@_";
 
-    while ( length($text) > 300 and $text =~ s/(.{0,300})\s+(.*)/\2/ ) {
+    while ( length($text) > 300 and $text =~ s/(.{0,300})\s+(.*)/$2/ ) {
         &say( $chl, $1 );
     }
     &say( $chl, $text ) if $text =~ /\S/;
@@ -3459,6 +3469,11 @@ sub check_band_name {
     my @union;
     Log "Finding union";
     while (1) {
+        unless ( $words[0]->{next_id} and $words[1]->{next_id} ) {
+            &add_new_band($bag);
+            return;
+        }
+
         if ( $words[0]->{next_id} == $words[1]->{next_id} ) {
             push @union, $words[0]->{next_id};
         }
@@ -3513,7 +3528,13 @@ sub add_new_band {
     Report "Learned a new band name from $bag->{who} in $bag->{chl} ("
       . join( " ", &round_time( $bag->{elapsed} ) )
       . "): $bag->{name}";
-    &cached_reply( $bag->{chl}, $bag->{who}, $bag->{name}, "band name reply" );
+    if ( &config("tumblr_name") > rand(100) ) {
+        &cached_reply( $bag->{chl}, $bag->{who}, $bag->{name},
+            "tumblr name reply" );
+    } else {
+        &cached_reply( $bag->{chl}, $bag->{who}, $bag->{name},
+            "band name reply" );
+    }
 }
 
 sub config {
