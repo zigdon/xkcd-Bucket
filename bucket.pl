@@ -2577,7 +2577,7 @@ sub cached_reply {
 
         $extra = "";
     } elsif ( $type eq 'tumblr name reply' ) {
-        $extra =~ s/ //g;
+        $extra =~ s/[^a-z0-9]+//ig;
         $extra = lc $extra;
         if ( $tidbit =~ /\$band/i ) {
             $tidbit =~ s/\$band/$extra/ig;
