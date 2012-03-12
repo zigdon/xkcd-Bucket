@@ -3761,7 +3761,7 @@ sub validate_factoid {
 
     if ( &config("var_limit") > 0 ) {
         my $l = &config("var_limit");
-        if ( $bag->{tidbit} =~ /(?:(?<!\\)\$.+){$l}/ ) {
+        if ( $bag->{tidbit} =~ /(?:(?<!\\)\$[a-zA-Z_].+){$l}/ ) {
             Report("Too many variables in $bag->{tidbit}");
             return 0;
         }
