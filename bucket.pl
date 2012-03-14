@@ -1743,6 +1743,7 @@ sub db_success {
             if (    &config("band_name")
                 and $bag{type} eq 'irc_public'
                 and rand(100) < &config("band_name") )
+                and $bag{orig} !~ m{https?://}i
             {
                 my $name = $bag{orig};
                 my $nicks = join "|", map { "\Q$_" } $irc->nicks();
