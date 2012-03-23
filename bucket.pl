@@ -1699,6 +1699,7 @@ sub db_success {
             }
         } elsif (
             $bag{orig} !~ /\?\s*$/
+            and $bag{editable}
             and $bag{orig} =~ /^(?:
                                puts \s (\S.+) \s in \s (the \s)? $nick\b
                              | (?:gives|hands) \s $nick \s (\S.+)
