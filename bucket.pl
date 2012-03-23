@@ -320,9 +320,8 @@ sub irc_on_public {
         $bag{op} = 1;
     }
 
-    $bag{editable} = 1
-      if ( $type ne 'irc_msg' and $chl ne '#bots' )
-      or ( $type eq 'irc_msg' and $bag{op} );
+    # allow editing only in public channels (other than #bots), or by ops.
+    $bag{editable} = 1 if ( $chl =~ /^#/ and $chl ne '#bots' ) or $bag{op};
 
     if ( $type eq 'irc_msg' ) {
         return if &signal_plugin( "on_msg", \%bag );
