@@ -298,7 +298,7 @@ sub irc_on_public {
     $last_activity{$chl} = time;
 
     if ( exists $config->{ignore}{ lc $bag{who} } ) {
-        Log("ignoring $bag{who}");
+        Log("ignoring $bag{who} in $bag{chl}");
         return;
     }
 
