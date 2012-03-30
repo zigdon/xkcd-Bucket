@@ -3675,8 +3675,8 @@ sub signal_plugin {
 
     if ( exists $plugin_signals{$sig_name} ) {
         foreach my $plugin ( @{ $plugin_signals{$sig_name} } ) {
-            eval { $rc = "Bucket::Plugin::$plugin"->route( $sig_name, $data ); };
-            $data->{rc}{plugin} = $rc;
+            eval { $data->{rc}{plugin} = "Bucket::Plugin::$plugin"->route( $sig_name, $data ); };
+            $rc ||= $data->{rc}{plugin};
 
             if ($@) {
                 Log("Error when signalling $sig_name to $plugin: $@");
@@ -3690,8 +3690,8 @@ sub signal_plugin {
 
     if ( exists $plugin_signals{"*"} ) {
         foreach my $plugin ( @{ $plugin_signals{"*"} } ) {
-            eval { $rc = "Bucket::Plugin::$plugin"->route( $sig_name, $data ); };
-            $data->{rc}{plugin} = $rc;
+            eval { $data->{rc}{plugin} = "Bucket::Plugin::$plugin"->route( $sig_name, $data ); };
+            $rc ||= $data->{rc}{plugin};
 
             if ($@) {
                 Log("Error when signalling $sig_name to $plugin: $@");
