@@ -6,7 +6,7 @@ require Exporter;
 
 # utility functions exposed from the main bucket code
 my @repeated =
-  qw/Log Report say say_long do config save talking cached_reply sql s commify/;
+  qw/Log Report say say_long do lookup config save talking cached_reply sql s commify/;
 push @EXPORT_OK, @repeated;
 
 # convenience methods
