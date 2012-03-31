@@ -8,15 +8,10 @@ my %table = (
     "&" => "\x{214B}",
     "'" => "\x{002C}",
     '(' => ")",
-    ')' => "(",
     '[' => "]",
-    ']' => "[",
     '{' => "}",
-    '}' => "{",
     '<' => ">",
-    '>' => "<",
     '/' => "\\",
-    '\\' => "/",
     '.' => "\x{02D9}",
     '3' => "\x{0190}",
     '4' => "\x{152D}",
@@ -67,6 +62,12 @@ my %table = (
     'V' => "\x{1D27}",
     'Y' => "\x{2144}",
 );
+
+# auto reverse the flip
+foreach (keys %table) {
+    next if exists $table{$table{$_}};
+    $table{$table{$_}} = $_;
+}
 
 sub signals {
     return (qw/say do/);
