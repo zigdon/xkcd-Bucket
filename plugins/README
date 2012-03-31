@@ -10,7 +10,7 @@ Bucket plugins:
 
 - Known signals:
   - "db_success", \%bag                      - called after database lookups
-  - "do", { chl, action }                    - on OUR action
+  - "do", { chl, text }                      - on OUR action
   - "get_stats", { text_ref }                - when generating the stats text
   - "heartbeat", {}                          - called on a regular interval
   - "jointopic", { chl, topic }              - topic upon joining a channel
