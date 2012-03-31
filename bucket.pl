@@ -2983,7 +2983,9 @@ sub say {
     my $chl  = shift;
     my $text = "@_";
 
-    return if &signal_plugin( "say", { chl => $chl, text => $text } );
+    my %data = ( chl => $chl, text => $text );
+    return if &signal_plugin( "say", \%data );
+    ($chl, $text) = ($data{chl}, $data{text});
 
     if ( $chl =~ m#^/# ) {
         Log "Writing to '$chl'";
