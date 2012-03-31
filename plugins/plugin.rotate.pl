@@ -38,8 +38,11 @@ my %table = (
     'l' => "\x{0283}",
     'm' => "\x{026F}",
     'n' => "\x{0075}",
+    'p' => "d",
+    'q' => "b",
     'r' => "\x{0279}",
     't' => "\x{0287}",
+    'u' => "n",
     'v' => "\x{028C}",
     'w' => "\x{028D}",
     'y' => "\x{028E}",
@@ -65,7 +68,7 @@ my %table = (
 );
 
 sub signals {
-    return (qw/say/);
+    return (qw/say do/);
 }
 
 sub route {

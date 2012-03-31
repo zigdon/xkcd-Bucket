@@ -3015,7 +3015,9 @@ sub do {
     my $chl    = shift;
     my $action = "@_";
 
-    return if &signal_plugin( "do", { chl => $chl, action => $action } );
+    my %data = ( chl => $chl, text => $action );
+    return if &signal_plugin( "do", \%data );
+    ($chl, $action) = ($data{chl}, $data{text});
 
     if ( $chl =~ m#^/# ) {
         if ( open FO, ">>", $chl ) {
