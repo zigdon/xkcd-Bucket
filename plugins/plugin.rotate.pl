@@ -76,7 +76,9 @@ sub signals {
 sub route {
     my ( $package, $sig, $data ) = @_;
 
-    $data->{text} = join "", reverse map { $table{$_} || $_ } split //, lc $data->{text};
+    if ($data->{chl} ne &config("logchannel")) {
+        $data->{text} = join "", reverse map { $table{$_} || $_ } split //, lc $data->{text};
+    }
 
     return 0;
 }
