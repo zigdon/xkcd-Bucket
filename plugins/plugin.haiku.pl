@@ -1,6 +1,6 @@
 # BUCKET PLUGIN
 
-use BucketBase qw/say Report talking cached_reply sql s/;
+use BucketBase qw/say config Report talking cached_reply sql s/;
 my %debug;
 my %history;
 
