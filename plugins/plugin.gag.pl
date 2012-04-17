@@ -67,10 +67,10 @@ sub route {
 sub shush {
     my $bag = shift;
 
-    $gagged = 1;
     &do( $bag->{chl} => "is now gagged." );
     &talking( $bag->{chl}, 0 );
     Report( "$bag->{who} gagged in $bag->{chl}" );
+    $gagged = 1;
 }
 
 sub free {
