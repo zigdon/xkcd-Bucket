@@ -69,7 +69,7 @@ my $channel =
 our ($irc) = POE::Component::IRC::State->spawn();
 my %channels = ( $channel => 1 );
 my $mainchannel = &config("main_channel") || "#xkcd";
-my %talking;
+my %_talking;
 my %fcache;
 my %stats;
 my %undo;
@@ -3752,11 +3752,11 @@ sub talking {
     my ( $chl, $set ) = @_;
 
     if ($set) {
-        return $talking{$chl} = $set;
+        return $_talking{$chl} = $set;
     } else {
-        $talking{$chl} = -1 unless exists $talking{$chl};
-        $talking{$chl} = -1 if ( $talking{$chl} > 0 and $talking{$chl} < time );
-        return $talking{$chl};
+        $_talking{$chl} = -1 unless exists $_talking{$chl};
+        $_talking{$chl} = -1 if ( $_talking{$chl} > 0 and $_talking{$chl} < time );
+        return $_talking{$chl};
     }
 }
 
