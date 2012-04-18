@@ -1424,7 +1424,7 @@ sub db_success {
         if ( $res->{ERROR} eq 'Lost connection to the database server.' ) {
             Report "DB Error: $res->{ERROR}  Restarting.";
             Log "DB Error: $res->{ERROR}";
-            &say( $channel => "Database lost.  Self-destruct initialized." );
+            &say( $channel => "Database lost.  Self-destruct initiated." );
             $irc->yield( quit => "Eep, the house is on fire!" );
             return;
         }
