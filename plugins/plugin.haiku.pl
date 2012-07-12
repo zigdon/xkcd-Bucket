@@ -73,10 +73,7 @@ sub check_haiku {
         push @haiku, @{ $history{$chl}[-3] }[0];
         push @haiku, @{ $history{$chl}[-2] }[0];
         push @haiku, @{ $history{$chl}[-1] }[0];
-        Report "Haiku found in $chl:";
-        Report $haiku[0];
-        Report $haiku[1];
-        Report $haiku[2];
+        Report "Haiku found in $chl!";
 
         if ( &talking($chl) == -1 ) {
             &cached_reply( $chl, $bag->{who}, "", "haiku detected" );

@@ -77,7 +77,6 @@ my %last_activity;
 my @inventory;
 my @random_items;
 my %replacables;
-my %haiku_history;
 my %handles;
 my %plugin_signals;
 my @registered_commands;
