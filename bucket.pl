@@ -466,7 +466,7 @@ sub irc_on_public {
         $bag{msg} = $fact;
         Log "Looking up a particular factoid - '$search' in '$fact'";
         &lookup( %bag, search => $search, );
-    } elsif ( $addressed and $operator and $bag{msg} =~ /^list plugins$/i ) {
+    } elsif ( $addressed and $operator and $bag{msg} =~ /^list plugins\W*$/i ) {
         &say(
             $chl => "$bag{who}: Currently loaded plugins: "
               . &make_list(
@@ -511,7 +511,7 @@ sub irc_on_public {
         );
     } elsif ( $addressed
         and $operator
-        and $bag{msg} =~ /^delete item #?(\d+)/i )
+        and $bag{msg} =~ /^delete item #?(\d+)\W*$/i )
     {
         unless ( $stats{detailed_inventory}{ $bag{who} } ) {
             &say( $chl => "$bag{who}: ask me for a detailed inventory first." );
@@ -795,7 +795,7 @@ sub irc_on_public {
             },
             EVENT => 'db_success'
         );
-    } elsif ( $operator and $addressed and $bag{msg} =~ /^lookup #?(\d+)$/ ) {
+    } elsif ( $operator and $addressed and $bag{msg} =~ /^lookup #?(\d+)\W*$/ ) {
         $_[KERNEL]->post(
             db  => 'SINGLE',
             SQL => 'select id, fact, verb, tidbit from bucket_facts 
@@ -814,7 +814,7 @@ sub irc_on_public {
         );
     } elsif ( $operator
         and $addressed
-        and $bag{msg} =~ /^forget (?:that|#(\d+))$/ )
+        and $bag{msg} =~ /^forget (?:that|#(\d+))\W*$/ )
     {
         my $id = $1 || $stats{last_fact}{$chl};
         unless ($id) {
@@ -1006,7 +1006,7 @@ sub irc_on_public {
 
         &save;
         return;
-    } elsif ( $operator and $addressed and $bag{msg} =~ /^get (\w+)\s*$/ ) {
+    } elsif ( $operator and $addressed and $bag{msg} =~ /^get (\w+)\W*$/ ) {
         my ($key) = ($1);
         unless ( exists $config_keys{$key} ) {
             &say_long( $chl => "$bag{who}: Valid keys are: "
@@ -1165,7 +1165,7 @@ sub irc_on_public {
 
         &sql( "insert into bucket_values (var_id, value) values (?, ?)",
             [ $replacables{$var}{id}, $value ] );
-    } elsif ( $operator and $addressed and $bag{msg} =~ /^create var (\w+)$/ ) {
+    } elsif ( $operator and $addressed and $bag{msg} =~ /^create var (\w+)\W*$/ ) {
         my $var = $1;
         if ( exists $replacables{$var} ) {
             &say( $chl =>
@@ -1220,7 +1220,7 @@ sub irc_on_public {
         delete $replacables{$var};
     } elsif ( $operator
         and $addressed
-        and $bag{msg} =~ /^var (\w+) type (var|verb|noun)$/ )
+        and $bag{msg} =~ /^var (\w+) type (var|verb|noun)\W*$/ )
     {
         my ( $var, $type ) = ( $1, $2 );
         unless ( exists $replacables{$var} ) {
