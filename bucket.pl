@@ -2434,6 +2434,8 @@ sub irc_start {
             Server   => &config("server") || "irc.foonetic.net",
             Port     => &config("port") || "6667",
             Flood    => 0,
+            UseSSL   => &config("ssl") || 0,
+            useipv6  => &config("ipv6") || 0
         }
     );
 
