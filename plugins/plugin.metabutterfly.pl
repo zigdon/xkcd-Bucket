@@ -1,4 +1,5 @@
-# Real Programmers Don't Write Perl
+# BUCKET PLUGIN
+# (Real Programmers Don't Write Perl)
 
 use BucketBase qw/say/;
 
