@@ -1,0 +1,32 @@
+---
+action: ko
+autojoin:
+  '#channel': 1
+channels: '*'
+kick_msg: Kicked
+re:
+  '#channel': !!perl/regexp '(?^ui:|kick.*me|k(nock)?o(ut)? me|dance!)'
+re_list:
+  -
+    - kick.*me
+    - '#channel'
+    - kick
+    - 0
+    - BOOM
+    - !!perl/regexp (?^u:kick.*me)
+  -
+    - 'k(nock)?o(ut)? me'
+    - '#channel'
+    - knockout
+    - 60
+    - 1m punt
+    - !!perl/regexp '(?^u:k(nock)?o(ut)? me)'
+  -
+    - dance!
+    - '#billygoat'
+    - do
+    - 0
+    - dances
+    - !!perl/regexp (?^u:dance!)
+    - 20
+timeout: 300
