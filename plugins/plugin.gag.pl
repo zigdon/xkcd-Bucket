@@ -21,7 +21,7 @@ sub commands {
             addressed => 0,
             operator  => 1,
             editable  => 0,
-            re        => qr/^gags bucket\W*$/i,
+            re        => qr/^gags $nick\W*$/i,
             callback  => \&shush,
         },
         {
@@ -29,7 +29,7 @@ sub commands {
             addressed => 0,
             operator  => 1,
             editable  => 0,
-            re        => qr/^releases bucket\W*$/i,
+            re        => qr/^releases $nick\W*$/i,
             callback  => \&free,
         },
     );
