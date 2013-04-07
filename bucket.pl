@@ -2468,6 +2468,7 @@ sub irc_on_notice {
         )
       )
     {
+        Log("Identified, joining $channel");
         $irc->yield( mode => $nick => &config("user_mode") );
         unless ( &config("hide_hostmask") ) {
             $irc->yield( mode => $nick => "-x" );
