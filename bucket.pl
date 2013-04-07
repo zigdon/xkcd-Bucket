@@ -1713,7 +1713,7 @@ sub db_success {
           )
         {
             my $item = ( $1 || $2 || $3 );
-            $item =~ s/\b(?:his|her)\b/$bag{who}\'s/;
+            $item =~ s/\b(?:his|her|their)\b/$bag{who}\'s/;
             $item =~ s/[ .?!]+$//;
             $item =~ s/\$+([a-zA-Z])/$1/g;
 
