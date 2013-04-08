@@ -1429,7 +1429,7 @@ sub db_success {
         }
         Report "DB Error: $res->{QUERY} -> $res->{ERROR}";
         Log "DB Error: $res->{QUERY} -> $res->{ERROR}";
-        &error( $bag{chl}, $bag{who} ) if $bag{chl};
+        &error( $bag{chl}, $bag{who} ) if $bag{chl} and $bag{addressed};
         return;
     }
 
