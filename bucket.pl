@@ -1429,7 +1429,11 @@ sub db_success {
         }
         Report "DB Error: $res->{QUERY} -> $res->{ERROR}";
         Log "DB Error: $res->{QUERY} -> $res->{ERROR}";
-        &error( $bag{chl}, $bag{who} ) if $bag{chl};
+        if ($bag{chl} and $bag{addressed}) {
+          &say( $bag{chl} => "Something is terribly wrong. I'll be back later." );
+          &say( $channel => "Something's wrong with the database. Shutting up in $bag{chl} for an hour." );
+          &talking( $bag{chl}, time + 60*60 );
+        }
         return;
     }
 
