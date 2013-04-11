@@ -40,8 +40,6 @@ my %stopword;
 my $last_timer;
 my $last_expire;
 my %kicks;
-my %joins;
-my %leaves;
 my %spam_counter;
 my %mode_set;
 my @banlist;
@@ -69,7 +67,6 @@ POE::Session->create(
         irc_331         => \&irc_on_jointopic,
         irc_367         => \&irc_on_banlist,
         irc_chan_mode   => \&irc_on_chanmode,
-        irc_part        => \&irc_on_part,
         irc_kick        => \&irc_on_kick,
         irc_join        => \&irc_on_join,
 
@@ -139,13 +136,6 @@ sub irc_on_chanmode {
     }
 }
 
-sub irc_on_part {
-    my ( $who, $mask ) = split /!/, $_[ARG0];
-    my $chl = $_[ARG1];
-
-    $leaves{$chl}{$who} = time;
-}
-
 sub irc_on_join {
     my ( $who, $mask ) = split /!/, $_[ARG0];
     my $chl = $_[ARG1];
@@ -160,11 +150,6 @@ sub irc_on_join {
 
     delete $kicks{$chl}{$who};
 
-    # keep track of new users who join
-    if (not exists $joins{$chl}{$who} and not exists $leaves{$chl}{$who}) {
-      $joins{$chl}{$who} = time;
-    }
-    delete $leaves{$chl}{$who};
 }
 
 sub irc_on_kick {
@@ -172,8 +157,6 @@ sub irc_on_kick {
     my $chl      = $_[ARG1];
     my $kickee   = $_[ARG2];
     my $desc     = $_[ARG3];
-
-    $leaves{$chl}{$kickee} = time;
 
     Log "$kicker kicked $kickee from $chl";
 
@@ -601,17 +584,6 @@ sub irc_on_public {
         &irc_on_msg(@_);
         return;
     }
-
-    # kick folks whoes first message to the channel is a URL
-    if (exists $joins{$chl}{$who} and $msg =~ m{http://}i) {
-        &ban( $chl, "*!$mask", 300 );
-        &kick( $chl, $who, "Nice to meet you too." );
-        $irc->yield( privmsg => $channel =>
-              "$who url-spammed $chl immediately after joining." );
-        return;
-    }
-    delete $joins{$chl}{$who};
-    delete $leaves{$chl}{$who};
 
     if ( exists $config->{ignore}{ lc $who } ) {
         # Log("ignoring $who");
