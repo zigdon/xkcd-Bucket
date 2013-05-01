@@ -122,7 +122,7 @@ if ( &config("autoload_plugins") ) {
         &load_plugin($plugin);
     }
 }
-#gender neutral pronouns added by tomatosalad, inspired by melody
+
 my %gender_vars = (
     subjective => {
         male        => "he",
@@ -138,7 +138,7 @@ my %gender_vars = (
         female      => "her",
         androgynous => "them",
         inanimate   => "it",
-	neutral     => "hir",
+        neutral     => "hir",
         "full name" => "%N",
         aliases     => [qw/him her them hir himher herhim/]
     },
@@ -147,7 +147,7 @@ my %gender_vars = (
         female      => "herself",
         androgynous => "themself",
         inanimate   => "itself",
-	netural     => "hirself",
+        netural     => "hirself",
         "full name" => "%N",
         aliases =>
           [qw/himself herself themself itself hirself himselfherself herselfhimself/]
@@ -157,7 +157,7 @@ my %gender_vars = (
         female      => "hers",
         androgynous => "theirs",
         inanimate   => "its",
-	netural     => "hirs",
+        netural     => "hirs",
         "full name" => "%N's",
         aliases     => [qw/hers theirs hirs hishers hershis/]
     },
@@ -166,7 +166,7 @@ my %gender_vars = (
         female      => "her",
         androgynous => "their",
         inanimate   => "its",
-	netural     => "hir",
+        netural     => "hir",
         "full name" => "%N's",
         aliases     => [qw/their hisher herhis/]
     },
@@ -1292,7 +1292,7 @@ sub irc_on_public {
             $gender = "male" if $pronoun eq 'him' or $pronoun eq 'he';
             $gender = "female" if $pronoun eq 'her' or $pronoun eq 'she';
             $gender = "inanimate" if $pronoun eq 'it';
-	    $gender = "neutral" if $pronoun eq 'hir' or $pronoun eq 'ze';
+            $gender = "neutral" if $pronoun eq 'hir' or $pronoun eq 'ze';
 
             unless ($gender) {
                 &say( $chl => "Sorry, $bag{who}, I didn't understand that." );
