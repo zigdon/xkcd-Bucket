@@ -168,7 +168,7 @@ my %gender_vars = (
         inanimate   => "its",
 	netural     => "hir",
         "full name" => "%N's",
-        aliases     => [qw/their hir hisher herhis/]
+        aliases     => [qw/their hisher herhis/]
     },
 );
 
