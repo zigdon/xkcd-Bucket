@@ -122,6 +122,7 @@ if ( &config("autoload_plugins") ) {
         &load_plugin($plugin);
     }
 }
+
 my %gender_vars = (
     subjective => {
         male        => "he",
