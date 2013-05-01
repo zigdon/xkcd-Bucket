@@ -1271,7 +1271,7 @@ sub irc_on_public {
                          random gender
                        )\.?$/ix
         or $bag{msg} =~ / ^(I|[-\w]+) \s (am|is) \s an? \s
-                       ( he | she | him | her | it | ze)\.?$
+                       ( he | she | him | her | it | ze | hir)\.?$
                      /ix
       )
     {
