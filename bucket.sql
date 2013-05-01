@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS `bucket_vars` (
 CREATE TABLE IF NOT EXISTS `genders` (
   `id` int(10) unsigned NOT NULL auto_increment,
   `nick` varchar(30) NOT NULL,
-  `gender` enum('male','female','Androgynous','inanimate','full name') NOT NULL default 'Androgynous',
+  `gender` enum('male','female','Androgynous','inanimate','neutral','full name','gender') NOT NULL default 'Androgynous',
   `stamp` timestamp NOT NULL default CURRENT_TIMESTAMP,
   PRIMARY KEY  (`id`),
   UNIQUE KEY `nick` (`nick`)
