@@ -129,39 +129,44 @@ my %gender_vars = (
         female      => "she",
         androgynous => "they",
         inanimate   => "it",
+        neutral     => "ze",
         "full name" => "%N",
-        aliases     => [qw/he she they it heshe shehe/]
+        aliases     => [qw/he she they it ze heshe shehe/]
     },
     objective => {
         male        => "him",
         female      => "her",
         androgynous => "them",
         inanimate   => "it",
+        neutral     => "hir",
         "full name" => "%N",
-        aliases     => [qw/him her them himher herhim/]
+        aliases     => [qw/him her them hir himher herhim/]
     },
     reflexive => {
         male        => "himself",
         female      => "herself",
         androgynous => "themself",
         inanimate   => "itself",
+        netural     => "hirself",
         "full name" => "%N",
         aliases =>
-          [qw/himself herself themself itself himselfherself herselfhimself/]
+          [qw/himself herself themself itself hirself himselfherself herselfhimself/]
     },
     possessive => {
         male        => "his",
         female      => "hers",
         androgynous => "theirs",
         inanimate   => "its",
+        netural     => "hirs",
         "full name" => "%N's",
-        aliases     => [qw/hers theirs hishers hershis/]
+        aliases     => [qw/hers theirs hirs hishers hershis/]
     },
     determiner => {
         male        => "his",
         female      => "her",
         androgynous => "their",
         inanimate   => "its",
+        netural     => "hir",
         "full name" => "%N's",
         aliases     => [qw/their hisher herhis/]
     },
@@ -1261,11 +1266,12 @@ sub irc_on_public {
                          female        |
                          androgynous   |
                          inanimate     |
+                         neutral       |
                          full \s name  |
                          random gender
                        )\.?$/ix
         or $bag{msg} =~ / ^(I|[-\w]+) \s (am|is) \s an? \s
-                       ( he | she | him | her | it )\.?$
+                       ( he | she | him | her | it | ze | hir )\.?$
                      /ix
       )
     {
@@ -1285,6 +1291,7 @@ sub irc_on_public {
             $gender = undef;
             $gender = "male" if $pronoun eq 'him' or $pronoun eq 'he';
             $gender = "female" if $pronoun eq 'her' or $pronoun eq 'she';
+            $gender = "neutral" if $pronoun eq 'ze' or $pronoun eq 'hir';
             $gender = "inanimate" if $pronoun eq 'it';
 
             unless ($gender) {
