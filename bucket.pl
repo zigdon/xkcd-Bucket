@@ -122,7 +122,7 @@ if ( &config("autoload_plugins") ) {
         &load_plugin($plugin);
     }
 }
-#gender neutral pronouns added by tomatosalad poorly, done properly by melody, inspired by melody
+#gender neutral pronouns added by tomatosalad, inspired by melody
 my %gender_vars = (
     subjective => {
         male        => "he",
