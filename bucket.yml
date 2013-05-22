@@ -1,5 +1,5 @@
 ---
-autoload_plugins: quote topic
+autoload_plugins: quotes topic
 plugin_dir: plugins
 autojoin:
   '#bucket': 1
