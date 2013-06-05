@@ -1611,8 +1611,8 @@ sub db_success {
                 return;
             }
         } elsif ( $bag{addressed}
-            and $bag{orig} =~ m{[+\-*/]}
-            and $bag{orig} =~ m{^([\s0-9a-fA-F_x+\-*/.()]+)$} )
+            and $bag{orig} =~ m{[+\-*%/]}
+            and $bag{orig} =~ m{^([\s0-9a-fA-F_x+\-*%/.()]+)$} )
         {
 
             # Mathing!
@@ -1629,7 +1629,7 @@ sub db_success {
 
             if ( $exp !~ /\*\*/ and $math ) {
                 my $newexp;
-                foreach my $word ( split /( |-[\d_e.]+|\*\*|[+\/()*])/, $exp ) {
+                foreach my $word ( split /( |-[\d_e.]+|\*\*|[+\/%()*])/, $exp ) {
                     $word = "new $math(\"$word\")" if $word =~ /^[_0-9.e]+$/;
                     $newexp .= $word;
                 }
