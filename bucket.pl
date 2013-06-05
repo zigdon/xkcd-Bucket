@@ -625,7 +625,7 @@ sub irc_on_public {
         );
     } elsif ( $addressed
         and $operator
-        and $bag{msg} =~ /^(\w+) has (\d+) syllables?\W*$/i )
+        and $bag{msg} =~ /^([\w']+) has (\d+) syllables?\W*$/i )
     {
         $config->{sylcheat}{ lc $1 } = $2;
         &save;
