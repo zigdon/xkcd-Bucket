@@ -1279,7 +1279,7 @@ sub irc_on_public {
             return;
         }
 
-        $target = $bag{who} if $target eq 'I';
+        $target = $bag{who} if uc $target eq 'I';
 
         if ($pronoun) {
             $gender = undef;
