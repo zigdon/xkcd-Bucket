@@ -93,7 +93,7 @@ that user's line under the trigger "nick quotes."
 `literal X` will list all the factoids associated with that trigger, separated by `|`. If there are too many, Bucket
 will automatically create a new page and append "*n* more." `literal[*p*] X` will list page number *p*.
 
-`literal[\*] X` will make Bucket produce a URL of a text file with all of the associated factoids.
+`literal[*] X` will make Bucket produce a URL of a text file with all of the associated factoids.
 
 `X =~ /m/` will make Bucket reply with the first factoid in trigger "X" containing "m."
 
