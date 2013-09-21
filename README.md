@@ -135,3 +135,9 @@ use an item and discard it, and `$newitem` will use a random item from previousl
 
 #### Special Factoids
 Bucket also has some factoids for hard-coded uses. These include "Don't Know", "Automatic Haiku" and "Band Name Reply."
+
+#### Contacting
+
+Any bugs, feature requests or questions should be directed to zigdon at
+irc.foonetic.net.  Or, ask people in #xkcd and #bucket there - many have years
+of experience with Bucket.
