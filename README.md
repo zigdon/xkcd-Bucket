@@ -63,17 +63,17 @@ create factoids this way. `X is also Y` will have the same effect.
 
 This is used identically to `X is Y`, with the exception being that Bucket will respond to "X" with "X are Y."
 
-#### X <verb> Y
+#### X \<verb\> Y
 
 Bucket is smart enough to know verbs! `X loves Y` and similar phrases will cause X to trigger "X loves Y."
 
 `X<'s> Y` is a special variant of this, making "X" trigger "X's Y."
 
-#### X <reply> Y
+#### X \<reply\> Y
 
 Perhaps the second-most used factoid are `X <reply> Y` factoids. Saying "X" will make Bucket respond "Y."
 
-#### X <action> Y
+#### X \<action\> Y
 
 This will make Bucket use a `/me` when he replies. Thus, saying "X" will make Bucket `/me Y`.
 
