@@ -533,7 +533,7 @@ sub irc_on_msg {
             if ($arg) {
                 if ( $arg eq 'add' ) {
                     $irc->yield( privmsg => $chl => $_ ) foreach (
-                        "Add a new action line:  add <regular expression>",
+                        "Add a new action line: add [options] <regular expression>",
                         "optional flags:",
                         "-channels \"#chan1 #chan2\" | -channel #chan1",
                         "-action (kb|ko|kn|shutup|kick|say|do|spam)",
