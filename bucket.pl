@@ -2787,6 +2787,7 @@ sub heartbeat {
         chl  => $chl,
         who  => $nick,
         idle => 1,
+        exclude_verb => ['<reply>','<action>'],
     );
 }
 
@@ -3076,6 +3077,9 @@ sub lookup {
     if ( exists $params{verb} ) {
         $sql .= " and verb = ?";
         push @placeholders, $params{verb};
+    } elsif ( exists $params{exclude_verb} ) {
+        $sql .= " and verb not in (" . join( ", ", map { "?" } @{ $params{exclude_verb} } ) . ")";
+        push @placeholders, @{ $params{exclude_verb} };
     }
 
     if ( $params{starts} ) {
