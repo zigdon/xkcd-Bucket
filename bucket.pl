@@ -103,6 +103,7 @@ my %config_keys = (
     random_wait              => [ i => 3 ],
     repeated_queries         => [ i => 5 ],
     timeout                  => [ i => 60 ],
+    the_fucking              => [ p => 100 ],
     tumblr_name              => [ p => 50 ],
     uses_reply               => [ i => 5 ],
     user_activity_timeout    => [ i => 360 ],
@@ -1680,6 +1681,7 @@ sub db_success {
             &say( $bag{chl} => $bag{orig} );
         } elsif ( &config("max_sub_length")
             and length( $bag{orig} ) < &config("max_sub_length")
+            and rand(100) < &config("the_fucking")
             and $bag{orig} =~ s/\bthe fucking\b/fucking the/ )
         {
             $stats{fucking}++;
