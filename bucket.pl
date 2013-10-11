@@ -507,6 +507,7 @@ sub irc_on_public {
                 cmd  => "literal",
                 page => $page,
                 fact => $fact,
+                addressed => $addressed,
             },
             EVENT => 'db_success'
         );
@@ -1371,7 +1372,7 @@ sub irc_on_public {
                         &config("repeated_queries") )
                     {
                         Report
-"Volunteering a dump of '$bag{msg}' for $bag{who} in $chl";
+"Volunteering a dump of '$bag{msg}' for $bag{who} in $chl (if it exists)";
                         $_[KERNEL]->post(
                             db => 'MULTIPLE',
                             SQL =>
@@ -2246,7 +2247,9 @@ sub db_success {
         my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
 
         unless (@lines) {
-            &error( $bag{chl}, $bag{who}, "$bag{who}: " );
+            if ( $bag{addressed} ) {
+                &error( $bag{chl}, $bag{who}, "$bag{who}: " );
+            }
             return;
         }
 
