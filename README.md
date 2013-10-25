@@ -21,26 +21,27 @@ Installing
 
 1. Clone this repository.
 2. Set up a MySQL database, other databases may work but are not guaranteed to do so.
-    $ sudo apt-get install mysql-server
-..*Replace this appropriately depending on your operating system.
+    `$ sudo apt-get install mysql-server`
+  *Replace this appropriately depending on your operating system.
 3. Create the tables in bucket.sql. You may need the arguments `--user=root --password` in order for it
 to work.
-    $ mysqladmin create bucket
+    ```$ mysqladmin create bucket
     $ mysql -D bucket < bucket.sql
-    $ mysql -D bucket < sample.sql
+    $ mysql -D bucket < sample.sql```
 4. Create a user for Bucket, and grant all perms on the bucket database.
-    $ echo 'grant all on bucket.* to bucket identified by "s3kr1tP@ss"' | mysql
+    `$ echo 'grant all on bucket.* to bucket identified by "s3kr1tP@ss"' | mysql`
 5. Edit config file (bucket.yml)
 6. Install perl modules.
-    $ sudo cpan POE POE::Component::IRC POE::Component::SimpleDBI Lingua::EN::Conjugate Lingua::EN::Inflect Lingua::EN::Syllable YAML HTML::Entities \ URI::Escape XML::Simple
+    ```$ sudo cpan POE POE::Component::IRC POE::Component::SimpleDBI Lingua::EN::Conjugate Lingua::EN::Inflect 
+    Lingua::EN::Syllable YAML HTML::Entities URI::Escape XML::Simple```
 7. Set bucket.pl as executable.
-    $ chmod +x bucket.pl
+    `$ chmod +x bucket.pl`
 8. Pre-flight checklist
-    1. Register your Bucket's nick with NickServ
-    2. Register your Bucket's logging and config channels, and configure them as private and restricted.
-    3. Add your Bucket's nick to the allow list for the logging and config channels. 
+  1. Register your Bucket's nick with NickServ
+  2. Register your Bucket's logging and config channels, and configure them as private and restricted.
+  3. Add your Bucket's nick to the allow list for the logging and config channels. 
 9. Start Bucket.
-    ./bucket.pl
+    `$ ./bucket.pl`
 10. Start adding factoids!
 
 What can Bucket do?
@@ -71,7 +72,7 @@ Bucket is smart enough to know verbs! `X loves Y` and similar phrases will cause
 
 #### X \<reply\> Y
 
-Perhaps the second-most used factoid are `X <reply> Y` factoids. Saying "X" will make Bucket respond "Y."
+Perhaps the second-most used factoids are `X <reply> Y` factoids. Saying "X" will make Bucket respond "Y."
 
 #### X \<action\> Y
 
@@ -79,7 +80,7 @@ This will make Bucket use a `/me` when he replies. Thus, saying "X" will make Bu
 
 #### Commands
 
-Bucket is not a client! Teaching him factoids such as "Quit <reply> /quit" will not work as intended.
+Bucket is not a client! Teaching him factoids such as `Quit <reply> /quit` will not work as intended.
 
 #### Quotes
 
