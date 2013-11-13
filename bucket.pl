@@ -99,6 +99,7 @@ my %config_keys = (
     minimum_length           => [ i => 6 ],
     nickserv_msg             => [ s => "" ],
     nickserv_nick            => [ s => "NickServ" ],
+    random_exclude_verbs     => [ s => '<reply>,<action>'],
     random_item_cache_size   => [ i => 20 ],
     random_wait              => [ i => 3 ],
     repeated_queries         => [ i => 5 ],
@@ -2792,6 +2793,7 @@ sub heartbeat {
         chl  => $chl,
         who  => $nick,
         idle => 1,
+        exclude_verb => [split(',',&config("random_exclude_verbs"))],
     );
 }
 
@@ -3081,6 +3083,9 @@ sub lookup {
     if ( exists $params{verb} ) {
         $sql .= " and verb = ?";
         push @placeholders, $params{verb};
+    } elsif ( exists $params{exclude_verb} ) {
+        $sql .= " and verb not in (" . join( ", ", map { "?" } @{ $params{exclude_verb} } ) . ")";
+        push @placeholders, @{ $params{exclude_verb} };
     }
 
     if ( $params{starts} ) {
