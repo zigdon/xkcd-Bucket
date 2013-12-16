@@ -1,6 +1,6 @@
 # BUCKET PLUGIN
 
-use BucketBase qw/say Log Report config save post/;
+use BucketBase qw/say say_long Log Report config save post/;
 
 my %history;
 
@@ -27,6 +27,14 @@ sub commands {
             callback  => \&disallow_quote
         },
         {
+            label     => 'list protections',
+            addressed => 1,
+            operator  => 1,
+            editable  => 0,
+            re        => qr/^list protected quotes$/i,
+            callback  => \&list_protections
+        },
+        {
             label     => 'remember',
             addressed => 1,
             operator  => 0,
@@ -38,9 +46,7 @@ sub commands {
 }
 
 sub settings {
-    return ( history_size => [ i => 30 ],
-             protected_quotes => [ s => '' ]
-           );
+    return ( history_size => [ i => 30 ],);
 }
 
 sub route {
@@ -74,6 +80,16 @@ sub save_self_history {
         &config("nick"), ( $type eq 'say' ? 'irc_public' : 'irc_ctcp_action' ),
         $bag->{text}
       ];
+}
+
+sub list_protections {
+    my $bag = shift;
+    my $quoteable = &config("protected_quotes") || {};
+    if (keys %$quoteable) {
+      &say_long( $bag->{chl} => "$bag->{who}: " . join(", ", sort keys %$quoteable));
+    } else {
+      &say_long( $bag->{chl} => "$bag->{who}: I'm remembering everything." );
+    }
 }
 
 sub allow_quote {

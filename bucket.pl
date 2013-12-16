@@ -395,7 +395,7 @@ sub irc_on_public {
             and $editable >= $cmd->{editable}
             and $bag{msg} =~ $cmd->{re} )
         {
-            Log("Matched cmd $cmd->{label}");
+            Log("Matched cmd '$cmd->{label}' from $cmd->{plugin}.");
             $cmd->{callback}->( \%bag );
             return;
         }
