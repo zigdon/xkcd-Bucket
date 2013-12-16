@@ -38,7 +38,9 @@ sub commands {
 }
 
 sub settings {
-    return ( history_size => [ i => 30 ], );
+    return ( history_size => [ i => 30 ],
+             protected_quotes => [ s => '' ]
+           );
 }
 
 sub route {
