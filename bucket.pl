@@ -3186,21 +3186,24 @@ sub expand {
       unless @{ $stats{last_vars}{$chl}{item} };
 
     $stats{last_vars}{$chl}{newitem} = [];
-    while ( $msg =~ /(?<!\\)(\$newitem|\${newitem})/i ) {
+    while ( $msg =~ /(?<!\\)(\$(new|get)item|\${(new|get)item})/i ) {
+        my $keep = lc($2 || $3);
         if ($editable) {
             my $newitem = shift @random_items || 'bananas';
-            my ( $rc, @dropped ) = &put_item( $newitem, 1 );
-            if ( $rc == 2 ) {
-                $stats{last_vars}{$chl}{dropped} = \@dropped;
-                &cached_reply( $chl, $who, \@dropped, "drops item" );
-                return;
+            if ($keep eq 'new') {
+                my ( $rc, @dropped ) = &put_item( $newitem, 1 );
+                if ( $rc == 2 ) {
+                    $stats{last_vars}{$chl}{dropped} = \@dropped;
+                    &cached_reply( $chl, $who, \@dropped, "drops item" );
+                    return;
+                }
             }
 
             my $cased = &set_case( $1, $newitem );
-            last unless $msg =~ s/(?<!\\)(?:\$newitem|\${newitem})/$cased/i;
+            last unless $msg =~ s/(?<!\\)(?:\$${keep}item|\${${keep}item})/$cased/i;
             push @{ $stats{last_vars}{$chl}{newitem} }, $newitem;
         } else {
-            $msg =~ s/(?<!\\)(?:\$newitem|\${newitem})/bananas/ig;
+            $msg =~ s/(?<!\\)(?:\$${keep}item|\${${keep}item})/bananas/ig;
         }
     }
     delete $stats{last_vars}{$chl}{newitem}
