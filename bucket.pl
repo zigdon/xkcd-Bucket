@@ -3794,3 +3794,5 @@ sub validate_factoid {
 
     return 1;
 }
+
+# vim: set sw=4
