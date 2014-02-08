@@ -99,7 +99,7 @@ my %config_keys = (
     minimum_length           => [ i => 6 ],
     nickserv_msg             => [ s => "" ],
     nickserv_nick            => [ s => "NickServ" ],
-    random_exclude_verbs     => [ s => '<reply>,<action>'],
+    random_exclude_verbs     => [ s => '<reply>,<action>' ],
     random_item_cache_size   => [ i => 20 ],
     random_wait              => [ i => 3 ],
     repeated_queries         => [ i => 5 ],
@@ -179,7 +179,7 @@ if ( &config("file_input") and -f &config("file_input") ) {
 
 # set up gender aliases
 foreach my $type ( keys %gender_vars ) {
-    foreach my $alias ( @{ $gender_vars{$type}{aliases} } ) {
+    foreach my $alias ( @{$gender_vars{$type}{aliases}} ) {
         $gender_vars{$alias} = $gender_vars{$type};
         &Log("Setting gender alias: $alias => $type");
     }
@@ -246,7 +246,7 @@ sub irc_on_topic {
     my $chl   = $_[ARG1];
     my $topic = $_[ARG2];
 
-    return if &signal_plugin( "on_topic", { chl => $chl, topic => $topic } );
+    return if &signal_plugin( "on_topic", {chl => $chl, topic => $topic} );
 }
 
 sub irc_on_kick {
@@ -298,7 +298,7 @@ sub irc_on_public {
 
     $last_activity{$chl} = time;
 
-    if ( exists $config->{ignore}{ lc $bag{who} } ) {
+    if ( exists $config->{ignore}{lc $bag{who}} ) {
         Log("ignoring $bag{who} in $bag{chl}");
         return;
     }
@@ -337,21 +337,21 @@ sub irc_on_public {
 
     # keep track of who's active in each channel
     if ( $chl =~ /^#/ ) {
-        $stats{users}{$chl}{ $bag{who} }{last_active} = time;
+        $stats{users}{$chl}{$bag{who}}{last_active} = time;
     }
 
-    unless ( exists $stats{users}{genders}{ lc $bag{who} } ) {
+    unless ( exists $stats{users}{genders}{lc $bag{who}} ) {
         &load_gender( $bag{who} );
     }
 
     # flood protection
     if ( not $operator and $addressed ) {
-        $stats{last_talk}{$chl}{ $bag{who} }{when} = time;
-        if ( $stats{last_talk}{$chl}{ $bag{who} }{count}++ > 20
-            and time - $stats{last_talk}{$chl}{ $bag{who} }{when} <
+        $stats{last_talk}{$chl}{$bag{who}}{when} = time;
+        if ( $stats{last_talk}{$chl}{$bag{who}}{count}++ > 20
+            and time - $stats{last_talk}{$chl}{$bag{who}}{when} <
             &config("user_activity_timeout") )
         {
-            if ( $stats{last_talk}{$chl}{ $bag{who} }{count} == 21 ) {
+            if ( $stats{last_talk}{$chl}{$bag{who}}{count} == 21 ) {
                 Report "Ignoring $bag{who} who is flooding in $chl.";
                 &say( $chl =>
                       "$bag{who}, I'm a bit busy now, try again in 5 minutes?"
@@ -423,25 +423,30 @@ sub irc_on_public {
           "$bag{who} is editing $fact in $chl: replacing '$old' with '$new'";
         Log "Editing $fact: replacing '$old' with '$new'";
         if ( $fact =~ /^#(\d+)$/ ) {
-            &sql('select * from bucket_facts where id = ?', [$1],
-              { %bag,
-                cmd      => "edit",
-                old      => $old,
-                'new'    => $new,
-                flag     => $flag,
-                db_type => 'MULTIPLE',
-              }
+            &sql(
+                'select * from bucket_facts where id = ?',
+                [$1],
+                {
+                    %bag,
+                    cmd     => "edit",
+                    old     => $old,
+                    'new'   => $new,
+                    flag    => $flag,
+                    db_type => 'MULTIPLE',
+                }
             );
         } else {
-            &sql('select * from bucket_facts where fact = ? order by id',
+            &sql(
+                'select * from bucket_facts where fact = ? order by id',
                 [$fact],
-                { %bag,
-                  cmd      => "edit",
-                  fact     => $fact,
-                  old      => $old,
-                  'new'    => $new,
-                  flag     => $flag,
-                  db_type => 'MULTIPLE',
+                {
+                    %bag,
+                    cmd     => "edit",
+                    fact    => $fact,
+                    old     => $old,
+                    'new'   => $new,
+                    flag    => $flag,
+                    db_type => 'MULTIPLE',
                 }
             );
         }
@@ -466,7 +471,7 @@ sub irc_on_public {
             $chl => "$bag{who}: Currently loaded plugins: "
               . &make_list(
                 map { "$_($stats{loaded_plugins}{$_})" }
-                sort keys %{ $stats{loaded_plugins} }
+                sort keys %{$stats{loaded_plugins}}
               )
         );
     } elsif ( $addressed
@@ -491,28 +496,30 @@ sub irc_on_public {
         $fact = &trim($fact);
         $fact = &decommify($fact);
         Log "Literal[$page] $fact";
-        &sql('select id, verb, tidbit, mood, chance, protected from
+        &sql(
+            'select id, verb, tidbit, mood, chance, protected from
               bucket_facts where fact = ? order by id',
-             [$fact],
-             { %bag,
-               cmd       => "literal",
-               page      => $page,
-               fact      => $fact,
-               addressed => $addressed,
-               multiple  => 1,
-             }
+            [$fact],
+            {
+                %bag,
+                cmd       => "literal",
+                page      => $page,
+                fact      => $fact,
+                addressed => $addressed,
+                multiple  => 1,
+            }
         );
     } elsif ( $addressed
         and $operator
         and $bag{msg} =~ /^delete item #?(\d+)\W*$/i )
     {
-        unless ( $stats{detailed_inventory}{ $bag{who} } ) {
+        unless ( $stats{detailed_inventory}{$bag{who}} ) {
             &say( $chl => "$bag{who}: ask me for a detailed inventory first." );
             return;
         }
 
         my $num  = $1 - 1;
-        my $item = $stats{detailed_inventory}{ $bag{who} }[$num];
+        my $item = $stats{detailed_inventory}{$bag{who}}[$num];
         unless ( defined $item ) {
             &say( $chl => "Sorry, $bag{who}, I can't find that!" );
             return;
@@ -520,7 +527,7 @@ sub irc_on_public {
         &say( $chl => "Okay, $bag{who}, destroying '$item'" );
         @inventory = grep { $_ ne $item } @inventory;
         &sql( "delete from bucket_items where `what` = ?", [$item] );
-        delete $stats{detailed_inventory}{ $bag{who} }[$num];
+        delete $stats{detailed_inventory}{$bag{who}}[$num];
     } elsif ( $addressed and $operator and $bag{msg} =~ /^delete ((#)?.+)/i ) {
         my $id   = $2;
         my $fact = $1;
@@ -528,21 +535,29 @@ sub irc_on_public {
 
         if ($id) {
             while ( $fact =~ s/#(\d+)\s*// ) {
-                &sql('select fact, tidbit, verb, RE, protected, mood, chance
+                &sql(
+                    'select fact, tidbit, verb, RE, protected, mood, chance
                       from bucket_facts where id = ?',
-                      [$1],
-                      { %bag, cmd  => "delete_id", fact => $1, db_type => "SINGLE", }
+                    [$1],
+                    {
+                        %bag,
+                        cmd     => "delete_id",
+                        fact    => $1,
+                        db_type => "SINGLE",
+                    }
                 );
             }
         } else {
-            &sql('select fact, tidbit, verb, RE, protected, mood, chance from
+            &sql(
+                'select fact, tidbit, verb, RE, protected, mood, chance from
                   bucket_facts where fact = ?',
-                  [$fact],
-                  { %bag,
-                    cmd      => "delete",
-                    fact     => $fact,
+                [$fact],
+                {
+                    %bag,
+                    cmd     => "delete",
+                    fact    => $fact,
                     db_type => 'MULTIPLE',
-                  }
+                }
             );
         }
     } elsif (
@@ -603,22 +618,22 @@ sub irc_on_public {
     } elsif ( $addressed and $operator and lc $bag{msg} eq 'list ignored' ) {
         &say(
             $chl => "Currently ignored: ",
-            join ", ", sort keys %{ $config->{ignore} }
+            join ", ", sort keys %{$config->{ignore}}
         );
     } elsif ( $addressed
         and $operator
         and $bag{msg} =~ /^([\w']+) has (\d+) syllables?\W*$/i )
     {
-        $config->{sylcheat}{ lc $1 } = $2;
+        $config->{sylcheat}{lc $1} = $2;
         &save;
         &say( $chl => "Okay, $bag{who}.  Cheat sheet updated." );
     } elsif ( $addressed and $operator and $bag{msg} =~ /^(un)?ignore (\S+)/i )
     {
         Report "$bag{who} is $1ignoring $2";
         if ($1) {
-            delete $config->{ignore}{ lc $2 };
+            delete $config->{ignore}{lc $2};
         } else {
-            $config->{ignore}{ lc $2 } = 1;
+            $config->{ignore}{lc $2} = 1;
         }
         &save;
         &say( $chl => "Okay, $bag{who}.  Ignore list updated." );
@@ -626,9 +641,9 @@ sub irc_on_public {
     {
         Report "$bag{who} is $1excluding $2";
         if ($1) {
-            delete $config->{exclude}{ lc $2 };
+            delete $config->{exclude}{lc $2};
         } else {
-            $config->{exclude}{ lc $2 } = 1;
+            $config->{exclude}{lc $2} = 1;
         }
         &save;
         &say( $chl => "Okay, $bag{who}.  Exclude list updated." );
@@ -639,14 +654,13 @@ sub irc_on_public {
         Log "$1protecting $fact";
 
         if ( $fact =~ s/^\$// ) {    # it's a variable!
-            unless ( exists $replacables{ lc $fact } ) {
+            unless ( exists $replacables{lc $fact} ) {
                 &say( $chl =>
                       "Sorry, $bag{who}, \$$fact isn't a valid variable." );
                 return;
             }
 
-            $replacables{ lc $fact }{perms} =
-              $protect ? "read-only" : "editable";
+            $replacables{lc $fact}{perms} = $protect ? "read-only" : "editable";
         } else {
             &sql( 'update bucket_facts set protected=? where fact=?',
                 [ $protect, $fact ] );
@@ -671,7 +685,7 @@ sub irc_on_public {
             delete $undo{$uchannel};
         } elsif ( $undo->[0] eq 'insert' ) {
             if ( $undo->[2] and ref $undo->[2] eq 'ARRAY' ) {
-                foreach my $entry ( @{ $undo->[2] } ) {
+                foreach my $entry ( @{$undo->[2]} ) {
                     my %old = %$entry;
                     $old{RE}        = 0 unless $old{RE};
                     $old{protected} = 0 unless $old{protected};
@@ -685,7 +699,7 @@ sub irc_on_public {
                 Report "$bag{who} called undo: undeleted $undo->[3].";
                 &say( $chl => "Okay, $bag{who}, undeleted $undo->[3]." );
             } elsif ( $undo->[2] and ref $undo->[2] eq 'HASH' ) {
-                my %old = %{ $undo->[2] };
+                my %old = %{$undo->[2]};
                 $old{RE}        = 0 unless $old{RE};
                 $old{protected} = 0 unless $old{protected};
                 &sql(
@@ -707,7 +721,7 @@ sub irc_on_public {
 
         } elsif ( $undo->[0] eq 'edit' ) {
             if ( $undo->[2] and ref $undo->[2] eq 'ARRAY' ) {
-                foreach my $entry ( @{ $undo->[2] } ) {
+                foreach my $entry ( @{$undo->[2]} ) {
                     if ( $entry->[0] eq 'update' ) {
                         &sql(
                             'update bucket_facts set verb=?, tidbit=?
@@ -715,7 +729,7 @@ sub irc_on_public {
                             [ $entry->[2], $entry->[3], $entry->[1] ],
                         );
                     } elsif ( $entry->[0] eq 'insert' ) {
-                        my %old = %{ $entry->[1] };
+                        my %old = %{$entry->[1]};
                         $old{RE}        = 0 unless $old{RE};
                         $old{protected} = 0 unless $old{protected};
                         &sql(
@@ -725,7 +739,7 @@ sub irc_on_public {
                             [
                                 @old{
                                     qw/fact verb tidbit protected RE mood chance/
-                                  }
+                                }
                             ],
                         );
                     }
@@ -746,20 +760,39 @@ sub irc_on_public {
         my ( $src, $dst ) = ( $1, $2 );
         $stats{merge}++;
 
-        &sql('select id, verb, tidbit from bucket_facts where fact = ? limit 1',
-          [$src], { %bag, cmd => "merge", src => $src, dst => $dst, db_type => "SINGLE", }
+        &sql(
+            'select id, verb, tidbit from bucket_facts where fact = ? limit 1',
+            [$src],
+            {
+                %bag,
+                cmd     => "merge",
+                src     => $src,
+                dst     => $dst,
+                db_type => "SINGLE",
+            }
         );
     } elsif ( $addressed and $operator and $bag{msg} =~ /^alias (.*) => (.*)/ )
     {
         my ( $src, $dst ) = ( $1, $2 );
         $stats{alias}++;
 
-        &sql('select id, verb, tidbit from bucket_facts where fact = ? limit 1',
-            [$src], { %bag, cmd => "alias1", src => $src, dst => $dst, db_type => "SINGLE", }
+        &sql(
+            'select id, verb, tidbit from bucket_facts where fact = ? limit 1',
+            [$src],
+            {
+                %bag,
+                cmd     => "alias1",
+                src     => $src,
+                dst     => $dst,
+                db_type => "SINGLE",
+            }
         );
-    } elsif ( $operator and $addressed and $bag{msg} =~ /^lookup #?(\d+)\W*$/ ) {
-        &sql('select id, fact, verb, tidbit from bucket_facts where id = ? ',
-            [$1], {
+    } elsif ( $operator and $addressed and $bag{msg} =~ /^lookup #?(\d+)\W*$/ )
+    {
+        &sql(
+            'select id, fact, verb, tidbit from bucket_facts where id = ? ',
+            [$1],
+            {
                 %bag,
                 cmd       => "fact",
                 msg       => $1,
@@ -780,9 +813,8 @@ sub irc_on_public {
             return;
         }
 
-        &sql('select * from bucket_facts where id = ?', [$id],
-            { %bag, cmd => "forget", id  => $id, db_type => "SINGLE", }
-        );
+        &sql( 'select * from bucket_facts where id = ?',
+            [$id], {%bag, cmd => "forget", id => $id, db_type => "SINGLE",} );
     } elsif ( $addressed and $bag{msg} =~ /^what was that\??$/i ) {
         my $id = $stats{last_fact}{$chl};
         unless ($id) {
@@ -791,9 +823,9 @@ sub irc_on_public {
         }
 
         if ( $id =~ /^(\d+)$/ ) {
-            &sql('select * from bucket_facts where id = ?', [$id],
-                { %bag, cmd => "report", id => $id, db_type => "SINGLE", }
-            );
+            &sql( 'select * from bucket_facts where id = ?',
+                [$id],
+                {%bag, cmd => "report", id => $id, db_type => "SINGLE",} );
         } else {
             &say( $chl => "$bag{who}: that was $id" );
         }
@@ -872,13 +904,14 @@ sub irc_on_public {
           . "about %s subject%s. ",
           &commify( $stats{rows} ),     &s( $stats{rows} ),
           &commify( $stats{triggers} ), &s( $stats{triggers} );
-        $reply .= sprintf "I know of %s object%s"
-          . " and am carrying %d of them. ",
+        $reply .=
+          sprintf "I know of %s object%s" . " and am carrying %d of them. ",
           &commify( $stats{items} ), &s( $stats{items} ), scalar @inventory;
         if ( &talking($chl) == 0 ) {
             $reply .= "I'm being quiet right now. ";
         } elsif ( &talking($chl) > 0 ) {
-            $reply .= sprintf "I'm being quiet right now, "
+            $reply .=
+              sprintf "I'm being quiet right now, "
               . "but I'll be back in about %s %s. ",
               &round_time( &talking($chl) - time );
         }
@@ -982,7 +1015,7 @@ sub irc_on_public {
         unless (
             $replacables{$var}{cache}
             or ( ref $replacables{$var}{vals} eq 'ARRAY'
-                and @{ $replacables{$var}{vals} } )
+                and @{$replacables{$var}{vals}} )
           )
         {
             &say( $chl => "$bag{who}: \$$var has no values defined!" );
@@ -991,21 +1024,23 @@ sub irc_on_public {
 
         if ( exists $replacables{$var}{cache}
             or ref $replacables{$var}{vals} eq 'ARRAY'
-            and @{ $replacables{$var}{vals} } > 30 )
+            and @{$replacables{$var}{vals}} > 30 )
         {
             if ( &config("www_root") ) {
-                &sql('select value
+                &sql(
+                    'select value
                       from bucket_vars vars
                            left join bucket_values vals
                            on vars.id = vals.var_id
                       where name = ?
                       order by value',
-                      [$var],
-                      { %bag,
-                        cmd  => "dump_var",
-                        name => $var,
+                    [$var],
+                    {
+                        %bag,
+                        cmd     => "dump_var",
+                        name    => $var,
                         db_type => 'MULTIPLE',
-                      }
+                    }
                 );
             } else {
                 &say( $chl =>
@@ -1015,7 +1050,7 @@ sub irc_on_public {
             return;
         }
 
-        my @vals = @{ $replacables{$var}{vals} };
+        my @vals = @{$replacables{$var}{vals}};
         &say( $chl => "$var:", &make_list( sort @vals ) );
     } elsif ( $addressed and $bag{msg} =~ /^remove value (\w+) (.+)$/ ) {
         my ( $var, $value ) = ( lc $1, lc $2 );
@@ -1044,11 +1079,11 @@ sub irc_on_public {
             Report "$bag{who} removed a value from \$$var in $chl: $value";
         }
 
-        foreach my $i ( 0 .. @{ $replacables{$var}{$key} } - 1 ) {
+        foreach my $i ( 0 .. @{$replacables{$var}{$key}} - 1 ) {
             next unless lc $replacables{$var}{$key}[$i] eq $value;
 
             Log "found!";
-            splice( @{ $replacables{$var}{vals} }, $i, 1, () );
+            splice( @{$replacables{$var}{vals}}, $i, 1, () );
 
             return if ( $key eq 'cache' );
 
@@ -1085,7 +1120,7 @@ sub irc_on_public {
             return;
         }
 
-        foreach my $v ( @{ $replacables{$var}{vals} } ) {
+        foreach my $v ( @{$replacables{$var}{vals}} ) {
             next unless lc $v eq lc $value;
 
             &say( $chl => "$bag{who}, I had it that way!" );
@@ -1093,16 +1128,19 @@ sub irc_on_public {
         }
 
         if ( exists $replacables{$var}{vals} ) {
-            push @{ $replacables{$var}{vals} }, $value;
+            push @{$replacables{$var}{vals}}, $value;
         } else {
-            push @{ $replacables{$var}{cache} }, $value;
+            push @{$replacables{$var}{cache}}, $value;
         }
         &say( $chl => "Okay, $bag{who}." );
         Report "$bag{who} added a value to \$$var in $chl: $value";
 
         &sql( "insert into bucket_values (var_id, value) values (?, ?)",
             [ $replacables{$var}{id}, $value ] );
-    } elsif ( $operator and $addressed and $bag{msg} =~ /^create var (\w+)\W*$/ ) {
+    } elsif ( $operator
+        and $addressed
+        and $bag{msg} =~ /^create var (\w+)\W*$/ )
+    {
         my $var = $1;
         if ( exists $replacables{$var} ) {
             &say( $chl =>
@@ -1110,15 +1148,14 @@ sub irc_on_public {
             return;
         }
 
-        $replacables{$var} =
-          { vals => [], perms => "read-only", type => "var" };
+        $replacables{$var} = {vals => [], perms => "read-only", type => "var"};
         Log "$bag{who} created a new variable '$var' in $chl";
         Report "$bag{who} created a new variable '$var' in $chl";
         $undo{$chl} = [ 'newvar', $bag{who}, $var, "new variable '$var'." ];
         &say( $chl => "Okay, $bag{who}." );
 
         &sql( 'insert into bucket_vars (name, perms) values (?, "read-only")',
-            [$var], { cmd => "create_var", var => $var } );
+            [$var], {cmd => "create_var", var => $var} );
     } elsif ( $operator
         and $addressed
         and $bag{msg} =~ /^remove var (\w+)\s*(!+)?$/ )
@@ -1144,7 +1181,7 @@ sub irc_on_public {
             ];
             &say(
                 $chl => "Okay, $bag{who}, removed variable \$$var with",
-                scalar @{ $replacables{$var}{vals} }, "values."
+                scalar @{$replacables{$var}{vals}}, "values."
             );
         } else {
             &say( $chl => "Okay, $bag{who}, removed variable \$$var." );
@@ -1178,13 +1215,13 @@ sub irc_on_public {
             &say( $chl => "Sorry, $bag{who}, I'm not carrying anything!" );
             return;
         }
-        $stats{detailed_inventory}{ $bag{who} } = [];
+        $stats{detailed_inventory}{$bag{who}} = [];
         my $line;
-        push @{ $stats{detailed_inventory}{ $bag{who} } }, sort @inventory;
+        push @{$stats{detailed_inventory}{$bag{who}}}, sort @inventory;
         my $c = 1;
         &say_long(
             $chl => "$bag{who}: " . join "; ",
-            map { $c++ . ": $_" } @{ $stats{detailed_inventory}{ $bag{who} } }
+            map { $c++ . ": $_" } @{$stats{detailed_inventory}{$bag{who}}}
         );
     } elsif ( $addressed and $bag{msg} =~ /^(?:inventory|list items)[?.!]?$/i )
     {
@@ -1231,17 +1268,17 @@ sub irc_on_public {
         }
 
         Log "$bag{who} set ${target}'s gender to $gender";
-        $stats{users}{genders}{ lc $target } = lc $gender;
+        $stats{users}{genders}{lc $target} = lc $gender;
         &sql( "replace genders (nick, gender, stamp) values (?, ?, ?)",
             [ $target, $gender, undef ] );
         &say( $chl => "Okay, $bag{who}" );
     } elsif ( $addressed
         and $bag{msg} =~ /^what is my gender\??$|^what gender am I\??/i )
     {
-        if ( exists $stats{users}{genders}{ lc $bag{who} } ) {
+        if ( exists $stats{users}{genders}{lc $bag{who}} ) {
             &say(
                 $chl => "$bag{who}: Grammatically, I refer to you as",
-                $stats{users}{genders}{ lc $bag{who} } . ".  See",
+                $stats{users}{genders}{lc $bag{who}} . ".  See",
                 "http://wiki.xkcd.com/irc/Bucket#Docs for information on",
                 "setting this."
             );
@@ -1251,7 +1288,7 @@ sub irc_on_public {
             &say( $chl => "$bag{who}: I don't know how to refer to you!" );
         }
     } elsif ( $addressed and $bag{msg} =~ /^what gender is ([-\w]+)\??$/i ) {
-        if ( exists $stats{users}{genders}{ lc $1 } ) {
+        if ( exists $stats{users}{genders}{lc $1} ) {
             &say( $chl => "$bag{who}: $1 is $stats{users}{genders}{lc $1}." );
         } else {
             &load_gender($1);
@@ -1267,15 +1304,16 @@ sub irc_on_public {
         and $bag{msg} =~ /^([A-Z])([A-Z])([A-Z])\??$/ )
     {
         my $pattern = "$1% $2% $3%";
-        &sql('select value
+        &sql(
+            'select value
               from bucket_values
                    left join bucket_vars
                    on var_id = bucket_vars.id
               where name = ?  and value like ?
               order by rand()
               limit 1',
-             [ &config("band_var"), $pattern ],
-             { %bag, cmd => "tla", tla => $bag{msg}, db_type => 'SINGLE', }
+            [ &config("band_var"), $pattern ],
+            {%bag, cmd => "tla", tla => $bag{msg}, db_type => 'SINGLE',}
         );
     } else {
         my $orig = $bag{msg};
@@ -1292,31 +1330,33 @@ sub irc_on_public {
                 and $type eq 'irc_public'
                 and &config("repeated_queries") > 0 )
             {
-                unless ( $stats{users}{$chl}{ $bag{who} }{last_lookup} ) {
-                    $stats{users}{$chl}{ $bag{who} }{last_lookup} =
+                unless ( $stats{users}{$chl}{$bag{who}}{last_lookup} ) {
+                    $stats{users}{$chl}{$bag{who}}{last_lookup} =
                       [ $bag{msg}, 0 ];
                 }
 
-                if ( $stats{users}{$chl}{ $bag{who} }{last_lookup}[0] eq
+                if ( $stats{users}{$chl}{$bag{who}}{last_lookup}[0] eq
                     $bag{msg} )
                 {
-                    if ( ++$stats{users}{$chl}{ $bag{who} }{last_lookup}[1] ==
+                    if ( ++$stats{users}{$chl}{$bag{who}}{last_lookup}[1] ==
                         &config("repeated_queries") )
                     {
                         Report
 "Volunteering a dump of '$bag{msg}' for $bag{who} in $chl (if it exists)";
-                        &sql('select id, verb, tidbit, mood, chance, protected
+                        &sql(
+                            'select id, verb, tidbit, mood, chance, protected
                               from bucket_facts where fact = ? order by id',
-                              [ $bag{msg} ],
-                              { %bag,
-                                cmd      => "literal",
-                                page     => "*",
-                                fact     => $bag{msg},
+                            [ $bag{msg} ],
+                            {
+                                %bag,
+                                cmd     => "literal",
+                                page    => "*",
+                                fact    => $bag{msg},
                                 db_type => 'MULTIPLE',
-                              }
+                            }
                         );
                         return;
-                    } elsif ( $stats{users}{$chl}{ $bag{who} }{last_lookup}[1] >
+                    } elsif ( $stats{users}{$chl}{$bag{who}}{last_lookup}[1] >
                         &config("repeated_queries") )
                     {
                         Log
@@ -1324,7 +1364,7 @@ sub irc_on_public {
                         return;
                     }
                 } else {
-                    $stats{users}{$chl}{ $bag{who} }{last_lookup} =
+                    $stats{users}{$chl}{$bag{who}}{last_lookup} =
                       [ $bag{msg}, 1 ];
                 }
             }
@@ -1340,14 +1380,14 @@ sub db_success {
     foreach ( keys %$res ) {
         if (    $_ eq 'RESULT'
             and ref $res->{RESULT} eq 'ARRAY'
-            and @{ $res->{RESULT} } > 50 )
+            and @{$res->{RESULT}} > 50 )
         {
-            print "RESULT: ", scalar @{ $res->{RESULT} }, "\n";
+            print "RESULT: ", scalar @{$res->{RESULT}}, "\n";
         } else {
             print "$_:\n", Dumper $res->{$_} if /BAGGAGE|PLACEHOLDERS|RESULT/;
         }
     }
-    my %bag = ref $res->{BAGGAGE} ? %{ $res->{BAGGAGE} } : ();
+    my %bag = ref $res->{BAGGAGE} ? %{$res->{BAGGAGE}} : ();
     if ( $res->{ERROR} ) {
 
         if ( $res->{ERROR} eq 'Lost connection to the database server.' ) {
@@ -1359,10 +1399,13 @@ sub db_success {
         }
         Report "DB Error: $res->{QUERY} -> $res->{ERROR}";
         Log "DB Error: $res->{QUERY} -> $res->{ERROR}";
-        if ($bag{chl} and $bag{addressed}) {
-          &say( $bag{chl} => "Something is terribly wrong. I'll be back later." );
-          &say( $channel => "Something's wrong with the database. Shutting up in $bag{chl} for an hour." );
-          &talking( $bag{chl}, time + 60*60 );
+        if ( $bag{chl} and $bag{addressed} ) {
+            &say( $bag{chl} =>
+                  "Something is terribly wrong. I'll be back later." );
+            &say( $channel =>
+"Something's wrong with the database. Shutting up in $bag{chl} for an hour."
+            );
+            &talking( $bag{chl}, time + 60 * 60 );
         }
         return;
     }
@@ -1372,11 +1415,11 @@ sub db_success {
     return if &signal_plugin( "db_success", {bag => \%bag, res => $res} );
 
     if ( $bag{cmd} eq 'fact' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
+        my %line = ref $res->{RESULT} ? %{$res->{RESULT}} : ();
         if ( defined $line{tidbit} ) {
 
             if ( $line{verb} eq '<alias>' ) {
-                if ( $bag{aliases}{ $line{tidbit} } ) {
+                if ( $bag{aliases}{$line{tidbit}} ) {
                     Report "Alias loop detected when '$line{fact}'"
                       . " is aliased to '$line{tidbit}'";
                     Log "Alias loop detected when '$line{fact}'"
@@ -1384,7 +1427,7 @@ sub db_success {
                     &error( $bag{chl}, $bag{who} );
                     return;
                 }
-                $bag{aliases}{ $line{tidbit} } = 1;
+                $bag{aliases}{$line{tidbit}} = 1;
                 $bag{alias_chain} .= "'$line{fact}' => ";
 
                 Log "Following alias '$line{fact}' -> '$line{tidbit}'";
@@ -1395,9 +1438,9 @@ sub db_success {
             $bag{msg}  = $line{fact} unless defined $bag{msg};
             $bag{orig} = $line{fact} unless defined $bag{orig};
 
-            $stats{last_vars}{ $bag{chl} }        = {};
-            $stats{last_fact}{ $bag{chl} }        = $line{id};
-            $stats{last_alias_chain}{ $bag{chl} } = $bag{alias_chain};
+            $stats{last_vars}{$bag{chl}}        = {};
+            $stats{last_fact}{$bag{chl}}        = $line{id};
+            $stats{last_alias_chain}{$bag{chl}} = $bag{alias_chain};
             $stats{lookup}++;
 
          # if we're just idle chatting, replace any $who reference with $someone
@@ -1502,16 +1545,18 @@ sub db_success {
 
             $fact = &decommify($fact);
             Log "Learning '$fact' '$verb' '$tidbit'";
-            &sql('select id, tidbit from bucket_facts
+            &sql(
+                'select id, tidbit from bucket_facts
                   where fact = ? and verb = "<alias>"',
-                  [$fact],
-                  { %bag,
-                    fact   => $fact,
-                    verb   => $verb,
-                    tidbit => $tidbit,
-                    cmd    => "unalias",
+                [$fact],
+                {
+                    %bag,
+                    fact    => $fact,
+                    verb    => $verb,
+                    tidbit  => $tidbit,
+                    cmd     => "unalias",
                     db_type => "SINGLE",
-                  }
+                }
             );
 
             return;
@@ -1556,7 +1601,8 @@ sub db_success {
 
             if ( $exp !~ /\*\*/ and $math ) {
                 my $newexp;
-                foreach my $word ( split /( |-[\d_e.]+|\*\*|[+\/%()*])/, $exp ) {
+                foreach my $word ( split /( |-[\d_e.]+|\*\*|[+\/%()*])/, $exp )
+                {
                     $word = "new $math(\"$word\")" if $word =~ /^[_0-9.e]+$/;
                     $newexp .= $word;
                 }
@@ -1674,8 +1720,7 @@ sub db_success {
             if (    &config("band_name")
                 and $bag{type} eq 'irc_public'
                 and rand(100) < &config("band_name")
-                and $bag{orig} !~ m{https?://}i
-               )
+                and $bag{orig} !~ m{https?://}i )
             {
                 my $name = $bag{orig};
                 my $nicks = join "|", map { "\Q$_" } $irc->nicks();
@@ -1692,19 +1737,21 @@ sub db_success {
                         and @words == 3
                         and $name !~ /\b[ha]{2,}\b/i )
                     {
-                        &sql('select value
+                        &sql(
+                            'select value
                               from bucket_values left join bucket_vars
                                    on bucket_vars.id = bucket_values.var_id
                               where name = "band" and value = ?
                               limit 1',
-                              [$stripped_name],
-                              { %bag,
+                            [$stripped_name],
+                            {
+                                %bag,
                                 name          => $name,
                                 stripped_name => $stripped_name,
                                 words         => \@words,
                                 cmd           => "band_name",
-                                db_type => 'SINGLE',
-                              }
+                                db_type       => 'SINGLE',
+                            }
                         );
                     }
                 }
@@ -1712,17 +1759,17 @@ sub db_success {
         }
     } elsif ( $bag{cmd} eq 'create_var' ) {
         if ( $res->{INSERTID} ) {
-            $replacables{ $bag{var} }{id} = $res->{INSERTID};
+            $replacables{$bag{var}}{id} = $res->{INSERTID};
             Log "ID for $bag{var}: $res->{INSERTID}";
         } else {
             Log "ERR: create_var called without an INSERTID!";
         }
     } elsif ( $bag{cmd} eq 'load_gender' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
-        $stats{users}{genders}{ lc $bag{nick} } =
+        my %line = ref $res->{RESULT} ? %{$res->{RESULT}} : ();
+        $stats{users}{genders}{lc $bag{nick}} =
           lc( $line{gender} || "androgynous" );
     } elsif ( $bag{cmd} eq 'load_vars' ) {
-        my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
+        my @lines = ref $res->{RESULT} ? @{$res->{RESULT}} : [];
         my ( @small, @large );
         foreach my $line (@lines) {
             if ( $line->{num} > &config("value_cache_limit") ) {
@@ -1737,37 +1784,39 @@ sub db_success {
         if (@small) {
 
             # load the smaller variables
-            &sql('select vars.id id, name, perms, type, value
+            &sql(
+                'select vars.id id, name, perms, type, value
                   from bucket_vars vars
                        left join bucket_values vals
                        on vars.id = vals.var_id
                   where name in (' . join( ",", map { "?" } @small ) . ')
                   order by vars.id',
-                  \@small,
-                  { cmd => "load_vars_cache", db_type => 'MULTIPLE'},
+                \@small,
+                {cmd => "load_vars_cache", db_type => 'MULTIPLE'},
             );
         }
 
         # make note of the larger variables, and preload a cache
         foreach my $var (@large) {
-            &sql('select vars.id id, name, perms, type, value
+            &sql(
+                'select vars.id id, name, perms, type, value
                   from bucket_vars vars
                        left join bucket_values vals
                        on vars.id = vals.var_id
                   where name = ?
                   order by rand()
                   limit 10',
-                  [$var],
-                  { cmd => "load_vars_large", db_type => 'MULTIPLE'}
+                [$var],
+                {cmd => "load_vars_large", db_type => 'MULTIPLE'}
             );
         }
     } elsif ( $bag{cmd} eq 'load_vars_large' ) {
-        my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
+        my @lines = ref $res->{RESULT} ? @{$res->{RESULT}} : [];
 
         Log "Loading large replacables: $lines[0]{name}";
         foreach my $line (@lines) {
-            unless ( exists $replacables{ $line->{name} } ) {
-                $replacables{ $line->{name} } = {
+            unless ( exists $replacables{$line->{name}} ) {
+                $replacables{$line->{name}} = {
                     cache => [],
                     perms => $line->{perms},
                     id    => $line->{id},
@@ -1775,15 +1824,15 @@ sub db_success {
                 };
             }
 
-            push @{ $replacables{ $line->{name} }{cache} }, $line->{value};
+            push @{$replacables{$line->{name}}{cache}}, $line->{value};
         }
     } elsif ( $bag{cmd} eq 'load_vars_cache' ) {
-        my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
+        my @lines = ref $res->{RESULT} ? @{$res->{RESULT}} : [];
 
         Log "Loading small replacables";
         foreach my $line (@lines) {
-            unless ( exists $replacables{ $line->{name} } ) {
-                $replacables{ $line->{name} } = {
+            unless ( exists $replacables{$line->{name}} ) {
+                $replacables{$line->{name}} = {
                     vals  => [],
                     perms => $line->{perms},
                     id    => $line->{id},
@@ -1791,12 +1840,12 @@ sub db_success {
                 };
             }
 
-            push @{ $replacables{ $line->{name} }{vals} }, $line->{value};
+            push @{$replacables{$line->{name}}{vals}}, $line->{value};
         }
 
         Log "Loaded vars:",
           &make_list(
-            map { "$_ (" . scalar @{ $replacables{$_}{vals} } . ")" }
+            map { "$_ (" . scalar @{$replacables{$_}{vals}} . ")" }
             sort keys %replacables
           );
     } elsif ( $bag{cmd} eq 'dump_var' ) {
@@ -1808,7 +1857,7 @@ sub db_success {
         my $url = &config("www_url") . "/" . uri_escape("var_$bag{name}.txt");
         if ( open( DUMP, ">", &config("www_root") . "/var_$bag{name}.txt" ) ) {
             my $count = 0;
-            foreach ( @{ $res->{RESULT} } ) {
+            foreach ( @{$res->{RESULT}} ) {
                 print DUMP "$_->{value}\n";
                 $count++;
             }
@@ -1820,12 +1869,12 @@ sub db_success {
                   "Sorry, $bag{who}, failed to dump out $bag{name}: $!" );
         }
     } elsif ( $bag{cmd} eq 'band_name' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
+        my %line = ref $res->{RESULT} ? %{$res->{RESULT}} : ();
         unless ( $line{value} ) {
             &check_band_name( \%bag );
         }
     } elsif ( $bag{cmd} eq 'edit' ) {
-        my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
+        my @lines = ref $res->{RESULT} ? @{$res->{RESULT}} : [];
 
         unless (@lines) {
             &error( $bag{chl}, $bag{who} );
@@ -1842,7 +1891,7 @@ sub db_success {
         $gflag = ( $bag{op} and $bag{flag} =~ s/g//g );
         $iflag = ( $bag{flag} =~ s/i//g ? "i" : "" );
         my $count = 0;
-        $undo{ $bag{chl} } = [
+        $undo{$bag{chl}} = [
             'edit', $bag{who},
             [],     "$lines[0]->{fact} =~ s/$bag{old}/$bag{new}/"
         ];
@@ -1891,7 +1940,7 @@ sub db_success {
                        where id=? limit 1',
                     [ $verb, $tidbit, $line->{id} ],
                 );
-                push @{ $undo{ $bag{chl} }[2] },
+                push @{$undo{$bag{chl}}[2]},
                   [ 'update', $line->{id}, $line->{verb}, $line->{tidbit} ];
             } elsif ( $bag{op} ) {
                 $stats{deleted}++;
@@ -1903,7 +1952,7 @@ sub db_success {
                     'delete from bucket_facts where id=? limit 1',
                     [ $line->{id} ],
                 );
-                push @{ $undo{ $bag{chl} }[2] }, [ 'insert', {%$line} ];
+                push @{$undo{$bag{chl}}[2]}, [ 'insert', {%$line} ];
             } else {
                 &error( $bag{chl}, $bag{who} );
                 Log "$bag{who}: $line->{fact} =~ s/// failed";
@@ -1914,7 +1963,7 @@ sub db_success {
             }
             &say( $bag{chl} => "Okay, $bag{who}, factoid updated." );
 
-            if ( exists $fcache{ lc $line->{fact} } ) {
+            if ( exists $fcache{lc $line->{fact}} ) {
                 Log "Updating cache for '$line->{fact}'";
                 &cache( $_[KERNEL], $line->{fact} );
             }
@@ -1929,7 +1978,7 @@ sub db_success {
             }
             &say( $bag{chl} => "Okay, $bag{who}; $count." );
 
-            if ( exists $fcache{ lc $bag{fact} } ) {
+            if ( exists $fcache{lc $bag{fact}} ) {
                 Log "Updating cache for '$bag{fact}'";
                 &cache( $_[KERNEL], $bag{fact} );
             }
@@ -1939,14 +1988,14 @@ sub db_success {
         &error( $bag{chl}, $bag{who} );
         Log "$bag{who}: $bag{fact} =~ s/// failed";
     } elsif ( $bag{cmd} eq 'forget' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
+        my %line = ref $res->{RESULT} ? %{$res->{RESULT}} : ();
         unless ( keys %line ) {
             &error( $bag{chl}, $bag{who} );
             Log "Nothing to forget in '$bag{id}'";
             return;
         }
 
-        $undo{ $bag{chl} } = [ 'insert', $bag{who}, \%line ];
+        $undo{$bag{chl}} = [ 'insert', $bag{who}, \%line ];
         Report "$bag{who} called forget to delete "
           . "'$line{fact}', '$line{verb}', '$line{tidbit}'";
         Log "forgetting $bag{fact}";
@@ -1956,28 +2005,28 @@ sub db_success {
             "$line{fact} $line{verb} $line{tidbit}"
         );
     } elsif ( $bag{cmd} eq 'delete_id' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
+        my %line = ref $res->{RESULT} ? %{$res->{RESULT}} : ();
         unless ( $line{fact} ) {
             &error( $bag{chl}, $bag{who} );
             Log "Nothing found in id $bag{fact}";
             return;
         }
 
-        $undo{ $bag{chl} } = [ 'insert', $bag{who}, \%line, $bag{fact} ];
+        $undo{$bag{chl}} = [ 'insert', $bag{who}, \%line, $bag{fact} ];
         Report "$bag{who} deleted '$line{fact}' (#$bag{fact}) in $bag{chl}";
         Log "deleting $bag{fact}";
         &sql( 'delete from bucket_facts where id=?', [ $bag{fact} ], );
         &say( $bag{chl} => "Okay, $bag{who}, deleted "
               . "'$line{fact} $line{verb} $line{tidbit}'." );
     } elsif ( $bag{cmd} eq 'delete' ) {
-        my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : ();
+        my @lines = ref $res->{RESULT} ? @{$res->{RESULT}} : ();
         unless (@lines) {
             &error( $bag{chl}, $bag{who} );
             Log "Nothing to delete in '$bag{fact}'";
             return;
         }
 
-        $undo{ $bag{chl} } = [ 'insert', $bag{who}, \@lines, $bag{fact} ];
+        $undo{$bag{chl}} = [ 'insert', $bag{who}, \@lines, $bag{fact} ];
         Report "$bag{who} deleted '$bag{fact}' in $bag{chl}";
         Log "deleting $bag{fact}";
         &sql( 'delete from bucket_facts where fact=?', [ $bag{fact} ], );
@@ -1987,29 +2036,32 @@ sub db_success {
               . scalar @lines
               . " factoid$s deleted." );
     } elsif ( $bag{cmd} eq 'unalias' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
+        my %line = ref $res->{RESULT} ? %{$res->{RESULT}} : ();
         my $fact = $bag{fact};
         if ( $line{id} ) {
             Log "Dealiased $fact => $line{tidbit}";
             $fact = $line{tidbit};
         }
 
-        &sql('select id from bucket_facts where fact = ? and tidbit = ?',
+        &sql(
+            'select id from bucket_facts where fact = ? and tidbit = ?',
             [ $fact, $bag{tidbit} ],
-            { %bag, fact => $fact, cmd  => "learn1", db_type => 'SINGLE', }
+            {%bag, fact => $fact, cmd => "learn1", db_type => 'SINGLE',}
         );
     } elsif ( $bag{cmd} eq 'learn1' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
+        my %line = ref $res->{RESULT} ? %{$res->{RESULT}} : ();
         if ( $line{id} ) {
             &say( $bag{chl} => "$bag{who}: I already had it that way" );
             return;
         }
 
-        &sql('select protected from bucket_facts where fact = ?',
-            [ $bag{fact} ], { %bag, cmd => "learn2", db_type => 'SINGLE', }
+        &sql(
+            'select protected from bucket_facts where fact = ?',
+            [ $bag{fact} ],
+            {%bag, cmd => "learn2", db_type => 'SINGLE',}
         );
     } elsif ( $bag{cmd} eq 'learn2' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
+        my %line = ref $res->{RESULT} ? %{$res->{RESULT}} : ();
         if ( $line{protected} ) {
             if ( $bag{op} ) {
                 unless ( $bag{forced} ) {
@@ -2048,16 +2100,16 @@ sub db_success {
             'insert bucket_facts (fact, verb, tidbit, protected)
                      values (?, ?, ?, ?)',
             [ $bag{fact}, $bag{verb}, $bag{tidbit}, $line{protected} || 0 ],
-            { %bag, cmd => "learn3" }
+            {%bag, cmd => "learn3"}
         );
     } elsif ( $bag{cmd} eq 'learn3' ) {
         if ( $res->{INSERTID} ) {
-            $undo{ $bag{chl} } = [
+            $undo{$bag{chl}} = [
                 'delete',         $bag{who},
                 $res->{INSERTID}, "that '$bag{fact}' is '$bag{tidbit}'"
             ];
 
-            $stats{last_fact}{ $bag{chl} } = $res->{INSERTID};
+            $stats{last_fact}{$bag{chl}} = $res->{INSERTID};
 
             Report "$bag{who} taught in $bag{chl} (#$res->{INSERTID}):"
               . " '$bag{fact}', '$bag{verb}', '$bag{tidbit}'";
@@ -2075,12 +2127,12 @@ sub db_success {
         }
         &say( $bag{chl} => $ack );
 
-        if ( exists $fcache{ lc $bag{fact} } ) {
+        if ( exists $fcache{lc $bag{fact}} ) {
             Log "Updating cache for '$bag{fact}'";
             &cache( $_[KERNEL], $bag{fact} );
         }
     } elsif ( $bag{cmd} eq 'merge' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
+        my %line = ref $res->{RESULT} ? %{$res->{RESULT}} : ();
         Report "$bag{who} merged in $bag{chl} '$bag{src}' with '$bag{dst}'";
         Log "$bag{who} merged '$bag{src}' with '$bag{dst}'";
         if ( $line{id} and $line{verb} eq '<alias>' ) {
@@ -2101,9 +2153,9 @@ sub db_success {
         );
 
         &say( $bag{chl} => "Okay, $bag{who}." );
-        $undo{ $bag{chl} } = ['merge'];
+        $undo{$bag{chl}} = ['merge'];
     } elsif ( $bag{cmd} eq 'alias1' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
+        my %line = ref $res->{RESULT} ? %{$res->{RESULT}} : ();
         if ( $line{id} and $line{verb} ne '<alias>' ) {
             &say( $bag{chl} => "Sorry, $bag{who}, "
                   . "there is already a factoid for '$bag{src}'." );
@@ -2116,32 +2168,32 @@ sub db_success {
             'insert bucket_facts (fact, verb, tidbit, protected)
                      values (?, "<alias>", ?, 1)',
             [ $bag{src}, $bag{dst} ],
-            { %bag, fact => $bag{src}, tidbit => $bag{dst}, cmd => "learn3" }
+            {%bag, fact => $bag{src}, tidbit => $bag{dst}, cmd => "learn3"}
         );
     } elsif ( $bag{cmd} eq 'cache' ) {
-        my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
-        $fcache{ lc $bag{key} } = [];
+        my @lines = ref $res->{RESULT} ? @{$res->{RESULT}} : [];
+        $fcache{lc $bag{key}} = [];
         foreach my $line (@lines) {
-            $fcache{ lc $bag{key} } = [@lines];
+            $fcache{lc $bag{key}} = [@lines];
         }
         Log "Cached " . scalar(@lines) . " factoids for $bag{key}";
     } elsif ( $bag{cmd} eq 'report' ) {
-        my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
+        my %line = ref $res->{RESULT} ? %{$res->{RESULT}} : ();
 
         if ( $line{id} ) {
-            if ( keys %{ $stats{last_vars}{ $bag{chl} } } ) {
-                my $report = Dumper( $stats{last_vars}{ $bag{chl} } );
+            if ( keys %{$stats{last_vars}{$bag{chl}}} ) {
+                my $report = Dumper( $stats{last_vars}{$bag{chl}} );
                 $report =~ s/\n//g;
                 $report =~ s/\$VAR1 = //;
                 $report =~ s/  +/ /g;
                 &say(   $bag{chl} => "$bag{who}: That was "
-                      . ( $stats{last_alias_chain}{ $bag{chl} } || "" )
+                      . ( $stats{last_alias_chain}{$bag{chl}} || "" )
                       . "'$line{fact}' "
                       . "(#$bag{id}): $line{verb} $line{tidbit};  "
                       . "vars used: $report." );
             } else {
                 &say(   $bag{chl} => "$bag{who}: That was "
-                      . ( $stats{last_alias_chain}{ $bag{chl} } || "" )
+                      . ( $stats{last_alias_chain}{$bag{chl}} || "" )
                       . "'$line{fact}' "
                       . "(#$bag{id}): $line{verb} $line{tidbit}" );
             }
@@ -2149,7 +2201,7 @@ sub db_success {
             &say( $bag{chl} => "$bag{who}: No idea!" );
         }
     } elsif ( $bag{cmd} eq 'literal' ) {
-        my @lines = ref $res->{RESULT} ? @{ $res->{RESULT} } : [];
+        my @lines = ref $res->{RESULT} ? @{$res->{RESULT}} : [];
 
         unless (@lines) {
             if ( $bag{addressed} ) {
@@ -2164,14 +2216,16 @@ sub db_success {
 
         if ( $lines[0]->{verb} eq "<alias>" ) {
             my $new_fact = $lines[0]->{tidbit};
-            &sql('select id, verb, tidbit, mood, chance, protected from
+            &sql(
+                'select id, verb, tidbit, mood, chance, protected from
                   bucket_facts where fact = ? order by id',
-                  [$new_fact],
-                  { %bag,
+                [$new_fact],
+                {
+                    %bag,
                     cmd      => "literal",
                     alias_to => $new_fact,
-                    db_type => 'MULTIPLE',
-                  }
+                    db_type  => 'MULTIPLE',
+                }
             );
             Report "Asked for the 'literal' of an alias,"
               . " being smart and redirecting to '$new_fact'";
@@ -2264,7 +2318,7 @@ sub db_success {
         $stats{stats_cached} = time;
     } elsif ( $bag{cmd} eq 'itemcache' ) {
         @random_items =
-          ref $res->{RESULT} ? map { $_->{what} } @{ $res->{RESULT} } : [];
+          ref $res->{RESULT} ? map { $_->{what} } @{$res->{RESULT}} : [];
         Log "Updated random item cache: ", join ", ", @random_items;
 
         if ( $stats{preloaded_items} ) {
@@ -2283,7 +2337,7 @@ sub db_success {
         if ( $res->{RESULT}{value} ) {
             $stats{lookup_tla}++;
             $bag{tla} =~ s/\W//g;
-            $stats{last_fact}{ $bag{chl} } = "a possible meaning of $bag{tla}.";
+            $stats{last_fact}{$bag{chl}} = "a possible meaning of $bag{tla}.";
             &say(
                 $bag{chl} => "$bag{who}: " . join " ",
                 map { ucfirst }
@@ -2308,12 +2362,13 @@ sub irc_start {
     $irc->plugin_add( Connector => $_[HEAP]->{connector} );
 
     # find out which variables should be preloaded
-    &sql('select name, count(value) num
+    &sql(
+        'select name, count(value) num
           from bucket_vars vars
                left join bucket_values
                on vars.id = var_id
           group by name', undef,
-          { cmd => "load_vars", db_type => 'MULTIPLE' }
+        {cmd => "load_vars", db_type => 'MULTIPLE'}
     );
 
     foreach my $reply (
@@ -2364,7 +2419,7 @@ sub irc_on_notice {
 
     Log("Notice from $who: $msg");
 
-    return if &signal_plugin( "on_notice", { who => $who, msg => $msg } );
+    return if &signal_plugin( "on_notice", {who => $who, msg => $msg} );
 
     return if $stats{identified};
     if (
@@ -2391,29 +2446,29 @@ sub irc_on_nick {
     my ($who) = split /!/, $_[ARG0];
     my $newnick = $_[ARG1];
 
-    return if &signal_plugin( "on_nick", { who => $who, newnick => $newnick } );
+    return if &signal_plugin( "on_nick", {who => $who, newnick => $newnick} );
 
-    return unless exists $stats{users}{genders}{ lc $who };
-    $stats{users}{genders}{ lc $newnick } =
-      delete $stats{users}{genders}{ lc $who };
+    return unless exists $stats{users}{genders}{lc $who};
+    $stats{users}{genders}{lc $newnick} =
+      delete $stats{users}{genders}{lc $who};
     &sql( "update genders set nick=? where nick=? limit 1",
         [ $newnick, $who ] );
     &load_gender($newnick);
 }
 
 sub irc_on_jointopic {
-    my ( $chl, $topic ) = @{ $_[ARG2] }[ 0, 1 ];
+    my ( $chl, $topic ) = @{$_[ARG2]}[ 0, 1 ];
     $topic =~ s/ ARRAY\(0x\w+\)$//;
 
-    return if &signal_plugin( "jointopic", { chl => $chl, topic => $topic } );
+    return if &signal_plugin( "jointopic", {chl => $chl, topic => $topic} );
 }
 
 sub irc_on_join {
     my ($who) = split /!/, $_[ARG0];
 
-    return if &signal_plugin( "on_join", { who => $who } );
+    return if &signal_plugin( "on_join", {who => $who} );
 
-    return if exists $stats{users}{genders}{ lc $who };
+    return if exists $stats{users}{genders}{lc $who};
 
     &load_gender($who);
 }
@@ -2422,12 +2477,11 @@ sub irc_on_chan_sync {
     my $chl = $_[ARG0];
     Log "Sync done for $chl";
 
-    return if &signal_plugin( "on_chan_sync", { chl => $chl } );
+    return if &signal_plugin( "on_chan_sync", {chl => $chl} );
 
     if ( not &DEBUG and $chl eq $channel ) {
         Log("Autojoining channels");
-        foreach my $chl ( &config("logchannel"), keys %{ $config->{autojoin} } )
-        {
+        foreach my $chl ( &config("logchannel"), keys %{$config->{autojoin}} ) {
             $irc->yield( join => $chl );
             Log("... $chl");
         }
@@ -2477,7 +2531,7 @@ sub inventory {
 
 sub cached_reply {
     my ( $chl, $who, $extra, $type ) = @_;
-    my $line = $fcache{$type}[ rand( @{ $fcache{$type} } ) ];
+    my $line = $fcache{$type}[ rand( @{$fcache{$type}} ) ];
     Log "cached '$type' reply: $line->{verb} $line->{tidbit}";
 
     my $tidbit = $line->{tidbit};
@@ -2541,19 +2595,20 @@ sub cached_reply {
 
 sub cache {
     my ( $kernel, $key ) = @_;
-    &sql('select verb, tidbit from bucket_facts where fact = ?',
-        [$key], { cmd => "cache", key => $key, db_type => 'MULTIPLE' }
-    );
+    &sql( 'select verb, tidbit from bucket_facts where fact = ?',
+        [$key], {cmd => "cache", key => $key, db_type => 'MULTIPLE'} );
 }
 
 sub get_stats {
     my ($kernel) = @_;
 
     Log "Updating stats";
-    &sql('select count(distinct fact) c from bucket_facts', undef,
-         { cmd => "stats1", db_type => 'SINGLE' } );
-    &sql('select count(id) c from bucket_facts', undef, { cmd => "stats2, db_type => 'SINGLE'" } );
-    &sql('select count(id) c from bucket_items', undef, { cmd => "stats3, db_type => 'SINGLE'" } );
+    &sql( 'select count(distinct fact) c from bucket_facts',
+        undef, {cmd => "stats1", db_type => 'SINGLE'} );
+    &sql( 'select count(id) c from bucket_facts',
+        undef, {cmd => "stats2, db_type => 'SINGLE'"} );
+    &sql( 'select count(id) c from bucket_items',
+        undef, {cmd => "stats3, db_type => 'SINGLE'"} );
 
     $stats{last_updated} = time;
 
@@ -2622,7 +2677,7 @@ sub heartbeat {
 
     return
       if &config("random_wait") == 0
-          or time - $last_activity{$chl} < 60 * &config("random_wait");
+      or time - $last_activity{$chl} < 60 * &config("random_wait");
 
     return if $stats{last_idle_time}{$chl} > $last_activity{$chl};
 
@@ -2661,7 +2716,7 @@ sub heartbeat {
 
     if ( $source ne 'factoid' ) {
         Log "Looking up $source story";
-        my ( $story, $url ) = &read_rss( @{ $sources{$source} } );
+        my ( $story, $url ) = &read_rss( @{$sources{$source}} );
         if ($story) {
             &say( $chl => $story );
             $stats{last_fact}{$chl} = $url;
@@ -2670,10 +2725,10 @@ sub heartbeat {
     }
 
     &lookup(
-        chl  => $chl,
-        who  => $nick,
-        idle => 1,
-        exclude_verb => [split(',',&config("random_exclude_verbs"))],
+        chl          => $chl,
+        who          => $nick,
+        idle         => 1,
+        exclude_verb => [ split( ',', &config("random_exclude_verbs") ) ],
     );
 }
 
@@ -2701,14 +2756,14 @@ sub get_item {
 sub someone {
     my $channel = shift;
     my @exclude = @_;
-    my %nicks   = map { lc $_ => $_ } keys %{ $stats{users}{$channel} };
+    my %nicks   = map { lc $_ => $_ } keys %{$stats{users}{$channel}};
 
     # we're never someone
     delete $nicks{$nick};
 
     # ignore people who asked to be excluded
     if ( ref $config->{exclude} ) {
-        delete @nicks{ map { lc } keys %{ $config->{exclude} } };
+        delete @nicks{map { lc } keys %{$config->{exclude}}};
     }
 
     # if we were supplied additional nicks to ignore, remove them
@@ -2721,17 +2776,17 @@ sub someone {
 }
 
 sub clear_cache {
-    foreach my $channel ( keys %{ $stats{users} } ) {
+    foreach my $channel ( keys %{$stats{users}} ) {
         next if $channel !~ /^#/;
-        foreach my $user ( keys %{ $stats{users}{$channel} } ) {
+        foreach my $user ( keys %{$stats{users}{$channel}} ) {
             delete $stats{users}{$channel}{$user}
               if $stats{users}{$channel}{$user}{last_active} <
-                  time - &config("user_activity_timeout");
+              time - &config("user_activity_timeout");
         }
     }
 
-    foreach my $chl ( keys %{ $stats{last_talk} } ) {
-        foreach my $user ( keys %{ $stats{last_talk}{$chl} } ) {
+    foreach my $chl ( keys %{$stats{last_talk}} ) {
+        foreach my $user ( keys %{$stats{last_talk}{$chl}} ) {
             if ( not $stats{last_talk}{$chl}{$user}{when}
                 or $stats{last_talk}{$chl}{$user}{when} >
                 &config("user_activity_timeout") )
@@ -2755,9 +2810,8 @@ sub random_item_cache {
         return;
     }
 
-    &sql("select what, user from bucket_items order by rand() limit $limit",
-        undef, { cmd => "itemcache", db_type => 'MULTIPLE' }
-    );
+    &sql( "select what, user from bucket_items order by rand() limit $limit",
+        undef, {cmd => "itemcache", db_type => 'MULTIPLE'} );
 }
 
 # here's the story.  put_item is called either when someone hands us a new
@@ -2874,7 +2928,7 @@ sub say {
 
     my %data = ( chl => $chl, text => $text );
     return if &signal_plugin( "say", \%data );
-    ($chl, $text) = ($data{chl}, $data{text});
+    ( $chl, $text ) = ( $data{chl}, $data{text} );
 
     if ( $chl =~ m#^/# ) {
         Log "Writing to '$chl'";
@@ -2906,7 +2960,7 @@ sub do {
 
     my %data = ( chl => $chl, text => $action );
     return if &signal_plugin( "do", \%data );
-    ($chl, $action) = ($data{chl}, $data{text});
+    ( $chl, $action ) = ( $data{chl}, $data{text} );
 
     if ( $chl =~ m#^/# ) {
         if ( open FO, ">>", $chl ) {
@@ -2925,9 +2979,8 @@ sub load_gender {
     my $who = shift;
 
     Log "Looking up ${who}'s gender...";
-    &sql('select gender from genders where nick = ? limit 1', [$who],
-         { cmd => 'load_gender', nick => $who, db_type => 'SINGLE' }
-    );
+    &sql( 'select gender from genders where nick = ? limit 1',
+        [$who], {cmd => 'load_gender', nick => $who, db_type => 'SINGLE'} );
 }
 
 sub lookup {
@@ -2944,8 +2997,8 @@ sub lookup {
         $params{msg}  = &decommify( $params{msg} );
         @placeholders = ( $params{msg} );
     } elsif ( exists $params{msgs} ) {
-        $sql = "fact in (" . join( ", ", map { "?" } @{ $params{msgs} } ) . ")";
-        @placeholders = map { &decommify($_) } @{ $params{msgs} };
+        $sql = "fact in (" . join( ", ", map { "?" } @{$params{msgs}} ) . ")";
+        @placeholders = map { &decommify($_) } @{$params{msgs}};
         $type = "multiple";
     } else {
         $sql  = "1";
@@ -2956,8 +3009,9 @@ sub lookup {
         $sql .= " and verb = ?";
         push @placeholders, $params{verb};
     } elsif ( exists $params{exclude_verb} ) {
-        $sql .= " and verb not in (" . join( ", ", map { "?" } @{ $params{exclude_verb} } ) . ")";
-        push @placeholders, @{ $params{exclude_verb} };
+        $sql .= " and verb not in ("
+          . join( ", ", map { "?" } @{$params{exclude_verb}} ) . ")";
+        push @placeholders, @{$params{exclude_verb}};
     }
 
     if ( $params{starts} ) {
@@ -2968,17 +3022,19 @@ sub lookup {
         push @placeholders, "\%$params{search}\%";
     }
 
-    &sql("select id, fact, verb, tidbit from bucket_facts
+    &sql(
+        "select id, fact, verb, tidbit from bucket_facts
           where $sql order by rand(" . int( rand(1e6) ) . ') limit 1',
-          \@placeholders,
-          { %params,
+        \@placeholders,
+        {
+            %params,
             cmd       => "fact",
             orig      => $params{orig} || $params{msg},
             addressed => $params{addressed} || 0,
             editable  => $params{editable} || 0,
             op        => $params{op} || 0,
             type      => $params{type} || "irc_public",
-            db_type => 'SINGLE',
+            db_type   => 'SINGLE',
         }
     );
 }
@@ -3001,7 +3057,7 @@ sub sql {
 sub expand {
     my ( $who, $chl, $msg, $editable, $to ) = @_;
 
-    my $gender = $stats{users}{genders}{ lc $who };
+    my $gender = $stats{users}{genders}{lc $who};
     my $target = $who;
     while ( $msg =~ /(?<!\\)(\$who\b|\${who})/i ) {
         my $cased = &set_case( $1, $who );
@@ -3015,9 +3071,9 @@ sub expand {
             my $rnick = &someone( $chl, $who, defined $to ? $to : () );
             my $cased = &set_case( $1, $rnick );
             last unless $msg =~ s/\$someone\b|\${someone}/$cased/i;
-            push @{ $stats{last_vars}{$chl}{someone} }, $rnick;
+            push @{$stats{last_vars}{$chl}{someone}}, $rnick;
 
-            $gender = $stats{users}{genders}{ lc $rnick };
+            $gender = $stats{users}{genders}{lc $rnick};
             $target = $rnick;
         }
     }
@@ -3028,9 +3084,9 @@ sub expand {
         }
         my $cased = &set_case( $1, $to );
         last unless $msg =~ s/(?<!\\)(?:\$to\b|\${to})/$cased/i;
-        push @{ $stats{last_vars}{$chl}{to} }, $to;
+        push @{$stats{last_vars}{$chl}{to}}, $to;
 
-        $gender = $stats{users}{genders}{ lc $to };
+        $gender = $stats{users}{genders}{lc $to};
         $target = $to;
     }
 
@@ -3041,26 +3097,26 @@ sub expand {
             my $give  = $editable && $giveflag;
             my $item  = &get_item($give);
             my $cased = &set_case( $1, $item );
-            push @{ $stats{last_vars}{$chl}{item} },
+            push @{$stats{last_vars}{$chl}{item}},
               $give ? "$item (given)" : $item;
             last
               unless $msg =~
-                  s/(?<!\\)(?:\$${giveflag}item|\${${giveflag}item})/$cased/i;
+              s/(?<!\\)(?:\$${giveflag}item|\${${giveflag}item})/$cased/i;
         } else {
             $msg =~
               s/(?<!\\)(?:\$${giveflag}item|\${${giveflag}item})/bananas/i;
-            push @{ $stats{last_vars}{$chl}{item} }, "(bananas)";
+            push @{$stats{last_vars}{$chl}{item}}, "(bananas)";
         }
     }
     delete $stats{last_vars}{$chl}{item}
-      unless @{ $stats{last_vars}{$chl}{item} };
+      unless @{$stats{last_vars}{$chl}{item}};
 
     $stats{last_vars}{$chl}{newitem} = [];
     while ( $msg =~ /(?<!\\)(\$(new|get)item|\${(new|get)item})/i ) {
-        my $keep = lc($2 || $3);
+        my $keep = lc( $2 || $3 );
         if ($editable) {
             my $newitem = shift @random_items || 'bananas';
-            if ($keep eq 'new') {
+            if ( $keep eq 'new' ) {
                 my ( $rc, @dropped ) = &put_item( $newitem, 1 );
                 if ( $rc == 2 ) {
                     $stats{last_vars}{$chl}{dropped} = \@dropped;
@@ -3070,14 +3126,16 @@ sub expand {
             }
 
             my $cased = &set_case( $1, $newitem );
-            last unless $msg =~ s/(?<!\\)(?:\$${keep}item|\${${keep}item})/$cased/i;
-            push @{ $stats{last_vars}{$chl}{newitem} }, $newitem;
+            last
+              unless $msg =~
+              s/(?<!\\)(?:\$${keep}item|\${${keep}item})/$cased/i;
+            push @{$stats{last_vars}{$chl}{newitem}}, $newitem;
         } else {
             $msg =~ s/(?<!\\)(?:\$${keep}item|\${${keep}item})/bananas/ig;
         }
     }
     delete $stats{last_vars}{$chl}{newitem}
-      unless @{ $stats{last_vars}{$chl}{newitem} };
+      unless @{$stats{last_vars}{$chl}{newitem}};
 
     if ($gender) {
         foreach my $gvar ( keys %gender_vars ) {
@@ -3113,10 +3171,10 @@ sub expand {
 
         # yay for special cases!
         my $conjugate;
-        my $record = $replacables{ lc $var };
+        my $record = $replacables{lc $var};
         my $full   = $var;
         if ( not $record and $var =~ s/ed$//i ) {
-            $record = $replacables{ lc $var };
+            $record = $replacables{lc $var};
             if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&past;
                 Log "Special case *ed";
@@ -3127,7 +3185,7 @@ sub expand {
         }
 
         if ( not $record and $var =~ s/ing$//i ) {
-            $record = $replacables{ lc $var };
+            $record = $replacables{lc $var};
             if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&gerund;
                 Log "Special case *ing";
@@ -3138,7 +3196,7 @@ sub expand {
         }
 
         if ( not $record and $var =~ s/s$//i ) {
-            $record = $replacables{ lc $var };
+            $record = $replacables{lc $var};
             if ( $record and $record->{type} eq 'verb' ) {
                 $conjugate = \&s_form;
                 Log "Special case *s (verb)";
@@ -3164,17 +3222,18 @@ sub expand {
             $replacement = &set_case( $var, $replacement );
             $replacement = A($replacement) if $2;
 
-            if ( exists $record->{cache} and not @{ $record->{cache} } ) {
+            if ( exists $record->{cache} and not @{$record->{cache}} ) {
                 Log "Refilling cache for $full";
-                &sql('select vars.id id, name, perms, type, value
+                &sql(
+                    'select vars.id id, name, perms, type, value
                       from bucket_vars vars
                            left join bucket_values vals
                            on vars.id = vals.var_id
                       where name = ?
                       order by rand()
                       limit 20',
-                      [$full],
-                      { cmd => "load_vars_large", db_type => 'MULTIPLE' }
+                    [$full],
+                    {cmd => "load_vars_large", db_type => 'MULTIPLE'}
                 );
             }
 
@@ -3187,7 +3246,7 @@ sub expand {
 
             $msg =~
               s/(?:\ban? )?(?<!\\)\$(?:$full|{$full})(?:\b|$)/$replacement/i;
-            push @{ $stats{last_vars}{$chl}{$full} }, $replacement;
+            push @{$stats{last_vars}{$chl}{$full}}, $replacement;
         }
 
         Log " => $msg";
@@ -3227,8 +3286,8 @@ sub get_var {
     return "\$$var" unless $record->{vals} or $record->{cache};
     my @values =
       exists $record->{vals}
-      ? @{ $record->{vals} }
-      : ( shift @{ $record->{cache} } );
+      ? @{$record->{vals}}
+      : ( shift @{$record->{cache}} );
     return "\$$var" unless @values;
     my $value = $values[ rand @values ];
     $value =~ s/\$//g;
@@ -3308,9 +3367,9 @@ sub check_band_name {
     my $handles = &get_band_name_handles();
     return unless $handles;
 
-    return unless ref $bag->{words} eq 'ARRAY' and @{ $bag->{words} } == 3;
+    return unless ref $bag->{words} eq 'ARRAY' and @{$bag->{words}} == 3;
     $bag->{start} = time;
-    my @trimmed_words = map { s/[^0-9a-zA-Z'\-]//g; lc $_ } @{ $bag->{words} };
+    my @trimmed_words = map { s/[^0-9a-zA-Z'\-]//g; lc $_ } @{$bag->{words}};
     if (   $trimmed_words[0] eq $trimmed_words[1]
         or $trimmed_words[0] eq $trimmed_words[2]
         or $trimmed_words[1] eq $trimmed_words[2] )
@@ -3384,10 +3443,11 @@ sub check_band_name {
 
     if ( @union > 0 ) {
         Log "Union ids: " . @union;
-        my $sth = $handles->{dbh}->prepare(
-            "select line from word2line where word = ?  and line in (?"
-              . ( ",?" x ( @union - 1 ) ) . ") limit 1"
-        );
+        my $sth =
+          $handles->{dbh}->prepare(
+                "select line from word2line where word = ?  and line in (?"
+              . ( ",?" x ( @union - 1 ) )
+              . ") limit 1" );
 
         my $res = $sth->execute( $delayed->{id}, @union );
         $found = $res > 0;
@@ -3409,7 +3469,7 @@ sub add_new_band {
         'insert into bucket_values (var_id, value)
          values ( (select id from bucket_vars where name = ? limit 1), ?);',
         [ &config("band_var"), $bag->{stripped_name} ],
-        { %$bag, cmd => "new band name" }
+        {%$bag, cmd => "new band name"}
     );
 
     $bag->{name} =~ s/(^| )(\w)/$1\u$2/g;
@@ -3529,7 +3589,7 @@ sub load_plugin {
         }
     }
 
-    &signal_plugin( "onload", { name => $name } );
+    &signal_plugin( "onload", {name => $name} );
 
     $stats{loaded_plugins}{$name} = "@signals";
 
@@ -3560,8 +3620,11 @@ sub signal_plugin {
     # called.
 
     if ( exists $plugin_signals{$sig_name} ) {
-        foreach my $plugin ( @{ $plugin_signals{$sig_name} } ) {
-            eval { $data->{rc}{plugin} = "Bucket::Plugin::$plugin"->route( $sig_name, $data ); };
+        foreach my $plugin ( @{$plugin_signals{$sig_name}} ) {
+            eval {
+                $data->{rc}{plugin} =
+                  "Bucket::Plugin::$plugin"->route( $sig_name, $data );
+            };
             $rc ||= $data->{rc}{plugin};
 
             if ($@) {
@@ -3575,8 +3638,11 @@ sub signal_plugin {
     return $rc if $rc < 0;
 
     if ( exists $plugin_signals{"*"} ) {
-        foreach my $plugin ( @{ $plugin_signals{"*"} } ) {
-            eval { $data->{rc}{plugin} = "Bucket::Plugin::$plugin"->route( $sig_name, $data ); };
+        foreach my $plugin ( @{$plugin_signals{"*"}} ) {
+            eval {
+                $data->{rc}{plugin} =
+                  "Bucket::Plugin::$plugin"->route( $sig_name, $data );
+            };
             $rc ||= $data->{rc}{plugin};
 
             if ($@) {
@@ -3598,10 +3664,10 @@ sub register {
         $plugin_signals{$signal} = [];
     }
 
-    if ( grep { $_ eq $name } @{ $plugin_signals{$signal} } ) {
+    if ( grep { $_ eq $name } @{$plugin_signals{$signal}} ) {
         Log("Already registered!");
     } else {
-        push @{ $plugin_signals{$signal} }, $name;
+        push @{$plugin_signals{$signal}}, $name;
     }
 }
 
@@ -3619,9 +3685,9 @@ sub unregister {
     }
 
     foreach my $sig (@signals) {
-        if ( grep { $_ eq $name } @{ $plugin_signals{$sig} } ) {
+        if ( grep { $_ eq $name } @{$plugin_signals{$sig}} ) {
             $plugin_signals{$sig} =
-              [ grep { $_ ne $name } @{ $plugin_signals{$sig} } ];
+              [ grep { $_ ne $name } @{$plugin_signals{$sig}} ];
         }
     }
 }
@@ -3637,7 +3703,8 @@ sub talking {
         return $_talking{$chl} = $set;
     } else {
         $_talking{$chl} = -1 unless exists $_talking{$chl};
-        $_talking{$chl} = -1 if ( $_talking{$chl} > 0 and $_talking{$chl} < time );
+        $_talking{$chl} = -1
+          if ( $_talking{$chl} > 0 and $_talking{$chl} < time );
         return $_talking{$chl};
     }
 }
