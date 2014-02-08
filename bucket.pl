@@ -423,33 +423,26 @@ sub irc_on_public {
           "$bag{who} is editing $fact in $chl: replacing '$old' with '$new'";
         Log "Editing $fact: replacing '$old' with '$new'";
         if ( $fact =~ /^#(\d+)$/ ) {
-            $_[KERNEL]->post(
-                db           => 'MULTIPLE',
-                SQL          => 'select * from bucket_facts where id = ?',
-                PLACEHOLDERS => [$1],
-                BAGGAGE      => {
-                    %bag,
-                    cmd   => "edit",
-                    old   => $old,
-                    'new' => $new,
-                    flag  => $flag,
-                },
-                EVENT => 'db_success'
+            &sql('select * from bucket_facts where id = ?', [$1],
+              { %bag,
+                cmd      => "edit",
+                old      => $old,
+                'new'    => $new,
+                flag     => $flag,
+                multiple => 1,
+              }
             );
         } else {
-            $_[KERNEL]->post(
-                db  => 'MULTIPLE',
-                SQL => 'select * from bucket_facts where fact = ? order by id',
-                PLACEHOLDERS => [$fact],
-                BAGGAGE      => {
-                    %bag,
-                    cmd   => "edit",
-                    fact  => $fact,
-                    old   => $old,
-                    'new' => $new,
-                    flag  => $flag,
-                },
-                EVENT => 'db_success'
+            &sql('select * from bucket_facts where fact = ? order by id',
+                [$fact],
+                { %bag,
+                  cmd      => "edit",
+                  fact     => $fact,
+                  old      => $old,
+                  'new'    => $new,
+                  flag     => $flag,
+                  multiple => 1,
+                }
             );
         }
     } elsif (
@@ -498,19 +491,16 @@ sub irc_on_public {
         $fact = &trim($fact);
         $fact = &decommify($fact);
         Log "Literal[$page] $fact";
-        $_[KERNEL]->post(
-            db  => 'MULTIPLE',
-            SQL => 'select id, verb, tidbit, mood, chance, protected
-                                from bucket_facts where fact = ? order by id',
-            PLACEHOLDERS => [$fact],
-            BAGGAGE      => {
-                %bag,
-                cmd  => "literal",
-                page => $page,
-                fact => $fact,
-                addressed => $addressed,
-            },
-            EVENT => 'db_success'
+        &sql('select id, verb, tidbit, mood, chance, protected from
+              bucket_facts where fact = ? order by id',
+             [$fact],
+             { %bag,
+               cmd       => "literal",
+               page      => $page,
+               fact      => $fact,
+               addressed => $addressed,
+               multiple  => 1,
+             }
         );
     } elsif ( $addressed
         and $operator
@@ -553,17 +543,14 @@ sub irc_on_public {
                 );
             }
         } else {
-            $_[KERNEL]->post(
-                db  => "MULTIPLE",
-                SQL => "select fact, tidbit, verb, RE, protected, mood, chance
-                                       from bucket_facts where fact = ?",
-                PLACEHOLDERS => [$fact],
-                EVENT        => "db_success",
-                BAGGAGE      => {
-                    %bag,
-                    cmd  => "delete",
-                    fact => $fact,
-                }
+            &sql('select fact, tidbit, verb, RE, protected, mood, chance from
+                  bucket_facts where fact = ?',
+                  [$fact],
+                  { %bag,
+                    cmd      => "delete",
+                    fact     => $fact,
+                    multiple => 1,
+                  }
             );
         }
     } elsif (
@@ -697,7 +684,7 @@ sub irc_on_public {
                     $old{RE}        = 0 unless $old{RE};
                     $old{protected} = 0 unless $old{protected};
                     &sql(
-                        'insert bucket_facts 
+                        'insert bucket_facts
                           (fact, verb, tidbit, protected, RE, mood, chance)
                           values(?, ?, ?, ?, ?, ?, ?)',
                         [ @old{qw/fact verb tidbit protected RE mood chance/} ],
@@ -710,7 +697,7 @@ sub irc_on_public {
                 $old{RE}        = 0 unless $old{RE};
                 $old{protected} = 0 unless $old{protected};
                 &sql(
-                    'insert bucket_facts 
+                    'insert bucket_facts
                       (id, fact, verb, tidbit, protected, RE, mood, chance)
                       values(?, ?, ?, ?, ?, ?, ?, ?)',
                     [ @old{qw/id fact verb tidbit protected RE mood chance/} ],
@@ -731,7 +718,7 @@ sub irc_on_public {
                 foreach my $entry ( @{ $undo->[2] } ) {
                     if ( $entry->[0] eq 'update' ) {
                         &sql(
-                            'update bucket_facts set verb=?, tidbit=? 
+                            'update bucket_facts set verb=?, tidbit=?
                               where id=? limit 1',
                             [ $entry->[2], $entry->[3], $entry->[1] ],
                         );
@@ -740,7 +727,7 @@ sub irc_on_public {
                         $old{RE}        = 0 unless $old{RE};
                         $old{protected} = 0 unless $old{protected};
                         &sql(
-                            'insert bucket_facts 
+                            'insert bucket_facts
                               (fact, verb, tidbit, protected, RE, mood, chance)
                               values(?, ?, ?, ?, ?, ?, ?)',
                             [
@@ -769,7 +756,7 @@ sub irc_on_public {
 
         $_[KERNEL]->post(
             db  => 'SINGLE',
-            SQL => 'select id, verb, tidbit 
+            SQL => 'select id, verb, tidbit
                     from bucket_facts where fact = ? limit 1',
             PLACEHOLDERS => [$src],
             BAGGAGE      => {
@@ -787,7 +774,7 @@ sub irc_on_public {
 
         $_[KERNEL]->post(
             db  => 'SINGLE',
-            SQL => 'select id, verb, tidbit 
+            SQL => 'select id, verb, tidbit
                     from bucket_facts where fact = ? limit 1',
             PLACEHOLDERS => [$src],
             BAGGAGE      => {
@@ -801,7 +788,7 @@ sub irc_on_public {
     } elsif ( $operator and $addressed and $bag{msg} =~ /^lookup #?(\d+)\W*$/ ) {
         $_[KERNEL]->post(
             db  => 'SINGLE',
-            SQL => 'select id, fact, verb, tidbit from bucket_facts 
+            SQL => 'select id, fact, verb, tidbit from bucket_facts
                             where id = ? ',
             PLACEHOLDERS => [$1],
             BAGGAGE      => {
@@ -827,7 +814,7 @@ sub irc_on_public {
 
         $_[KERNEL]->post(
             db  => 'SINGLE',
-            SQL => 'select * from bucket_facts 
+            SQL => 'select * from bucket_facts
                             where id = ? ',
             PLACEHOLDERS => [$id],
             BAGGAGE      => {
@@ -847,7 +834,7 @@ sub irc_on_public {
         if ( $id =~ /^(\d+)$/ ) {
             $_[KERNEL]->post(
                 db  => 'SINGLE',
-                SQL => 'select * from bucket_facts 
+                SQL => 'select * from bucket_facts
                                 where id = ? ',
                 PLACEHOLDERS => [$id],
                 BAGGAGE      => {
@@ -1057,21 +1044,18 @@ sub irc_on_public {
             and @{ $replacables{$var}{vals} } > 30 )
         {
             if ( &config("www_root") ) {
-                $_[KERNEL]->post(
-                    db  => 'MULTIPLE',
-                    SQL => 'select value 
-                        from bucket_vars vars 
-                             left join bucket_values vals 
-                             on vars.id = vals.var_id  
-                        where name = ?
-                        order by value',
-                    PLACEHOLDERS => [$var],
-                    BAGGAGE      => {
-                        %bag,
+                &sql('select value
+                      from bucket_vars vars
+                           left join bucket_values vals
+                           on vars.id = vals.var_id
+                      where name = ?
+                      order by value',
+                      [$var],
+                      { %bag,
                         cmd  => "dump_var",
                         name => $var,
-                    },
-                    EVENT => 'db_success'
+                        multiple => 1,
+                      }
                 );
             } else {
                 &say( $chl =>
@@ -1336,8 +1320,8 @@ sub irc_on_public {
         $_[KERNEL]->post(
             db  => 'SINGLE',
             SQL => 'select value
-               from bucket_values 
-               left join bucket_vars 
+               from bucket_values
+               left join bucket_vars
                     on var_id = bucket_vars.id
                where name = ?  and value like ?
                order by rand()
@@ -1374,19 +1358,15 @@ sub irc_on_public {
                     {
                         Report
 "Volunteering a dump of '$bag{msg}' for $bag{who} in $chl (if it exists)";
-                        $_[KERNEL]->post(
-                            db => 'MULTIPLE',
-                            SQL =>
-                              'select id, verb, tidbit, mood, chance, protected
-                                          from bucket_facts where fact = ? order by id',
-                            PLACEHOLDERS => [ $bag{msg} ],
-                            BAGGAGE      => {
-                                %bag,
-                                cmd  => "literal",
-                                page => "*",
-                                fact => $bag{msg},
-                            },
-                            EVENT => 'db_success'
+                        &sql('select id, verb, tidbit, mood, chance, protected
+                              from bucket_facts where fact = ? order by id',
+                              [ $bag{msg} ],
+                              { %bag,
+                                cmd      => "literal",
+                                page     => "*",
+                                fact     => $bag{msg},
+                                multiple => 1,
+                              }
                         );
                         return;
                     } elsif ( $stats{users}{$chl}{ $bag{who} }{last_lookup}[1] >
@@ -1442,7 +1422,7 @@ sub db_success {
 
     return unless $bag{cmd};
 
-    return if &signal_plugin( "db_success", \%bag );
+    return if &signal_plugin( "db_success", {bag => \%bag, res => $res} );
 
     if ( $bag{cmd} eq 'fact' ) {
         my %line = ref $res->{RESULT} ? %{ $res->{RESULT} } : ();
@@ -1577,7 +1557,7 @@ sub db_success {
             Log "Learning '$fact' '$verb' '$tidbit'";
             $_[KERNEL]->post(
                 db  => 'SINGLE',
-                SQL => 'select id, tidbit from bucket_facts 
+                SQL => 'select id, tidbit from bucket_facts
                         where fact = ? and verb = "<alias>"',
                 PLACEHOLDERS => [$fact],
                 BAGGAGE      => {
@@ -1593,7 +1573,7 @@ sub db_success {
             return;
         } elsif (
             $bag{orig} =~ m{ ^ \s* (how|what|whom?|where|why) # interrogative
-                                   \s+ does 
+                                   \s+ does
                                    \s+ (\S+) # nick
                                    \s+ (\w+) # verb
                                    (?:.*) # more }xi
@@ -1749,7 +1729,7 @@ sub db_success {
         } else {    # lookup band name!
             if (    &config("band_name")
                 and $bag{type} eq 'irc_public'
-                and rand(100) < &config("band_name") 
+                and rand(100) < &config("band_name")
                 and $bag{orig} !~ m{https?://}i
                )
             {
@@ -1770,8 +1750,8 @@ sub db_success {
                     {
                         $_[KERNEL]->post(
                             db  => 'SINGLE',
-                            SQL => 'select value 
-                                    from bucket_values left join bucket_vars 
+                            SQL => 'select value
+                                    from bucket_values left join bucket_vars
                                          on bucket_vars.id = bucket_values.var_id
                                     where name = "band" and value = ?
                                     limit 1',
@@ -1816,34 +1796,28 @@ sub db_success {
         if (@small) {
 
             # load the smaller variables
-            $_[KERNEL]->post(
-                db  => 'MULTIPLE',
-                SQL => 'select vars.id id, name, perms, type, value 
-                      from bucket_vars vars 
-                           left join bucket_values vals 
-                           on vars.id = vals.var_id  
-                      where name in (' . join( ",", map { "?" } @small ) . ')
-                      order by vars.id',
-                PLACEHOLDERS => \@small,
-                BAGGAGE      => { cmd => "load_vars_cache", },
-                EVENT        => 'db_success'
+            &sql('select vars.id id, name, perms, type, value
+                  from bucket_vars vars
+                       left join bucket_values vals
+                       on vars.id = vals.var_id
+                  where name in (' . join( ",", map { "?" } @small ) . ')
+                  order by vars.id',
+                  \@small,
+                  { cmd => "load_vars_cache", multiple => 1},
             );
         }
 
         # make note of the larger variables, and preload a cache
         foreach my $var (@large) {
-            $_[KERNEL]->post(
-                db  => 'MULTIPLE',
-                SQL => 'select vars.id id, name, perms, type, value 
-                      from bucket_vars vars 
-                           left join bucket_values vals 
-                           on vars.id = vals.var_id  
-                      where name = ?
-                      order by rand()
-                      limit 10',
-                PLACEHOLDERS => [$var],
-                BAGGAGE      => { cmd => "load_vars_large", },
-                EVENT        => 'db_success'
+            &sql('select vars.id id, name, perms, type, value
+                  from bucket_vars vars
+                       left join bucket_values vals
+                       on vars.id = vals.var_id
+                  where name = ?
+                  order by rand()
+                  limit 10',
+                  [$var],
+                  { cmd => "load_vars_large", multiple => 1}
             );
         }
     } elsif ( $bag{cmd} eq 'load_vars_large' ) {
@@ -2260,17 +2234,14 @@ sub db_success {
 
         if ( $lines[0]->{verb} eq "<alias>" ) {
             my $new_fact = $lines[0]->{tidbit};
-            $_[KERNEL]->post(
-                db  => 'MULTIPLE',
-                SQL => 'select id, verb, tidbit, mood, chance, protected
-					from bucket_facts where fact = ? order by id',
-                PLACEHOLDERS => [$new_fact],
-                BAGGAGE      => {
-                    %bag,
+            &sql('select id, verb, tidbit, mood, chance, protected from
+                  bucket_facts where fact = ? order by id',
+                  [$new_fact],
+                  { %bag,
                     cmd      => "literal",
-                    alias_to => $new_fact
-                },
-                EVENT => 'db_success'
+                    alias_to => $new_fact,
+                    multiple => 1,
+                  }
             );
             Report "Asked for the 'literal' of an alias,"
               . " being smart and redirecting to '$new_fact'";
@@ -2407,15 +2378,12 @@ sub irc_start {
     $irc->plugin_add( Connector => $_[HEAP]->{connector} );
 
     # find out which variables should be preloaded
-    $_[KERNEL]->post(
-        db  => 'MULTIPLE',
-        SQL => 'select name, count(value) num
-                from bucket_vars vars
-                     left join bucket_values 
-                     on vars.id = var_id
-                group by name',
-        BAGGAGE => { cmd => "load_vars" },
-        EVENT   => 'db_success'
+    &sql('select name, count(value) num
+          from bucket_vars vars
+               left join bucket_values
+               on vars.id = var_id
+          group by name', undef,
+          { cmd => "load_vars", multiple => 1 }
     );
 
     foreach my $reply (
@@ -2643,12 +2611,8 @@ sub cached_reply {
 
 sub cache {
     my ( $kernel, $key ) = @_;
-    $kernel->post(
-        db           => 'MULTIPLE',
-        BAGGAGE      => { cmd => "cache", key => $key },
-        SQL          => 'select verb, tidbit from bucket_facts where fact = ?',
-        PLACEHOLDERS => [$key],
-        EVENT        => 'db_success'
+    &sql('select verb, tidbit from bucket_facts where fact = ?',
+        [$key], { cmd => "cache", key => $key, multiple => 1 }
     );
 }
 
@@ -2875,12 +2839,8 @@ sub random_item_cache {
         return;
     }
 
-    $kernel->post(
-        db      => 'MULTIPLE',
-        BAGGAGE => { cmd => "itemcache" },
-        SQL =>
-          "select what, user from bucket_items order by rand() limit $limit",
-        EVENT => 'db_success'
+    &sql("select what, user from bucket_items order by rand() limit $limit",
+        undef, { cmd => "itemcache", multiple => 1 }
     );
 }
 
@@ -3098,9 +3058,9 @@ sub lookup {
 
     POE::Kernel->post(
         db  => 'SINGLE',
-        SQL => "select id, fact, verb, tidbit from bucket_facts 
+        SQL => "select id, fact, verb, tidbit from bucket_facts
 			where $sql order by rand("
-          . int( rand(1e6) ) 
+          . int( rand(1e6) )
           . ') limit 1',
         PLACEHOLDERS => \@placeholders,
         BAGGAGE      => {
@@ -3119,8 +3079,11 @@ sub lookup {
 sub sql {
     my ( $sql, $placeholders, $baggage ) = @_;
 
+    my $multi = $baggage->{multiple};
+    delete $baggage->{multiple};
+
     POE::Kernel->post(
-        db    => 'DO',
+        db    => $multi ? 'MULTIPLE' : 'DO',
         SQL   => $sql,
         EVENT => 'db_success',
         $placeholders ? ( PLACEHOLDERS => $placeholders ) : (),
@@ -3296,18 +3259,15 @@ sub expand {
 
             if ( exists $record->{cache} and not @{ $record->{cache} } ) {
                 Log "Refilling cache for $full";
-                POE::Kernel->post(
-                    db  => 'MULTIPLE',
-                    SQL => 'select vars.id id, name, perms, type, value 
-                            from bucket_vars vars 
-                                 left join bucket_values vals 
-                                 on vars.id = vals.var_id  
-                            where name = ?
-                            order by rand()
-                            limit 20',
-                    PLACEHOLDERS => [$full],
-                    BAGGAGE      => { cmd => "load_vars_large", },
-                    EVENT        => 'db_success'
+                &sql('select vars.id id, name, perms, type, value
+                      from bucket_vars vars
+                           left join bucket_values vals
+                           on vars.id = vals.var_id
+                      where name = ?
+                      order by rand()
+                      limit 20',
+                      [$full],
+                      { cmd => "load_vars_large", multiple => 1 }
                 );
             }
 
@@ -3426,10 +3386,10 @@ sub get_band_name_handles {
     }
 
     $handles{lookup} = $handles{dbh}->prepare(
-        "select id, word, `lines` 
-                                  from word2id 
-                                  where word in (?, ?, ?) 
-                                  order by `lines`"
+        "select id, word, `lines`
+         from word2id
+         where word in (?, ?, ?)
+         order by `lines`"
     );
 
     return \%handles;
@@ -3467,10 +3427,10 @@ sub check_band_name {
         if ( @words < 2 ) {
             Log "processing $entry->{word} ($entry->{count})\n";
             $entry->{sth} = $handles->{dbh}->prepare(
-                "select line 
-                                                      from word2line 
-                                                      where word = ? 
-                                                      order by line"
+                "select line
+                 from word2line
+                 where word = ?
+                 order by line"
             );
             $entry->{sth}->execute( $entry->{id} );
             $entry->{cur} = $entry->{sth}->fetchrow_hashref;
@@ -3518,12 +3478,8 @@ sub check_band_name {
     if ( @union > 0 ) {
         Log "Union ids: " . @union;
         my $sth = $handles->{dbh}->prepare(
-            "select line 
-                                            from word2line 
-                                            where word = ? 
-                                              and line in (?"
-              . ( ",?" x ( @union - 1 ) ) . ") 
-                                            limit 1"
+            "select line from word2line where word = ?  and line in (?"
+              . ( ",?" x ( @union - 1 ) ) . ") limit 1"
         );
 
         my $res = $sth->execute( $delayed->{id}, @union );
@@ -3543,7 +3499,7 @@ sub check_band_name {
 sub add_new_band {
     my $bag = shift;
     &sql(
-        'insert into bucket_values (var_id, value) 
+        'insert into bucket_values (var_id, value)
          values ( (select id from bucket_vars where name = ? limit 1), ?);',
         [ &config("band_var"), $bag->{stripped_name} ],
         { %$bag, cmd => "new band name" }

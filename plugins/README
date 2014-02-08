@@ -9,7 +9,7 @@ Bucket plugins:
   - settings - settings the plugin uses
 
 - Known signals:
-  - "db_success", \%bag                      - called after database lookups
+  - "db_success", { bag, res }               - called after database lookups
   - "do", { chl, text }                      - on OUR action
   - "get_stats", { text_ref }                - when generating the stats text
   - "heartbeat", {}                          - called on a regular interval
