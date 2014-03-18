@@ -73,13 +73,45 @@ sub signals {
     return (qw/say do/);
 }
 
+sub commands {
+    return (
+        {
+            label     => 'flip',
+            addressed => 1,
+            operator  => 0,
+            editable  => 0,
+            re        => qr/^flip ([\w\-]+)\W*$/i,
+            callback  => \&flip,
+        },
+     );
+}
+
+sub settings {
+    return ( rotate => [ p => 1 ], );
+}
+
 sub route {
     my ( $package, $sig, $data ) = @_;
 
-    if ($data->{chl} ne &config("logchannel")) {
-        $data->{text} = join "", reverse map { $table{$_} || $_ } split //, lc $data->{text};
+    if ($data->{chl} ne &config("logchannel") and
+      rand(100) < &config("rotate")) {
+        $data->{text} = &rotate($data->{text});
+        
     }
 
     return 0;
 }
 
+sub rotate {
+    my ( $text ) = @_;
+    return join "", 
+           reverse 
+           map { $table{$_} || $_ } 
+           split //,
+           lc $text;
+}
+
+sub flip {
+    my $bag = shift;
+    &say($bag->{chl} => "(╯°□°）╯︵" . &rotate($bag->{msg}));
+}
