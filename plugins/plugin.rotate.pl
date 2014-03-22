@@ -1,6 +1,7 @@
 # BUCKET PLUGIN
 
-use BucketBase qw/config/;
+use BucketBase qw/config say/;
+use utf8;
 
 my %table = (
     "!" => "\x{00A1}",
@@ -80,14 +81,14 @@ sub commands {
             addressed => 1,
             operator  => 0,
             editable  => 0,
-            re        => qr/^flip ([\w\-]+)\W*$/i,
+            re        => qr/^flip ([\s\w\-]+)\W*$/i,
             callback  => \&flip,
         },
      );
 }
 
 sub settings {
-    return ( rotate => [ p => 1 ], );
+    return ( rotate => [ p => 100 ], );
 }
 
 sub route {
@@ -113,5 +114,11 @@ sub rotate {
 
 sub flip {
     my $bag = shift;
-    &say($bag->{chl} => "(╯°□°）╯︵" . &rotate($bag->{msg}));
+    my $arm = "\N{U+256f}";
+    my $eye = "\N{U+b0}";
+    my $nose = "\N{U+25a1}";
+    my $flip = "\N{U+fe35}";
+    my $face = join "", "(", $arm, $eye, $nose, $eye, ")", $arm, $flip;
+
+    &say($bag->{chl} => $face . &rotate($1));
 }
