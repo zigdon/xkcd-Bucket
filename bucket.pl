@@ -506,7 +506,7 @@ sub irc_on_public {
                 page      => $page,
                 fact      => $fact,
                 addressed => $addressed,
-                multiple  => 1,
+                db_type   => 'MULTIPLE',
             }
         );
     } elsif ( $addressed
@@ -3508,6 +3508,8 @@ sub open_log {
         open( LOG, ">>", $logfile )
           or die "Can't write " . &config("logfile") . ": $!";
         Log("Opened $logfile");
+        print STDERR scalar localtime, " - @_\n";
+        print STDERR "Logfile opened: $logfile.\n";
     }
 }
 
