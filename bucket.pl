@@ -2604,11 +2604,11 @@ sub get_stats {
 
     Log "Updating stats";
     &sql( 'select count(distinct fact) c from bucket_facts',
-        undef, {cmd => "stats1", db_type => 'SINGLE'} );
+        undef, {cmd => 'stats1', db_type => 'SINGLE'} );
     &sql( 'select count(id) c from bucket_facts',
-        undef, {cmd => "stats2, db_type => 'SINGLE'"} );
+        undef, {cmd => 'stats2', db_type => 'SINGLE'} );
     &sql( 'select count(id) c from bucket_items',
-        undef, {cmd => "stats3, db_type => 'SINGLE'"} );
+        undef, {cmd => 'stats3', db_type => 'SINGLE'} );
 
     $stats{last_updated} = time;
 
