@@ -796,7 +796,6 @@ sub irc_on_public {
                 %bag,
                 cmd       => "fact",
                 msg       => $1,
-                orig      => $1,
                 addressed => 0,
                 editable  => 0,
                 op        => 0,
@@ -1456,7 +1455,7 @@ sub db_success {
             if ( $line{verb} eq '<reply>' ) {
                 &say( $bag{chl} => $line{tidbit} );
             } elsif ( $line{verb} eq '\'s' ) {
-                &say( $bag{chl} => "$bag{msg}'s $line{tidbit}" );
+                &say( $bag{chl} => "$bag{orig}'s $line{tidbit}" );
             } elsif ( $line{verb} eq '<action>' ) {
                 &do( $bag{chl} => $line{tidbit} );
             } else {
@@ -1464,7 +1463,7 @@ sub db_success {
                     $bag{msg}   = 'I';
                     $line{verb} = 'am';
                 }
-                &say( $bag{chl} => "$bag{msg} $line{verb} $line{tidbit}" );
+                &say( $bag{chl} => "$bag{orig} $line{verb} $line{tidbit}" );
             }
             return;
         } elsif ( $bag{msg} =~ s/^what is |^what's |^the //i ) {
