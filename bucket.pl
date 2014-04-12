@@ -1460,7 +1460,7 @@ sub db_success {
                 &do( $bag{chl} => $line{tidbit} );
             } else {
                 if ( lc $bag{msg} eq 'bucket' and lc $line{verb} eq 'is' ) {
-                    $bag{msg}   = 'I';
+                    $bag{orig}   = 'I';
                     $line{verb} = 'am';
                 }
                 &say( $bag{chl} => "$bag{orig} $line{verb} $line{tidbit}" );
