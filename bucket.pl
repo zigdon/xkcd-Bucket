@@ -1315,7 +1315,6 @@ sub irc_on_public {
             {%bag, cmd => "tla", tla => $bag{msg}, db_type => 'SINGLE',}
         );
     } else {
-        my $orig = $bag{msg};
         $bag{msg} = &trim( $bag{msg} );
         if (   $addressed
             or length $bag{msg} >= &config("minimum_length")
@@ -1340,8 +1339,8 @@ sub irc_on_public {
                     if ( ++$stats{users}{$chl}{$bag{who}}{last_lookup}[1] ==
                         &config("repeated_queries") )
                     {
-                        Report
-"Volunteering a dump of '$bag{msg}' for $bag{who} in $chl (if it exists)";
+                        Report "Volunteering a dump of '$bag{msg}' for" .
+                               " $bag{who} in $chl (if it exists)";
                         &sql(
                             'select id, verb, tidbit, mood, chance, protected
                               from bucket_facts where fact = ? order by id',
@@ -1358,8 +1357,8 @@ sub irc_on_public {
                     } elsif ( $stats{users}{$chl}{$bag{who}}{last_lookup}[1] >
                         &config("repeated_queries") )
                     {
-                        Log
-"Ignoring $bag{who} who is asking '$bag{msg}' in $chl";
+                        Log "Ignoring $bag{who} who is asking '$bag{msg}'" .
+                            " in $chl";
                         return;
                     }
                 } else {
@@ -1368,7 +1367,7 @@ sub irc_on_public {
                 }
             }
 
-            &lookup( %bag, orig => $orig, );
+            &lookup( %bag );
         }
     }
 }
