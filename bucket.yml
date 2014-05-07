@@ -8,12 +8,17 @@ autojoin:
 db_dsn: DBI:mysql:database=dbname;host=db.example.com
 db_password: SekritAwesome
 db_username: DBUsername
+hide_hostmask: 0
 password: NickservPassword
 logfile: /path/to/log/file
 logchannel: #logChannel
 control_channel: #InviteOnlyChannel
+identify_before_autojoin: 1
 main_channel: #xkcd
 nick: bucketClone
+nickserv_msg: ''
+nickserv_nick: 'NickServ'
+user_mode: '+B'
 bucketlog: /path/to/external/log
 timeout: 60
 server: irc.example.com
