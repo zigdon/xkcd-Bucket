@@ -787,8 +787,8 @@ sub irc_on_public {
             [$1],
             {
                 %bag,
+                msg       => undef,
                 cmd       => "fact",
-                msg       => $1,
                 addressed => 0,
                 editable  => 0,
                 op        => 0,
@@ -1308,6 +1308,7 @@ sub irc_on_public {
             {%bag, cmd => "tla", tla => $bag{msg}, db_type => 'SINGLE',}
         );
     } else {
+        my $orig = $bag{msg};
         $bag{msg} = &trim( $bag{msg} );
         if (   $addressed
             or length $bag{msg} >= &config("minimum_length")
@@ -1360,7 +1361,7 @@ sub irc_on_public {
                 }
             }
 
-            &lookup( %bag );
+            &lookup( %bag, orig => $orig );
         }
     }
 }
@@ -1455,7 +1456,7 @@ sub db_success {
                     $bag{orig}   = 'I';
                     $line{verb} = 'am';
                 }
-                &say( $bag{chl} => "$bag{orig} $line{verb} $line{tidbit}" );
+                &say( $bag{chl} => "$bag{msg} $line{verb} $line{tidbit}" );
             }
             return;
         } elsif ( $bag{msg} =~ s/^what is |^what's |^the //i ) {
