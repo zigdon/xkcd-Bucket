@@ -3117,6 +3117,12 @@ sub expand {
                 }
             }
 
+            if (@random_items <= &config("random_item_cache_size") / 2) {
+              # force a cache update
+              Log "Random item cache running low, forcing an update.";
+              $stats{last_updated} = 0;
+            }
+
             my $cased = &set_case( $1, $newitem );
             last
               unless $msg =~
