@@ -2933,6 +2933,8 @@ sub say {
         return;
     }
 
+    utf8::decode( $text );
+
     $irc->yield( privmsg => $chl => $text );
 }
 
