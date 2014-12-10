@@ -2918,6 +2918,9 @@ sub say {
     my $chl  = shift;
     my $text = "@_";
 
+    utf8::encode( $chl ) if utf8::is_utf8( $chl );
+    utf8::encode( $text ) if utf8::is_utf8( $text );
+
     my %data = ( chl => $chl, text => $text );
     return if &signal_plugin( "say", \%data );
     ( $chl, $text ) = ( $data{chl}, $data{text} );
@@ -2932,8 +2935,6 @@ sub say {
         }
         return;
     }
-
-    utf8::decode( $text );
 
     $irc->yield( privmsg => $chl => $text );
 }
