@@ -2953,6 +2953,9 @@ sub do {
     my $chl    = shift;
     my $action = "@_";
 
+    utf8::encode( $chl ) if utf8::is_utf8( $chl );
+    utf8::encode( $action ) if utf8::is_utf8( $action );
+
     my %data = ( chl => $chl, text => $action );
     return if &signal_plugin( "do", \%data );
     ( $chl, $action ) = ( $data{chl}, $data{text} );
