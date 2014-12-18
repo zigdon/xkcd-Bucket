@@ -1452,8 +1452,8 @@ sub db_success {
             } elsif ( $line{verb} eq '<action>' ) {
                 &do( $bag{chl} => $line{tidbit} );
             } else {
-                if ( lc $bag{msg} eq 'bucket' and lc $line{verb} eq 'is' ) {
-                    $bag{orig}   = 'I';
+                if ( lc $bag{msg} eq lc $nick and lc $line{verb} eq 'is' ) {
+                    $bag{msg}   = 'I';
                     $line{verb} = 'am';
                 }
                 &say( $bag{chl} => "$bag{msg} $line{verb} $line{tidbit}" );
