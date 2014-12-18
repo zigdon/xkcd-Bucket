@@ -1312,7 +1312,7 @@ sub irc_on_public {
         $bag{msg} = &trim( $bag{msg} );
         if (   $addressed
             or length $bag{msg} >= &config("minimum_length")
-            or $bag{msg} eq '...' )
+            or $bag{msg} eq '...' or $bag{msg} eq '…' )
         {
             if ( $addressed and length $bag{msg} == 0 ) {
                 $bag{msg} = $nick;
