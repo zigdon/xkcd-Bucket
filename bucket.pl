@@ -2390,7 +2390,8 @@ sub irc_start {
             Port     => &config("port") || "6667",
             Flood    => 0,
             UseSSL   => &config("ssl") || 0,
-            useipv6  => &config("ipv6") || 0
+            useipv6  => &config("ipv6") || 0,
+            LocalAddr => &config("local_address")
         }
     );
 
