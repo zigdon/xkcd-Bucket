@@ -99,6 +99,7 @@ my %config_keys = (
     random_item_cache_size   => [ i => 20 ],
     random_wait              => [ i => 3 ],
     repeated_queries         => [ i => 5 ],
+    server_pass              => [ s => '' ],
     timeout                  => [ i => 60 ],
     the_fucking              => [ p => 100 ],
     tumblr_name              => [ p => 50 ],
@@ -2388,6 +2389,7 @@ sub irc_start {
             Ircname  => &config("irc_name") || "YABI",
             Server   => &config("server") || "irc.foonetic.net",
             Port     => &config("port") || "6667",
+            Password => &config("server_pass") || "",
             Flood    => 0,
             UseSSL   => &config("ssl") || 0,
             useipv6  => &config("ipv6") || 0
