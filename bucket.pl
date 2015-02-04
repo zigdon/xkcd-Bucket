@@ -99,7 +99,6 @@ my %config_keys = (
     random_item_cache_size   => [ i => 20 ],
     random_wait              => [ i => 3 ],
     repeated_queries         => [ i => 5 ],
-    server_pass              => [ s => '' ],
     timeout                  => [ i => 60 ],
     the_fucking              => [ p => 100 ],
     tumblr_name              => [ p => 50 ],
