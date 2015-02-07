@@ -3065,6 +3065,12 @@ sub expand {
         $stats{last_vars}{$chl}{who} = $who;
     }
 
+    while ( $msg =~ /(?<!\\)(\$channel\b|\${channel})/i ) {
+        my $cased = &set_case( $1, $chl );
+        last unless $msg =~ s/(?<!\\)(?:\$channel\b|\${channel})/$cased/i;
+        $stats{last_vars}{$chl}{channel} = $chl;
+    }
+
     if ( $msg =~ /(?<!\\)(?:\$someone\b|\${someone})/i ) {
         $stats{last_vars}{$chl}{someone} = [];
         while ( $msg =~ /(?<!\\)(\$someone\b|\${someone})/i ) {
