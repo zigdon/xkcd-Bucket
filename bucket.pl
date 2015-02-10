@@ -2389,7 +2389,7 @@ sub irc_start {
             Server   => &config("server") || "irc.foonetic.net",
             Port     => &config("port") || "6667",
             Password => &config("server_pass") || "",
-            Flood    => 0,
+            Flood    => ( &config("flood_control") ? 0 : 1 ),
             UseSSL   => &config("ssl") || 0,
             useipv6  => &config("ipv6") || 0,
             LocalAddr => &config("local_address")
