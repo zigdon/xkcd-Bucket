@@ -985,7 +985,7 @@ sub irc_on_public {
             &say( $chl => "Sorry, $bag{who}, there are no defined variables!" );
             return;
         }
-        &say(
+        &say_long(
             $chl => "Known variables:",
             &make_list(
                 map {
