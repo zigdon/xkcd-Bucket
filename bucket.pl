@@ -3235,7 +3235,7 @@ sub expand {
             $replacement = A($replacement) if $2;
 
             if ( exists $record->{cache} and not @{$record->{cache}} ) {
-                Log "Refilling cache for $full";
+                Log "Refilling cache for $var";
                 &sql(
                     'select vars.id id, name, perms, type, value
                       from bucket_vars vars
@@ -3244,7 +3244,7 @@ sub expand {
                       where name = ?
                       order by rand()
                       limit 20',
-                    [$full],
+                    [$var],
                     {cmd => "load_vars_large", db_type => 'MULTIPLE'}
                 );
             }
