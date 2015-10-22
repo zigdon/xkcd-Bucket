@@ -3477,10 +3477,18 @@ sub check_band_name {
 
 sub add_new_band {
     my $bag = shift;
+    my $band_var = &config("band_var");
+    my $new_band = $bag->{stripped_name};
+
+    if ( exists $replacables{$band_var}{vals} ) {
+        push @{$replacables{$band_var}{vals}}, $new_band;
+    } else {
+        push @{$replacables{$band_var}{cache}}, $new_band;
+    }
     &sql(
         'insert into bucket_values (var_id, value)
          values ( (select id from bucket_vars where name = ? limit 1), ?);',
-        [ &config("band_var"), $bag->{stripped_name} ],
+        [ $band_var, $new_band ],
         {%$bag, cmd => "new band name"}
     );
 
