@@ -3234,7 +3234,7 @@ sub expand {
             $replacement = &set_case( $var, $replacement );
             $replacement = A($replacement) if $2;
 
-            if ( exists $record->{cache} and not @{$record->{cache}} ) {
+            if ( exists $record->{cache} and 3 > @{$record->{cache}} ) {
                 Log "Refilling cache for $var";
                 &sql(
                     'select vars.id id, name, perms, type, value
