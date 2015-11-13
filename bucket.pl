@@ -1633,7 +1633,7 @@ sub db_success {
             $msg .= "!";
             &say( $bag{chl} => ucfirst $msg );
         } elsif ( $bag{orig} =~ /^(?:Do you|Does anyone) know (\w+)/i
-            and $1 !~ /who|of|if|why|where|what|when|whose|how/i )
+            and $1 !~ /^(?:who|of|if|why|where|what|when|whose|how)$/i )
         {
             $stats{hum}++;
             &say( $bag{chl} => "No, but if you hum a few bars I can fake it" );
