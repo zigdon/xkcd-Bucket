@@ -609,9 +609,9 @@ sub irc_on_public {
         &say( $chl => "$bag{who}: ${cmd}ing $dst" );
         Report "${cmd}ing $dst at ${who}'s request";
     } elsif ( $addressed and $operator and lc $bag{msg} eq 'list ignored' ) {
-        &say(
-            $chl => "Currently ignored: ",
-            join ", ", sort keys %{$config->{ignore}}
+        &say_long(
+            $chl => "Currently ignored:",
+            &make_list( sort keys %{$config->{ignore}} )
         );
     } elsif ( $addressed
         and $operator
