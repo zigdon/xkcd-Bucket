@@ -27,6 +27,7 @@ use POE::Component::SimpleDBI;
 use Lingua::EN::Conjugate qw/past gerund/;
 use Lingua::EN::Inflect qw/A PL_N/;
 use Lingua::EN::Syllable qw//;    # don't import anything
+use IO::Handle;
 use YAML qw/LoadFile DumpFile/;
 use Data::Dumper;
 use Fcntl qw/:seek/;
@@ -3528,6 +3529,7 @@ sub open_log {
           &DEBUG ? &config("logfile") . ".debug" : &config("logfile");
         open( LOG, ">>", $logfile )
           or die "Can't write " . &config("logfile") . ": $!";
+        LOG->autoflush(1);  # see issue 74
         Log("Opened $logfile");
         print STDERR scalar localtime, " - @_\n";
         print STDERR "Logfile opened: $logfile.\n";
