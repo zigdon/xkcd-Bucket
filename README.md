@@ -30,7 +30,9 @@ to work.
     $ mysql -D bucket < sample.sql```
 4. Create a user for Bucket, and grant all perms on the bucket database.
     `$ echo 'grant all on bucket.* to bucket identified by "s3kr1tP@ss"' | mysql`
-5. Edit config file (bucket.yml)
+5. Edit config file
+  1. Copy bucket.yml.sample -> bucket.yml
+  2. Edit bucket.yml and save
 6. Install perl modules.
     ```$ sudo cpan POE POE::Component::IRC POE::Component::SimpleDBI Lingua::EN::Conjugate Lingua::EN::Inflect 
     Lingua::EN::Syllable YAML HTML::Entities URI::Escape XML::Simple```
