@@ -302,7 +302,7 @@ sub irc_on_public {
         $bag{addressed} = 1;
         $bag{to}        = $nick;
     } else {
-        $bag{msg} =~ s/^(\S+):\s*//;
+        $bag{msg} =~ s/^(\S+):\s+//;
         $bag{to} = $1;
     }
 
