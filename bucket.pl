@@ -304,10 +304,12 @@ sub irc_on_public {
     } else {
         my $orig_msg = $bag{msg};
         $bag{msg} =~ s/^(\S+):\s*//;
-        if( &nick_in_chan($1, $chl) ) {
-            $bag{to} = $1;
-        } else {
-            $bag{msg} = $orig_msg;
+        if( defined($1) ) {
+            if( $irc->is_channel_member( $bag{chl}, $1 ) ) {
+                $bag{to} = $1;
+            } else {
+                $bag{msg} = $orig_msg;
+            }
         }
     }
 
@@ -2773,14 +2775,6 @@ sub someone {
 
     return 'someone' unless keys %nicks;
     return ( values %nicks )[ rand( keys %nicks ) ];
-}
-
-sub nick_in_chan {
-    my $nick = lc shift;
-    my $channel = shift;
-    my %nicks   = map { lc $_ => $_ } keys %{$stats{users}{$channel}};
-
-    return exists $nicks{$nick};
 }
 
 sub clear_cache {
