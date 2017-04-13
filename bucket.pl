@@ -1623,9 +1623,12 @@ sub db_success {
                 &error( $bag{chl}, $bag{who} );
             }
             return;
-        } elsif ( $bag{addressed} ) {
-            &error( $bag{chl}, $bag{who} );
-            return;
+        } else {
+            return if &signal_plugin( "empty_lookup", \%bag );
+            if ( $bag{addressed} ) {
+                &error( $bag{chl}, $bag{who} );
+                return;
+            }
         }
 
         #Log "extra work on $bag{msg}";
