@@ -3063,6 +3063,8 @@ sub sql {
 sub expand {
     my ( $who, $chl, $msg, $editable, $to ) = @_;
 
+    return if &signal_plugin( "pre_expand", {tidbit => \$msg} );
+
     my $gender = $stats{users}{genders}{lc $who};
     my $target = $who;
     while ( $msg =~ /(?<!\\)(\$who\b|\${who})/i ) {
