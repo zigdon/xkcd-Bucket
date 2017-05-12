@@ -1078,7 +1078,7 @@ sub irc_on_public {
             next unless lc $replacables{$var}{$key}[$i] eq $value;
 
             Log "found!";
-            splice( @{$replacables{$var}{vals}}, $i, 1, () );
+            splice( @{$replacables{$var}{$key}}, $i, 1, () );
 
             return if ( $key eq 'cache' );
 
@@ -1115,14 +1115,13 @@ sub irc_on_public {
             return;
         }
 
-        foreach my $v ( @{$replacables{$var}{vals}} ) {
-            next unless lc $v eq lc $value;
-
-            &say( $chl => "$bag{who}, I had it that way!" );
-            return;
-        }
-
         if ( exists $replacables{$var}{vals} ) {
+            foreach my $v ( @{$replacables{$var}{vals}} ) {
+                next unless lc $v eq lc $value;
+
+                &say( $chl => "$bag{who}, I had it that way!" );
+                return;
+            }
             push @{$replacables{$var}{vals}}, $value;
         } else {
             push @{$replacables{$var}{cache}}, $value;
