@@ -27,6 +27,7 @@ Bucket plugins:
   - "on_notice", { who, msg }                - when seeing a notice
   - "on_public", \%bag                       - on public messages
   - "on_topic": { chl, topic }               - when topic is changed
+  - "pre_expand": { \$msg }                  - before variables are interpolated in tidbit
   - "say", { chl, text }                     - when WE say anything
   - "start", {}                              - called on boot
 
