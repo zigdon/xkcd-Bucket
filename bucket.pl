@@ -520,7 +520,7 @@ sub irc_on_public {
             &say( $chl => "Sorry, $bag{who}, I can't find that!" );
             return;
         }
-        &say( $chl => "Okay, $bag{who}, destroying '$item'" );
+        &say( $chl => "Okay, $bag{who}, deleting item '$item'" );
         @inventory = grep { $_ ne $item } @inventory;
         &sql( "delete from bucket_items where `what` = ?", [$item] );
         delete $stats{detailed_inventory}{$bag{who}}[$num];
