@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS `bucket_facts` (
   `fact` varchar(128) NOT NULL,
   `tidbit` text NOT NULL,
   `verb` varchar(16) NOT NULL default 'is',
-  `RE` tinyint(1) NOT NULL,
+  `RE` tinyint(1) NOT NULL default 0,
   `protected` tinyint(1) NOT NULL,
   `mood` tinyint(3) unsigned default NULL,
   `chance` tinyint(3) unsigned default NULL,

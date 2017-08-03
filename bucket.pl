@@ -3066,24 +3066,24 @@ sub expand {
 
     my $gender = $stats{users}{genders}{lc $who};
     my $target = $who;
-    while ( $msg =~ /(?<!\\)(\$who\b|\${who})/i ) {
+    while ( $msg =~ /(?<!\\)(\$who\b|\$\{who\})/i ) {
         my $cased = &set_case( $1, $who );
-        last unless $msg =~ s/(?<!\\)(?:\$who\b|\${who})/$cased/i;
+        last unless $msg =~ s/(?<!\\)(?:\$who\b|\$\{who\})/$cased/i;
         $stats{last_vars}{$chl}{who} = $who;
     }
 
-    while ( $msg =~ /(?<!\\)(\$channel\b|\${channel})/i ) {
+    while ( $msg =~ /(?<!\\)(\$channel\b|\$\{channel\})/i ) {
         my $cased = &set_case( $1, $chl );
-        last unless $msg =~ s/(?<!\\)(?:\$channel\b|\${channel})/$cased/i;
+        last unless $msg =~ s/(?<!\\)(?:\$channel\b|\$\{channel\})/$cased/i;
         $stats{last_vars}{$chl}{channel} = $chl;
     }
 
-    if ( $msg =~ /(?<!\\)(?:\$someone\b|\${someone})/i ) {
+    if ( $msg =~ /(?<!\\)(?:\$someone\b|\$\{someone\})/i ) {
         $stats{last_vars}{$chl}{someone} = [];
-        while ( $msg =~ /(?<!\\)(\$someone\b|\${someone})/i ) {
+        while ( $msg =~ /(?<!\\)(\$someone\b|\$\{someone\})/i ) {
             my $rnick = &someone( $chl, $who, defined $to ? $to : () );
             my $cased = &set_case( $1, $rnick );
-            last unless $msg =~ s/\$someone\b|\${someone}/$cased/i;
+            last unless $msg =~ s/\$someone\b|\$\{someone\}/$cased/i;
             push @{$stats{last_vars}{$chl}{someone}}, $rnick;
 
             $gender = $stats{users}{genders}{lc $rnick};
@@ -3091,12 +3091,12 @@ sub expand {
         }
     }
 
-    while ( $msg =~ /(?<!\\)(\$to\b|\${to})/i ) {
+    while ( $msg =~ /(?<!\\)(\$to\b|\$\{to\})/i ) {
         unless ( defined $to ) {
             $to = &someone( $chl, $who );
         }
         my $cased = &set_case( $1, $to );
-        last unless $msg =~ s/(?<!\\)(?:\$to\b|\${to})/$cased/i;
+        last unless $msg =~ s/(?<!\\)(?:\$to\b|\$\{to\})/$cased/i;
         push @{$stats{last_vars}{$chl}{to}}, $to;
 
         $gender = $stats{users}{genders}{lc $to};
@@ -3104,7 +3104,7 @@ sub expand {
     }
 
     $stats{last_vars}{$chl}{item} = [];
-    while ( $msg =~ /(?<!\\)(\$(give)?item|\${(give)?item})/i ) {
+    while ( $msg =~ /(?<!\\)(\$(give)?item|\$\{(give)?item\})/i ) {
         my $giveflag = $2 || $3 ? "give" : "";
         if (@inventory) {
             my $give  = $editable && $giveflag;
@@ -3114,10 +3114,10 @@ sub expand {
               $give ? "$item (given)" : $item;
             last
               unless $msg =~
-              s/(?<!\\)(?:\$${giveflag}item|\${${giveflag}item})/$cased/i;
+              s/(?<!\\)(?:\$${giveflag}item|\$\{${giveflag}item\})/$cased/i;
         } else {
             $msg =~
-              s/(?<!\\)(?:\$${giveflag}item|\${${giveflag}item})/bananas/i;
+              s/(?<!\\)(?:\$${giveflag}item|\$\{${giveflag}item\})/bananas/i;
             push @{$stats{last_vars}{$chl}{item}}, "(bananas)";
         }
     }
@@ -3125,7 +3125,7 @@ sub expand {
       unless @{$stats{last_vars}{$chl}{item}};
 
     $stats{last_vars}{$chl}{newitem} = [];
-    while ( $msg =~ /(?<!\\)(\$(new|get)item|\${(new|get)item})/i ) {
+    while ( $msg =~ /(?<!\\)(\$(new|get)item|\$\{(new|get)item\})/i ) {
         my $keep = lc( $2 || $3 );
         if ($editable) {
             my $newitem = shift @random_items || 'bananas';
@@ -3147,10 +3147,10 @@ sub expand {
             my $cased = &set_case( $1, $newitem );
             last
               unless $msg =~
-              s/(?<!\\)(?:\$${keep}item|\${${keep}item})/$cased/i;
+              s/(?<!\\)(?:\$${keep}item|\$\{${keep}item\})/$cased/i;
             push @{$stats{last_vars}{$chl}{newitem}}, $newitem;
         } else {
-            $msg =~ s/(?<!\\)(?:\$${keep}item|\${${keep}item})/bananas/ig;
+            $msg =~ s/(?<!\\)(?:\$${keep}item|\$\{${keep}item\})/bananas/ig;
         }
     }
     delete $stats{last_vars}{$chl}{newitem}
@@ -3158,7 +3158,7 @@ sub expand {
 
     if ($gender) {
         foreach my $gvar ( keys %gender_vars ) {
-            next unless $msg =~ /(?<!\\)(?:\$$gvar\b|\${$gvar})/i;
+            next unless $msg =~ /(?<!\\)(?:\$$gvar\b|\$\{$gvar\})/i;
 
             Log "Replacing gvar $gvar...";
             if ( exists $gender_vars{$gvar}{$gender} ) {
@@ -3168,7 +3168,7 @@ sub expand {
                     $g_v =~ s/%N/$target/;
                     Log " => $g_v";
                 }
-                while ( $msg =~ /(?<!\\)(\$$gvar\b|\${$gvar})/i ) {
+                while ( $msg =~ /(?<!\\)(\$$gvar\b|\$\{$gvar\})/i ) {
                     my $cased = &set_case( $1, $g_v );
                     last unless $msg =~ s/\Q$1/$cased/g;
                 }
@@ -3182,7 +3182,7 @@ sub expand {
     my $oldmsg = "";
     $stats{last_vars}{$chl} = {};
     while ( $oldmsg ne $msg
-        and $msg =~ /(?<!\\)(?:\$([a-zA-Z_]\w+)|\${([a-zA-Z_]\w+)})/ )
+        and $msg =~ /(?<!\\)(?:\$([a-zA-Z_]\w+)|\$\{([a-zA-Z_]\w+)\})/ )
     {
         $oldmsg = $msg;
         my $var = $1 || $2;
