@@ -155,7 +155,6 @@ sub quote {
     }
 
     my $quote;
-    $match->[2] =~ s/^(?:\S+:)? +//;
     if ( $match->[1] eq 'irc_ctcp_action' ) {
         $quote = "* $match->[0] $match->[2]";
     } else {
