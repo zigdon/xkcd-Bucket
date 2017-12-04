@@ -791,7 +791,8 @@ sub irc_on_public {
             {
                 %bag,
                 msg       => undef,
-                cmd       => "fact",
+                cmd       => "lookup",
+                id        => $1,
                 addressed => 0,
                 editable  => 0,
                 op        => 0,
@@ -2196,6 +2197,15 @@ sub db_success {
             }
         } else {
             &say( $bag{chl} => "$bag{who}: No idea!" );
+        }
+    } elsif ( $bag{cmd} eq 'lookup' ) {
+        my %line = ref $res->{RESULT} ? %{$res->{RESULT}} : ();
+
+        if ( $line{id} ) {
+            &say(   $bag{chl} => "$bag{who}: #$line{id} ('$line{fact}'): "
+                  . "$line{verb} $line{tidbit}" );
+        } else {
+            &say( $bag{chl} => "$bag{who}: #$bag{id} doesn't exist!" )
         }
     } elsif ( $bag{cmd} eq 'literal' ) {
         my @lines = ref $res->{RESULT} ? @{$res->{RESULT}} : [];
