@@ -646,6 +646,7 @@ sub irc_on_public {
     } elsif ( $addressed and $operator and $bag{msg} =~ /^(un)?protect (.+)/i )
     {
         my ( $protect, $fact ) = ( ( $1 ? 0 : 1 ), $2 );
+        my $perm = ( $protect ? "read-only" : "editable" );
         Report "$bag{who} is $1protecting $fact";
         Log "$1protecting $fact";
 
@@ -656,7 +657,10 @@ sub irc_on_public {
                 return;
             }
 
-            $replacables{lc $fact}{perms} = $protect ? "read-only" : "editable";
+            $replacables{lc $fact}{perms} = $perm;
+            &sql(
+                'update bucket_vars set perms=? where name=?',
+                [ $perm, $fact ] );
         } else {
             &sql( 'update bucket_facts set protected=? where fact=?',
                 [ $protect, $fact ] );
