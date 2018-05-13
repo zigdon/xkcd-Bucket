@@ -302,8 +302,8 @@ sub irc_on_public {
         $bag{addressed} = 1;
         $bag{to}        = $nick;
     } else {
-        if( $bag{msg} =~ m/^(\S+):\s*/ and $irc->is_channel_member( $bag{chl}, $1 ) ) {
-            $bag{msg} =~ s/^(\S+):\s*//;
+        if( $bag{msg} =~ m/^(\S+)[:,]\s*/ and $irc->is_channel_member( $bag{chl}, $1 ) ) {
+            $bag{msg} =~ s/^(\S+)[:,]\s*//;
             $bag{to} = $1;
         }
     }
