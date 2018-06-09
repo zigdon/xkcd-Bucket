@@ -19,13 +19,15 @@ Bucket plugins:
   - "on_chan_sync", { chl }                  - after joining a channel
   - "on_connect", {}                         - when connecting to IRC server (shortly after startup)
   - "on_disconnect", {}                      - when disconnecting (just before quitting)
-  - "on_join", { who }                       - when joinin a channel
+  - "on_join", { who, chl }                  - when someone joins a channel
   - "on_kick", { kicker, chl, kickee, desc } - someone was kicked
   - "onload", { name }                       - when ANY plugin is loaded
   - "on_msg", \%bag                          - when PMed
   - "on_nick", { who, newnick }              - when someone changes nick
   - "on_notice", { who, msg }                - when seeing a notice
+  - "on_part", { who, chl }                  - when someone parts a channel
   - "on_public", \%bag                       - on public messages
+  - "on_quit", { who }                       - when someone quits IRC
   - "on_topic": { chl, topic }               - when topic is changed
   - "pre_expand": { \$msg }                  - before variables are interpolated in tidbit
   - "say", { chl, text }                     - when WE say anything
