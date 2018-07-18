@@ -189,6 +189,7 @@ POE::Session->create(
         _start           => \&irc_start,
         irc_001          => \&irc_on_connect,
         irc_kick         => \&irc_on_kick,
+        irc_quit         => \&irc_on_quit,
         irc_public       => \&irc_on_public,
         irc_ctcp_action  => \&irc_on_public,
         irc_msg          => \&irc_on_public,
@@ -196,6 +197,7 @@ POE::Session->create(
         irc_disconnected => \&irc_on_disconnect,
         irc_topic        => \&irc_on_topic,
         irc_join         => \&irc_on_join,
+        irc_part         => \&irc_on_part,
         irc_332          => \&irc_on_jointopic,
         irc_331          => \&irc_on_jointopic,
         irc_nick         => \&irc_on_nick,
@@ -269,6 +271,14 @@ sub irc_on_kick {
         op   => 1,
         type => 'irc_kick',
     );
+}
+
+sub irc_on_quit {
+    my ($quitter) = split /!/, $_[ARG0];
+
+    return if &signal_plugin( "on_quit", {who => $quitter} );
+
+    delete $stats{users}{genders}{lc $quitter};
 }
 
 sub irc_on_public {
@@ -2478,12 +2488,22 @@ sub irc_on_jointopic {
 
 sub irc_on_join {
     my ($who) = split /!/, $_[ARG0];
+    my $chl = $_[ARG1];
 
-    return if &signal_plugin( "on_join", {who => $who} );
+    return if &signal_plugin( "on_join", {who => $who, chl => $chl} );
 
     return if exists $stats{users}{genders}{lc $who};
 
     &load_gender($who);
+}
+
+sub irc_on_part {
+    my ($who) = split /!/, $_[ARG0];
+    my $chl = $_[ARG1];
+
+    return if &signal_plugin( "on_part", {who => $who, chl => $chl} );
+
+    delete $stats{users}{genders}{lc who};
 }
 
 sub irc_on_chan_sync {
