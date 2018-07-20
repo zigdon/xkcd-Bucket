@@ -2503,7 +2503,7 @@ sub irc_on_part {
 
     return if &signal_plugin( "on_part", {who => $who, chl => $chl} );
 
-    delete $stats{users}{genders}{lc who};
+    delete $stats{users}{genders}{lc $who};
 }
 
 sub irc_on_chan_sync {
