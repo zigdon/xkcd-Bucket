@@ -725,8 +725,9 @@ sub irc_on_public {
                 );
             } else {
                 &say( $chl =>
-                        "Sorry, $bag{who}, that's an invalid undo structure."
-                      . "  Tell Zigdon, please." );
+                        "Sorry, $bag{who}, that's an invalid undo structure. "
+                      . "Please tell Zigdon, or report the command used at "
+                      . "https://github.com/zigdon/xkcd-Bucket/issues/new" );
             }
 
         } elsif ( $undo->[0] eq 'edit' ) {
@@ -758,8 +759,9 @@ sub irc_on_public {
                 &say( $chl => "Okay, $bag{who}, undone $undo->[3]." );
             } else {
                 &say( $chl =>
-                        "Sorry, $bag{who}, that's an invalid undo structure."
-                      . "  Tell Zigdon, please." );
+                        "Sorry, $bag{who}, that's an invalid undo structure. "
+                      . "Please tell Zigdon, or report the command used at "
+                      . "https://github.com/zigdon/xkcd-Bucket/issues/new" );
             }
             delete $undo{$uchannel};
         } else {
