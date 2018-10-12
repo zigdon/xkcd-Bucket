@@ -1508,9 +1508,6 @@ sub db_success {
             if ( $fact eq 'you' and $verb eq 'are' ) {
                 $fact = $nick;
                 $verb = "is";
-            } elsif ( $fact eq 'I' and $verb eq 'am' ) {
-                $fact = $bag{who};
-                $verb = "is";
             }
 
             $stats{learn}++;
