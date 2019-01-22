@@ -271,12 +271,19 @@ sub irc_on_kick {
         op   => 1,
         type => 'irc_kick',
     );
+
+    delete $stats{users}{$chl}{$kickee};
 }
 
 sub irc_on_quit {
     my ($quitter) = split /!/, $_[ARG0];
 
     return if &signal_plugin( "on_quit", {who => $quitter} );
+
+    foreach my $chl (keys %{$stats{users}}) {
+        next if $chl !~ /^#/;
+        delete $stats{users}{$chl}{$quitter};
+    }
 
     delete $stats{users}{genders}{lc $quitter};
 }
@@ -2471,6 +2478,11 @@ sub irc_on_nick {
 
     return if &signal_plugin( "on_nick", {who => $who, newnick => $newnick} );
 
+    foreach my $chl (keys %{$stats{users}}) {
+        next if $chl !~ /^#/ or not exists $stats{users}{$chl}{$who};
+        $stats{users}{$chl}{$newnick} = delete $stats{users}{$chl}{$who};
+    }
+
     return unless exists $stats{users}{genders}{lc $who};
     $stats{users}{genders}{lc $newnick} =
       delete $stats{users}{genders}{lc $who};
@@ -2502,6 +2514,8 @@ sub irc_on_part {
     my $chl = $_[ARG1];
 
     return if &signal_plugin( "on_part", {who => $who, chl => $chl} );
+
+    delete $stats{users}{$chl}{$who};
 
     delete $stats{users}{genders}{lc $who};
 }
