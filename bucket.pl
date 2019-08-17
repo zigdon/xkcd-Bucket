@@ -618,7 +618,7 @@ sub irc_on_public {
         &talking( $chl, -1 );
     } elsif ( $addressed
         and $operator
-        and $bag{msg} =~ /^(join|part) (#[-\w]+)(?: (.*))?/i )
+        and $bag{msg} =~ /^(join|part) (#\S+)(?: (.*))?/i )
     {
         my ( $cmd, $dst, $msg ) = ( $1, $2, $3 );
         unless ($dst) {
