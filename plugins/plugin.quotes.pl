@@ -1,6 +1,6 @@
 # BUCKET PLUGIN
 
-use BucketBase qw/say say_long Log Report config save post/;
+use BucketBase qw/say say_long Log Report config save post sql/;
 
 my %history;
 
@@ -41,6 +41,14 @@ sub commands {
             editable  => 0,
             re        => qr/^remember (\S+) ([^<>]+)$/i,
             callback  => \&quote
+        },
+        {
+            label     => 'random quote',
+            addressed => 1,
+            operator  => 0,
+            editable  => 0,
+            re        => qr/^random quote$/i,
+            callback  => \&random_quote
         },
     );
 }
@@ -179,5 +187,25 @@ sub quote {
             ack       => "Okay, $bag->{who}, remembering \"$match->[2]\".",
         },
         EVENT => 'db_success'
+    );
+}
+
+sub random_quote {
+    my $bag = shift;
+    &Log("Looking up a random quote")
+    &sql(
+        "select id, fact, verb, tidbit from bucket_facts
+          where fact like '% quotes' order by rand(" . int( rand(1e6) ) . ') limit 1',
+        [],
+        {
+            %$bag,
+            cmd       => "fact",
+            orig      => $bag->{orig} || $bag->{msg},
+            addressed => $bag->{addressed} || 0,
+            editable  => $bag->{editable} || 0,
+            op        => $bag->{op} || 0,
+            type      => $bag->{type} || "irc_public",
+            db_type   => 'SINGLE',
+        }
     );
 }
