@@ -93,6 +93,7 @@ my %config_keys = (
     inventory_preload        => [ i => 0 ],
     inventory_size           => [ i => 20 ],
     item_drop_rate           => [ i => 3 ],
+    literal_page_max         => [ i => 10],
     lookup_tla               => [ i => 10 ],
     max_sub_length           => [ i => 80 ],
     minimum_length           => [ i => 6 ],
@@ -2237,7 +2238,7 @@ sub db_success {
             return;
         }
 
-        if ( $bag{page} ne "*" and $bag{page} > 10 ) {
+        if ( $bag{page} ne "*" and $bag{page} > &config("literal_page_max") ) {
             $bag{page} = "*";
         }
 
