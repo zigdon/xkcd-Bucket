@@ -2730,27 +2730,14 @@ sub heartbeat {
 
     $stats{last_idle_time}{$chl} = time;
 
+    # List of potential sources of random content - New entries should look like:
+    # Key => [ RSS URL, Processing regexp, tag for attribution link. Example:
+    #   MLIA => [
+    #       "http://feeds.feedburner.com/mlia", qr/MLIA.*/,
+    #       "feedburner:origLink"
+    #   ],
+
     my %sources = (
-        MLIA => [
-            "http://feeds.feedburner.com/mlia", qr/MLIA.*/,
-            "feedburner:origLink"
-        ],
-        SMDS => [
-            "http://twitter.com/statuses/user_timeline/62581962.rss",
-            qr/^shitmydadsays: "|"$/, "link"
-        ],
-        FAPSB => [
-            "http://twitter.com/statuses/user_timeline/83883736.rss",
-            qr/^FakeAPStylebook: /, "link"
-        ],
-        FAF => [
-            "http://twitter.com/statuses/user_timeline/14062390.rss",
-            qr/^fakeanimalfacts: |http:.*/, "link"
-        ],
-        Batman => [
-            "http://twitter.com/statuses/user_timeline/126881128.rss",
-            qr/^God_Damn_Batman: |http:.*/, "link"
-        ],
         factoid => 1
     );
     my $source = &config("idle_source");
