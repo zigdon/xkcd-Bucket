@@ -274,6 +274,10 @@ sub irc_on_kick {
     );
 
     delete $stats{users}{$chl}{$kickee};
+
+    if ( !@{$irc->nick_channels( $kickee )} ) {
+        delete $stats{users}{genders}{lc $who};
+    }
 }
 
 sub irc_on_quit {
@@ -2517,7 +2521,9 @@ sub irc_on_part {
 
     delete $stats{users}{$chl}{$who};
 
-    delete $stats{users}{genders}{lc $who};
+    if ( !@{$irc->nick_channels( $who )} ) {
+        delete $stats{users}{genders}{lc $who};
+    }
 }
 
 sub irc_on_chan_sync {
