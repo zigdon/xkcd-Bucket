@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS `genders` (
   `id` int(10) unsigned NOT NULL auto_increment,
   `nick` varchar(30) NOT NULL,
   `gender` enum('male','female','Androgynous','inanimate','full name') NOT NULL default 'Androgynous',
-  `stamp` timestamp NOT NULL default CURRENT_TIMESTAMP,
+  `stamp` timestamp NOT NULL default CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY  (`id`),
   UNIQUE KEY `nick` (`nick`)
 ) ENGINE=MyISAM  DEFAULT CHARSET=latin1;
