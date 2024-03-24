@@ -1292,8 +1292,8 @@ sub irc_on_public {
 
         Log "$bag{who} set ${target}'s gender to $gender";
         $stats{users}{genders}{lc $target} = lc $gender;
-        &sql( "replace genders (nick, gender, stamp) values (?, ?, ?)",
-            [ $target, $gender, undef ] );
+        &sql( "replace genders (nick, gender) values (?, ?)",
+            [ $target, $gender ] );
         &say( $chl => "Okay, $bag{who}" );
     } elsif ( $addressed
         and $bag{msg} =~ /^what is my gender\??$|^what gender am I\??/i )
