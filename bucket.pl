@@ -507,7 +507,7 @@ sub irc_on_public {
     {
         &unload_plugin( lc $1 );
         &say( $chl => "Okay, $bag{who}. Plugin $1 unloaded." );
-    } elsif ( $addressed and $bag{msg} =~ /^literal(?:\[([*\d]+)\])?\s+(.*)/i )
+    } elsif ( $addressed and $bag{msg} =~ /^literal(?:\[(\*|\d+)\])?\s+(.*)/i )
     {
         my ( $page, $fact ) = ( $1 || 1, $2 );
         $stats{literal}++;
@@ -2312,7 +2312,7 @@ sub db_success {
 
         my $answer;
         my $linelen = 400;
-        while ( $bag{page}-- ) {
+        while ( $bag{page}-- > 0 ) {
             $answer = "";
             while ( my $fact = shift @lines ) {
                 my $bit;
