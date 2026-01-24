@@ -1302,7 +1302,7 @@ sub irc_on_public {
             &say(
                 $chl => "$bag{who}: Grammatically, I refer to you as",
                 $stats{users}{genders}{lc $bag{who}} . ".  See",
-                "https://github.com/zigdon/xkcd-Bucket/wiki/Using-the-%23xkcd-bucket#gender for information on",
+                "https://github.com/CO2-Codes/xkcd-bucket-docs/blob/main/README.md#gender for information on",
                 "setting this."
             );
 
